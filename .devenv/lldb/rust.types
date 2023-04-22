@@ -1,0 +1,7 @@
+command script import .devenv/lldb/rust/chrono.py 
+
+type summary add -F chrono.naive_date chrono::naive::date::NaiveDate
+type summary add -F chrono.naive_time chrono::naive::time::NaiveTime
+type summary add -F chrono.naive_datetime chrono::naive::datetime::NaiveDateTime
+type summary add -F chrono.datetime_fixed chrono::datetime::DateTime<chrono::offset::fixed::FixedOffset>
+type summary add -F chrono.datetime_utc chrono::datetime::DateTime<chrono::offset::utc::Utc>
