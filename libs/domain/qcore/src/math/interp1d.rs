@@ -1,0 +1,6 @@
+mod _knots;
+mod lerp;
+mod traits;
+
+pub use lerp::Lerp1d;
+pub use traits::{DestructibleInterp1d, Interp1d, Interp1dBuilder};

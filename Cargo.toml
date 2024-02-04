@@ -1,0 +1,23 @@
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["libs/domain/qcore"] 
+
+[workspace.dependencies]
+# external
+anyhow = { version = "1.0.79"}
+approx = { version = "0.5.1" }
+chrono = { version = "0.4.33", features = ["serde"] }
+num = { version = "0.4.1" }
+rstest = { version = "0.18.2" }
+rstest_reuse ={ version = "0.6.0" }
+rust_decimal = { version = "1.34.2" }
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = { version = "1.0.113" }
+static_assertions = { version = "1.1.0" }
+thiserror = { version = "1.0.56" }
+
+# internal
+qcore = { path = "libs/domain/qcore" }
