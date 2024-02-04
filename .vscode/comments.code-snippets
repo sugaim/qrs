@@ -1,28 +1,62 @@
 {
-	// Place your qrs workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
-	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
-	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is 
-	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are: 
-	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. 
-	// Placeholders with the same ids are connected.
-	// Example:
-	// "Print to console": {
-	// 	"scope": "javascript,typescript",
-	// 	"prefix": "log",
-	// 	"body": [
-	// 		"console.log('$1');",
-	// 		"$2"
-	// 	],
-	// 	"description": "Log output to console"
-	// }
-	"Header for categorized codes": {
+	"Struct name block": {
 		"scope": "rust",
-		"prefix": "categorized",
+		"prefix": "bname",
 		"body": [
-			"// -----------------------------------------------------------------------------",
-			"// $0",
 			"// -----------------------------------------------------------------------------"
+			"// $0",
+			"//"
 		],
-		"description": "Header for categorized codes"
+		"description": "name block for structs"
+	},
+	"Constructor block": {
+		"scope": "rust",
+		"prefix": "bctor",
+		"body": [
+			"//",
+			"// construction",
+			"//",
+		],
+		"description": "constructor block"
+	},
+	"Display block": {
+		"scope": "rust",
+		"prefix": "bdisp",
+		"body": [
+			"//",
+			"// display, serde",
+			"//",
+		],
+		"description": "display block"
+	},
+	"Comparison block": {
+		"scope": "rust",
+		"prefix": "bcomp",
+		"body": [
+			"//",
+			"// comparison",
+			"//",
+		],
+		"description": "comparison block"
+	},
+	"Method block": {
+		"scope": "rust",
+		"prefix": "bmethod",
+		"body": [
+			"//",
+			"// methods",
+			"//",
+		],
+		"description": "method block"
+	},
+	"Operator block": {
+		"scope": "rust",
+		"prefix": "bop",
+		"body": [
+			"//",
+			"// operators",
+			"//",
+		],
+		"description": "operator block"
 	},
 }

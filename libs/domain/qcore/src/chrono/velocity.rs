@@ -5,6 +5,10 @@ use crate::math::num::{Arithmetic, FloatBased, Scalar, Vector};
 
 use super::Duration;
 
+// -----------------------------------------------------------------------------
+// Velocity
+//
+
 /// A velocity, which is a change per given duration.
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct Velocity<V> {
@@ -23,41 +27,9 @@ fn _dur2cnt<T: num::Float + Arithmetic>(dur: Duration) -> T {
         + T::from(dur.subsec_nanos()).unwrap() / T::from(1_000_000_000).unwrap()
 }
 
-// -----------------------------------------------------------------------------
-// Construction, Conversion
-// -----------------------------------------------------------------------------
-impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
-    /// Create a new velocity.
-    /// Note that this function does not check if the duration is zero.
-    #[inline]
-    pub fn new(chg: V, dur: Duration) -> Self {
-        if dur.is_zero() {
-            return Self {
-                chg,
-                is_diverged: true,
-            };
-        }
-        Self {
-            chg: if dur == _unit_time() {
-                chg
-            } else {
-                chg / &_dur2cnt(dur)
-            },
-            is_diverged: false,
-        }
-    }
-
-    /// Create a new velocity.
-    /// If the duration is zero, this function returns `None`.
-    #[inline]
-    pub fn safe_new(chg: V, dur: Duration) -> Option<Self> {
-        if dur.is_zero() {
-            None
-        } else {
-            Some(Self::new(chg, dur))
-        }
-    }
-}
+//
+// display, serde
+//
 
 impl<'de, V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Velocity<V>
 where
@@ -102,6 +74,42 @@ impl<'de, V: FloatBased + Vector<V::BaseFloat> + Deserialize<'de>> Deserialize<'
     }
 }
 
+//
+// construction
+//
+impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
+    /// Create a new velocity.
+    /// Note that this function does not check if the duration is zero.
+    #[inline]
+    pub fn new(chg: V, dur: Duration) -> Self {
+        if dur.is_zero() {
+            return Self {
+                chg,
+                is_diverged: true,
+            };
+        }
+        Self {
+            chg: if dur == _unit_time() {
+                chg
+            } else {
+                chg / &_dur2cnt(dur)
+            },
+            is_diverged: false,
+        }
+    }
+
+    /// Create a new velocity.
+    /// If the duration is zero, this function returns `None`.
+    #[inline]
+    pub fn safe_new(chg: V, dur: Duration) -> Option<Self> {
+        if dur.is_zero() {
+            None
+        } else {
+            Some(Self::new(chg, dur))
+        }
+    }
+}
+
 impl<V: FloatBased + Vector<V::BaseFloat>> Zero for Velocity<V> {
     #[inline]
     fn zero() -> Self {
@@ -117,9 +125,9 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Zero for Velocity<V> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Compare
-// -----------------------------------------------------------------------------
+//
+// comparison
+//
 impl<V: PartialEq + FloatBased + Vector<V::BaseFloat>> PartialEq for Velocity<V> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -140,9 +148,9 @@ impl<V: PartialOrd + FloatBased + Vector<V::BaseFloat>> PartialOrd for Velocity<
     }
 }
 
-// -----------------------------------------------------------------------------
-// Other
-// -----------------------------------------------------------------------------
+//
+// methods
+//
 impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
     /// Get the change per given duration.
     ///
@@ -188,9 +196,9 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Arithmetic
-// -----------------------------------------------------------------------------
+//
+// operators
+//
 // neg
 impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Neg for Velocity<V> {
     type Output = Self;
@@ -334,6 +342,7 @@ impl<K: Scalar, V: Vector<K>> std::ops::DivAssign<&K> for Velocity<V> {
     }
 }
 
+// =============================================================================
 #[cfg(test)]
 mod tests {
     use approx::assert_abs_diff_eq;

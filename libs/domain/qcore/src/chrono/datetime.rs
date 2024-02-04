@@ -7,6 +7,10 @@ use std::{
 use chrono::{format::DelayedFormat, TimeZone};
 use serde::{Deserialize, Serialize};
 
+// -----------------------------------------------------------------------------
+// DateTime
+//
+
 /// Thin wrapper around [chrono::DateTime] to override some traits
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DateTime<Tz: chrono::TimeZone> {
@@ -15,9 +19,9 @@ pub struct DateTime<Tz: chrono::TimeZone> {
 
 impl<Tz: TimeZone> Copy for DateTime<Tz> where Tz::Offset: Copy {}
 
-// -----------------------------------------------------------------------------
-// Display, Serde
-// -----------------------------------------------------------------------------
+//
+// display, serde
+//
 impl<Tz: TimeZone> Debug for DateTime<Tz> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -78,9 +82,9 @@ where
     }
 }
 
-// -----------------------------------------------------------------------------
-// Constructors, Converters
-// -----------------------------------------------------------------------------
+//
+// construction
+//
 impl<Tz: TimeZone> From<chrono::DateTime<Tz>> for DateTime<Tz> {
     #[inline]
     fn from(internal: chrono::DateTime<Tz>) -> Self {
@@ -114,9 +118,9 @@ where
     }
 }
 
-// -----------------------------------------------------------------------------
-// Accessors
-// -----------------------------------------------------------------------------
+//
+// getters
+//
 impl<Tz: TimeZone> chrono::Datelike for DateTime<Tz> {
     #[inline]
     fn year(&self) -> i32 {
@@ -183,6 +187,7 @@ impl<Tz: TimeZone> chrono::Datelike for DateTime<Tz> {
         self.internal.with_ordinal0(ordinal0).map(|dt| dt.into())
     }
 }
+
 impl<Tz: TimeZone> chrono::Timelike for DateTime<Tz> {
     #[inline]
     fn hour(&self) -> u32 {
@@ -344,9 +349,9 @@ impl<Tz: TimeZone> DateTime<Tz> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Arithmetic
-// -----------------------------------------------------------------------------
+//
+// operators
+//
 impl<Tz: TimeZone> Sub for DateTime<Tz> {
     type Output = super::Duration;
 

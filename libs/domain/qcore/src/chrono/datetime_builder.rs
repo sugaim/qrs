@@ -1,5 +1,9 @@
 use chrono::{NaiveDate, NaiveTime, TimeZone};
 
+// -----------------------------------------------------------------------------
+// DateTimeBuilder
+//
+
 /// A builder for creating a `qcore::chrono::DateTime`.
 ///
 /// # Example
@@ -23,9 +27,9 @@ pub struct DateTimeBuilder<D, T, Tz> {
 
 pub type DateToDateTime<Tz> = DateTimeBuilder<NaiveDate, (), Tz>;
 
-// -----------------------------------------------------------------------------
-// Constructors
-// -----------------------------------------------------------------------------
+//
+// construction
+//
 impl Default for DateTimeBuilder<(), (), ()> {
     #[inline]
     fn default() -> Self {
@@ -44,9 +48,9 @@ impl DateTimeBuilder<(), (), ()> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Set
-// -----------------------------------------------------------------------------
+//
+// setters
+//
 impl<D, Tz> DateTimeBuilder<D, (), Tz> {
     /// Set time to the builder.
     /// Available types are implementations of [chrono::Timelike].
@@ -297,9 +301,9 @@ impl<D, T> DateTimeBuilder<D, T, ()> {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Build
-// -----------------------------------------------------------------------------
+//
+// build
+//
 impl<Tz: TimeZone> DateTimeBuilder<NaiveDate, NaiveTime, Tz> {
     /// Build a `DateTime` from the builder with stored date, time and timezone.
     /// This methos is available only after setting date, time and timezone.

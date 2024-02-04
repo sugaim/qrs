@@ -11,15 +11,19 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use super::Velocity;
 
+// -----------------------------------------------------------------------------
+// Duration
+//
+
 /// Thin wrapper around `chrono::Duration` to override some traits.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Duration {
     internal: chrono::Duration,
 }
 
-// -----------------------------------------------------------------------------
-// Display, Serde
-// -----------------------------------------------------------------------------
+//
+// display, serde
+//
 impl Debug for Duration {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -34,9 +38,31 @@ impl Display for Duration {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Constructors, Converters
-// -----------------------------------------------------------------------------
+impl Serialize for Duration {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Duration {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+//
+// construction
+//
 impl Zero for Duration {
     #[inline]
     fn zero() -> Self {
@@ -237,28 +263,6 @@ fn _parse_dur_sec(s_time: &str) -> Result<(Duration, &str), anyhow::Error> {
     ))
 }
 
-impl Serialize for Duration {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = self.to_string();
-        serializer.serialize_str(&s)
-    }
-}
-
-impl<'de> Deserialize<'de> for Duration {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
-    }
-}
-
 impl Duration {
     /// Same as [chrono::Duration::zero].
     ///
@@ -397,9 +401,9 @@ impl Duration {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Accessors
-// -----------------------------------------------------------------------------
+//
+// getters
+//
 impl Duration {
     /// Returns the internal [chrono::Duration] reference.
     ///
@@ -557,9 +561,9 @@ impl Duration {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Arithmetic
-// -----------------------------------------------------------------------------
+//
+// operators
+//
 impl std::ops::Neg for Duration {
     type Output = Duration;
 
@@ -706,6 +710,7 @@ macro_rules! define_div_to_velocity {
 define_div_to_velocity!(f32);
 define_div_to_velocity!(f64);
 
+// =============================================================================
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
