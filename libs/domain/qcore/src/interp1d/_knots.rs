@@ -49,7 +49,7 @@ impl<G: PartialOrd, V> Knots<G, V> {
     ///
     /// # Examples
     /// ```ignore
-    /// use qcore::math::interp1d::lerp::Knots;
+    /// use qcore::interp1d::lerp::Knots;
     ///
     /// let knots = Knots::new(vec![0, 10, 20], vec![0, 1, 2]).unwrap();
     ///

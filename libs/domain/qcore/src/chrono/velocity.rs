@@ -1,7 +1,7 @@
 use num::{One, Zero};
 use serde::{Deserialize, Serialize};
 
-use crate::math::num::{Arithmetic, FloatBased, Scalar, Vector};
+use crate::num::{Arithmetic, FloatBased, Scalar, Vector};
 
 use super::Duration;
 

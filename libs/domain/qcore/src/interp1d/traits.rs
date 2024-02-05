@@ -1,4 +1,4 @@
-use crate::math::func1d::Func1d;
+use crate::func1d::Func1d;
 
 /// Trait for 1-dimensional interpolation.
 pub trait Interp1d {

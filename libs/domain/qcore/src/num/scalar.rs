@@ -9,7 +9,7 @@ use super::{Exp, Log, TotalCmpForSort};
 ///
 /// # Example
 /// ```
-/// use qcore::math::num::Arithmetic;
+/// use qcore::num::Arithmetic;
 /// use static_assertions::assert_impl_all;
 ///
 /// // integer types
@@ -80,7 +80,7 @@ impl<T: num::Float + Arithmetic> FloatBased for num::Complex<T> {
 ///
 /// # Example
 /// ```
-/// use qcore::math::num::Scalar;
+/// use qcore::num::Scalar;
 /// use static_assertions::assert_impl_all;
 ///
 /// assert_impl_all!(f32: Scalar);

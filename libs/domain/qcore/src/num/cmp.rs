@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 /// # Examples
 /// ```
 /// use std::cmp::Ordering;
-/// use qcore::math::num::TotalCmpForSort;
+/// use qcore::num::TotalCmpForSort;
 ///
 /// // ordinary comparison
 /// assert_eq!(TotalCmpForSort::total_cmp_for_sort(&1.0, &2.0), Ordering::Less);

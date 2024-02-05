@@ -3,7 +3,7 @@ use std::ops::{Div, Sub};
 use num::{One, Zero};
 use serde::{Deserialize, Serialize};
 
-use crate::math::{
+use crate::{
     func1d::{Func1dDer1, Func1dDer2},
     num::{RelPos, Vector},
 };
