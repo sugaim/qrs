@@ -1,12 +1,15 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, VecDeque},
     fmt::Display,
     sync::{Mutex, Weak},
 };
 
 use derivative::Derivative;
+use dyn_clone::DynClone;
 use serde::Serialize;
 use uuid::Uuid;
+
+use super::{Convert, Map, MapErr, WithLogger};
 
 // -----------------------------------------------------------------------------
 // NodeId
@@ -177,6 +180,56 @@ impl NodeInfo {
 }
 
 // -----------------------------------------------------------------------------
+// StateRecorder
+//
+#[derive(Debug)]
+pub struct StateRecorder<K> {
+    max: Option<u64>,
+    data: Mutex<VecDeque<(K, NodeStateId)>>,
+}
+
+//
+// construction
+//
+impl<K> StateRecorder<K> {
+    pub fn new(max_capacity: Option<u64>) -> Self {
+        Self {
+            max: max_capacity,
+            data: Mutex::new(VecDeque::new()),
+        }
+    }
+}
+
+//
+// methods
+//
+impl<K: Eq + Clone> StateRecorder<K> {
+    /// Get the state id of the node with the given key.
+    ///
+    /// - `Ok`: when state is already recorded
+    /// - `Err`: when state is not recorded. New state id is generated and returned.
+    pub fn get_or_gen(&self, key: &K) -> Result<NodeStateId, NodeStateId> {
+        let mut data = self.data.lock().unwrap();
+        if let Some(id) = data.iter().rev().find(|(k, _)| k == key).map(|(_, id)| *id) {
+            return Ok(id);
+        }
+        let new = NodeStateId::gen();
+        data.push_back((key.clone(), new));
+        if let Some(max) = self.max {
+            let max = max as usize;
+            while max < data.len() {
+                data.pop_front();
+            }
+        }
+        Err(new)
+    }
+
+    pub fn get_or_gen_unwrapped(&self, key: &K) -> NodeStateId {
+        self.get_or_gen(key).unwrap_or_else(|id| id)
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Tree
 //
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
@@ -225,9 +278,157 @@ pub trait Node: 'static {
 // -----------------------------------------------------------------------------
 // DataSrc
 //
-pub trait DataSrc<K: ?Sized>: Clone + Node {
+pub trait DataSrc<K: ?Sized>: DynClone + Node {
     type Output;
     type Err;
 
+    /// Request data with the given key
+    /// In addition to the data, the state id of the node is also returned.
+    ///
+    /// - `Ok`: when the data is successfully retrieved
+    /// - `Err`: when the data is not found or some error occurred
     fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err>;
+
+    /// Map the output of this data source
+    fn map<F>(self, f: F, desc: impl Into<String>) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Output) -> Self::Output + 'static,
+    {
+        Map::new(desc, self, f)
+    }
+
+    /// Map the error of this data source
+    fn map_err<F, E>(self, f: F, desc: impl Into<String>) -> MapErr<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Err) -> E + 'static,
+    {
+        MapErr::new(desc, self, f)
+    }
+
+    /// Convert the output and error of this data source
+    fn convert<F, O, E>(self, f: F, desc: impl Into<String>) -> Convert<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
+    {
+        Convert::new(desc, self, f)
+    }
+
+    /// Add a logger to data source
+    fn with_logger<L>(self, logger: L, desc: impl Into<String>) -> WithLogger<Self, L>
+    where
+        Self: Sized,
+        L: Fn(&K, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
+    {
+        WithLogger::new(desc, self, logger)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// DataSrc2Args
+//
+pub trait DataSrc2Args<K1: ?Sized, K2: ?Sized>: DynClone + Node {
+    type Output;
+    type Err;
+
+    /// Request data with the given keys
+    /// In addition to the data, the state id of the node is also returned.
+    ///
+    /// - `Ok`: when the data is successfully retrieved
+    /// - `Err`: when the data is not found or some error occurred
+    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err>;
+
+    /// Map the output of this data source
+    fn map<F>(self, f: F, desc: impl Into<String>) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Output) -> Self::Output + 'static,
+    {
+        Map::new(desc, self, f)
+    }
+
+    /// Map the error of this data source
+    fn map_err<F, E>(self, f: F, desc: impl Into<String>) -> MapErr<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Err) -> E + 'static,
+    {
+        MapErr::new(desc, self, f)
+    }
+
+    /// Convert the output and error of this data source
+    fn convert<F, O, E>(self, f: F, desc: impl Into<String>) -> Convert<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
+    {
+        Convert::new(desc, self, f)
+    }
+
+    /// Add a logger to data source
+    fn with_logger<L>(self, logger: L, desc: impl Into<String>) -> WithLogger<Self, L>
+    where
+        Self: Sized,
+        L: Fn(&K1, &K2, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
+    {
+        WithLogger::new(desc, self, logger)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// DataSrc3Args
+//
+pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
+    type Output;
+    type Err;
+
+    /// Request data with the given keys
+    /// In addition to the data, the state id of the node is also returned.
+    ///
+    /// - `Ok`: when the data is successfully retrieved
+    /// - `Err`: when the data is not found or some error occurred
+    fn req(
+        &self,
+        key1: &K1,
+        key2: &K2,
+        key3: &K3,
+    ) -> Result<(NodeStateId, Self::Output), Self::Err>;
+
+    /// Map the output of this data source
+    fn map<F>(self, f: F, desc: impl Into<String>) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Output) -> Self::Output + 'static,
+    {
+        Map::new(desc, self, f)
+    }
+
+    /// Map the error of this data source
+    fn map_err<F, E>(self, f: F, desc: impl Into<String>) -> MapErr<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Err) -> E + 'static,
+    {
+        MapErr::new(desc, self, f)
+    }
+
+    /// Convert the output and error of this data source
+    fn convert<F, O, E>(self, f: F, desc: impl Into<String>) -> Convert<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
+    {
+        Convert::new(desc, self, f)
+    }
+
+    /// Add a logger to data source
+    fn with_logger<L>(self, logger: L, desc: impl Into<String>) -> WithLogger<Self, L>
+    where
+        Self: Sized,
+        L: Fn(&K1, &K2, &K3, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
+    {
+        WithLogger::new(desc, self, logger)
+    }
 }

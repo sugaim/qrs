@@ -294,12 +294,15 @@ impl Calendar {
     /// use qcore::chrono::Calendar;
     /// use chrono::NaiveDate;
     ///
-    /// let cal = Calendar::new(
-    ///     vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
-    ///     vec![],
-    ///     NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
-    ///     NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
-    /// ).unwrap();
+    /// let cal = Calendar::builder()
+    ///     .with_valid_period(
+    ///         NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+    ///         NaiveDate::from_ymd_opt(2021, 1, 10).unwrap()
+    ///     )
+    ///     .with_extra_holidays(vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()])
+    ///     .with_extra_business_days(vec![])
+    ///     .build()
+    ///     .unwrap();
     ///
     /// let mut iter = cal.iter_bizdays(NaiveDate::from_ymd_opt(2021, 1, 1).unwrap());
     ///
@@ -332,12 +335,15 @@ impl Calendar {
     /// use qcore::chrono::Calendar;
     /// use chrono::NaiveDate;
     ///
-    /// let cal = Calendar::new(
-    ///     vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
-    ///     vec![],
-    ///     NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
-    ///     NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
-    /// ).unwrap();
+    /// let cal = Calendar::builder()
+    ///     .with_valid_period(
+    ///         NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+    ///         NaiveDate::from_ymd_opt(2021, 1, 10).unwrap()
+    ///     )
+    ///     .with_extra_holidays(vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()])
+    ///     .with_extra_business_days(vec![])
+    ///     .build()
+    ///     .unwrap();
     ///
     /// let mut iter = cal.iter_holidays(NaiveDate::from_ymd_opt(2021, 1, 1).unwrap());
     /// assert_eq!(iter.next(), Some(NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()));

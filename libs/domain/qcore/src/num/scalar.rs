@@ -2,8 +2,6 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssi
 
 use num::{One, Zero};
 
-use crate::datasrc::CacheKeyWorkaround;
-
 use super::{Exp, Log};
 
 /// Trait for arithmetic operations.
@@ -89,22 +87,12 @@ impl<T: num::Float + Arithmetic> FloatBased for num::Complex<T> {
 /// assert_impl_all!(f64: Scalar);
 /// ```
 pub trait Scalar:
-    Arithmetic
-    + FloatBased
-    + CacheKeyWorkaround
-    + From<Self::BaseFloat>
-    + Exp<Output = Self>
-    + Log<Output = Self>
+    Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
 {
 }
 
 impl<T> Scalar for T where
-    T: Arithmetic
-        + FloatBased
-        + CacheKeyWorkaround
-        + From<Self::BaseFloat>
-        + Exp<Output = Self>
-        + Log<Output = Self>
+    T: Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
 {
 }
 

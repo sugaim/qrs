@@ -161,8 +161,9 @@ impl<S: DataSrc<str, Output = Calendar>> DataSrc<CalendarSymbol> for CalendarSrc
 
 impl<S: TakeSnapshot<str, Output = Calendar>> TakeSnapshot<CalendarSymbol> for CalendarSrc<S> {
     type SnapShot = CalendarSrc<S::SnapShot>;
+    type SnapShotErr = S::SnapShotErr;
 
-    fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, S::Err>
+    fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = &'a CalendarSymbol>,
         CalendarSymbol: 'a,
