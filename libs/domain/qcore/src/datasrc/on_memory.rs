@@ -68,7 +68,7 @@ impl<K: 'static, V: 'static> Node for ImmutableOnMemorySrc<K, V> {
 
     /// This node does not depend on other nodes, so this method does nothing.
     #[inline]
-    fn accept_state(&self, _: &NodeId, _: &NodeStateId) {}
+    fn subscribe(&self, _: &NodeId, _: &NodeStateId) {}
 }
 
 impl<Q, K, V> DataSrc<Q> for ImmutableOnMemorySrc<K, V>
@@ -204,7 +204,7 @@ impl<K1: 'static, K2: 'static, V: 'static> Node for ImmutableOnMemorySrc2Args<K1
 
     /// This node does not depend on other nodes, so this method does nothing.
     #[inline]
-    fn accept_state(&self, _: &NodeId, _: &NodeStateId) {}
+    fn subscribe(&self, _: &NodeId, _: &NodeStateId) {}
 }
 
 impl<Q1, Q2, K1, K2, V> DataSrc2Args<Q1, Q2> for ImmutableOnMemorySrc2Args<K1, K2, V>
@@ -364,7 +364,7 @@ impl<K1: 'static, K2: 'static, K3: 'static, V: 'static> Node
 
     /// This node does not depend on other nodes, so this method does nothing.
     #[inline]
-    fn accept_state(&self, _: &NodeId, _: &NodeStateId) {}
+    fn subscribe(&self, _: &NodeId, _: &NodeStateId) {}
 }
 
 impl<Q1, Q2, Q3, K1, K2, K3, V> DataSrc3Args<Q1, Q2, Q3>
@@ -538,7 +538,7 @@ impl<K: 'static, V: 'static> Node for OnMemorySrc<K, V> {
 
     /// This node does not depend on other nodes, so this method does nothing.
     #[inline]
-    fn accept_state(&self, _: &NodeId, _: &NodeStateId) {}
+    fn subscribe(&self, _: &NodeId, _: &NodeStateId) {}
 }
 
 impl<Q, K, V> DataSrc<Q> for OnMemorySrc<K, V>
@@ -645,6 +645,16 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
     pub fn capacity(&self) -> usize {
         self._data().lock().unwrap().capacity()
     }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        let mut data = self._data().lock().unwrap();
+        if !data.is_empty() {
+            data.clear();
+            self._info().set_state(NodeStateId::gen());
+            self._info().notify_all();
+        }
+    }
 }
 
 impl<K: Eq + Hash, V> Extend<(K, V)> for OnMemorySrc<K, V> {
@@ -737,7 +747,7 @@ impl<K1: 'static, K2: 'static, V: 'static> Node for OnMemorySrc2Args<K1, K2, V> 
 
     /// This node does not depend on other nodes, so this method does nothing.
     #[inline]
-    fn accept_state(&self, _: &NodeId, _: &NodeStateId) {}
+    fn subscribe(&self, _: &NodeId, _: &NodeStateId) {}
 }
 
 impl<Q1, Q2, K1, K2, V> DataSrc2Args<Q1, Q2> for OnMemorySrc2Args<K1, K2, V>
@@ -874,6 +884,16 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
     pub fn capacity(&self) -> usize {
         self._data().lock().unwrap().capacity()
     }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        let mut data = self._data().lock().unwrap();
+        if !data.is_empty() {
+            data.clear();
+            self._info().set_state(NodeStateId::gen());
+            self._info().notify_all();
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -960,7 +980,7 @@ impl<K1: 'static, K2: 'static, K3: 'static, V: 'static> Node for OnMemorySrc3Arg
 
     /// This node does not depend on other nodes, so this method does nothing.
     #[inline]
-    fn accept_state(&self, _: &NodeId, _: &NodeStateId) {}
+    fn subscribe(&self, _: &NodeId, _: &NodeStateId) {}
 }
 
 impl<Q1, Q2, Q3, K1, K2, K3, V> DataSrc3Args<Q1, Q2, Q3> for OnMemorySrc3Args<K1, K2, K3, V>
@@ -1127,5 +1147,15 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
     #[inline]
     pub fn capacity(&self) -> usize {
         self._data().lock().unwrap().capacity()
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        let mut data = self._data().lock().unwrap();
+        if !data.is_empty() {
+            data.clear();
+            self._info().set_state(NodeStateId::gen());
+            self._info().notify_all();
+        }
     }
 }

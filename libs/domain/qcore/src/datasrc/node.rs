@@ -154,7 +154,7 @@ impl NodeInfo {
         let mut children = self.children.lock().unwrap();
         children.retain(|child| match &child.upgrade() {
             Some(child) => {
-                child.accept_state(&id, &state);
+                child.subscribe(&id, &state);
                 true
             }
             None => false,
@@ -209,6 +209,9 @@ impl<K: Eq + Clone> StateRecorder<K> {
     /// - `Ok`: when state is already recorded
     /// - `Err`: when state is not recorded. New state id is generated and returned.
     pub fn get_or_gen(&self, key: &K) -> Result<NodeStateId, NodeStateId> {
+        if self.max == Some(0) {
+            return Err(NodeStateId::gen());
+        }
         let mut data = self.data.lock().unwrap();
         if let Some(id) = data.iter().rev().find(|(k, _)| k == key).map(|(_, id)| *id) {
             return Ok(id);
@@ -226,6 +229,10 @@ impl<K: Eq + Clone> StateRecorder<K> {
 
     pub fn get_or_gen_unwrapped(&self, key: &K) -> NodeStateId {
         self.get_or_gen(key).unwrap_or_else(|id| id)
+    }
+
+    pub fn clear(&self) {
+        self.data.lock().unwrap().clear();
     }
 }
 
@@ -272,7 +279,7 @@ pub trait Node: 'static {
     fn remove_subscriber(&self, subscriber: &NodeId);
 
     /// Behavior as subscriber. Accept the state changing event from the publisher
-    fn accept_state(&self, publisher: &NodeId, state: &NodeStateId);
+    fn subscribe(&self, publisher: &NodeId, state: &NodeStateId);
 }
 
 // -----------------------------------------------------------------------------
@@ -290,7 +297,7 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err>;
 
     /// Map the output of this data source
-    fn map<F>(self, f: F, desc: impl Into<String>) -> Map<Self, F>
+    fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
     where
         Self: Sized,
         F: Fn(Self::Output) -> Self::Output + 'static,
@@ -299,7 +306,7 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     }
 
     /// Map the error of this data source
-    fn map_err<F, E>(self, f: F, desc: impl Into<String>) -> MapErr<Self, F>
+    fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
     where
         Self: Sized,
         F: Fn(Self::Err) -> E + 'static,
@@ -308,7 +315,7 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     }
 
     /// Convert the output and error of this data source
-    fn convert<F, O, E>(self, f: F, desc: impl Into<String>) -> Convert<Self, F>
+    fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
     where
         Self: Sized,
         F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
@@ -317,7 +324,7 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     }
 
     /// Add a logger to data source
-    fn with_logger<L>(self, logger: L, desc: impl Into<String>) -> WithLogger<Self, L>
+    fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
         L: Fn(&K, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
@@ -341,7 +348,7 @@ pub trait DataSrc2Args<K1: ?Sized, K2: ?Sized>: DynClone + Node {
     fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err>;
 
     /// Map the output of this data source
-    fn map<F>(self, f: F, desc: impl Into<String>) -> Map<Self, F>
+    fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
     where
         Self: Sized,
         F: Fn(Self::Output) -> Self::Output + 'static,
@@ -350,7 +357,7 @@ pub trait DataSrc2Args<K1: ?Sized, K2: ?Sized>: DynClone + Node {
     }
 
     /// Map the error of this data source
-    fn map_err<F, E>(self, f: F, desc: impl Into<String>) -> MapErr<Self, F>
+    fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
     where
         Self: Sized,
         F: Fn(Self::Err) -> E + 'static,
@@ -359,7 +366,7 @@ pub trait DataSrc2Args<K1: ?Sized, K2: ?Sized>: DynClone + Node {
     }
 
     /// Convert the output and error of this data source
-    fn convert<F, O, E>(self, f: F, desc: impl Into<String>) -> Convert<Self, F>
+    fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
     where
         Self: Sized,
         F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
@@ -368,7 +375,7 @@ pub trait DataSrc2Args<K1: ?Sized, K2: ?Sized>: DynClone + Node {
     }
 
     /// Add a logger to data source
-    fn with_logger<L>(self, logger: L, desc: impl Into<String>) -> WithLogger<Self, L>
+    fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
         L: Fn(&K1, &K2, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
@@ -397,7 +404,7 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     ) -> Result<(NodeStateId, Self::Output), Self::Err>;
 
     /// Map the output of this data source
-    fn map<F>(self, f: F, desc: impl Into<String>) -> Map<Self, F>
+    fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
     where
         Self: Sized,
         F: Fn(Self::Output) -> Self::Output + 'static,
@@ -406,7 +413,7 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     }
 
     /// Map the error of this data source
-    fn map_err<F, E>(self, f: F, desc: impl Into<String>) -> MapErr<Self, F>
+    fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
     where
         Self: Sized,
         F: Fn(Self::Err) -> E + 'static,
@@ -415,7 +422,7 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     }
 
     /// Convert the output and error of this data source
-    fn convert<F, O, E>(self, f: F, desc: impl Into<String>) -> Convert<Self, F>
+    fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
     where
         Self: Sized,
         F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
@@ -424,7 +431,7 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     }
 
     /// Add a logger to data source
-    fn with_logger<L>(self, logger: L, desc: impl Into<String>) -> WithLogger<Self, L>
+    fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
         L: Fn(&K1, &K2, &K3, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,

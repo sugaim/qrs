@@ -90,100 +90,11 @@ pub fn derive_node(input: TokenStream) -> TokenStream {
                 self. #field_name .remove_subscriber(subscriber)
             }
             #[inline]
-            fn accept_state(&self, id: &#root ::datasrc::NodeId, state: &#root ::datasrc::NodeStateId) {
-                self. #field_name .accept_state(id, state)
+            fn subscribe(&self, id: &#root ::datasrc::NodeId, state: &#root ::datasrc::NodeStateId) {
+                self. #field_name .subscribe(id, state)
             }
         }
     ).into()
-}
-
-#[proc_macro_attribute]
-pub fn node_transparent(args: TokenStream, mut item: TokenStream) -> TokenStream {
-    let class = {
-        let item = item.clone();
-        syn::parse_macro_input!(item as DeriveInput)
-    };
-    let field_spec = parse_attrib_for_specify_field(args);
-    let (impl_generics, ty_generics, where_clause) = class.generics.split_for_impl();
-
-    let (field_name, field) = {
-        let Data::Struct(s) = &class.data else {
-            panic!("node_transparent can only be used on structs");
-        };
-        match (&s.fields, field_spec) {
-            (Fields::Unnamed(fs), None) => match fs.unnamed.len() {
-                1 => (quote!(0), fs.unnamed.first().unwrap()),
-                _ => panic!("node_transparent can only be used on tuple with a single field"),
-            },
-            (Fields::Unnamed(fs), Some(Either::Left(n))) => {
-                let field = fs.unnamed.iter().nth(n as usize).expect(
-                    format!("{n}-th field is specified as base node but it is not found").as_str(),
-                );
-                (quote!(#n), field)
-            }
-            (Fields::Named(fs), Some(Either::Right(name))) => {
-                let field = fs
-                    .named
-                    .iter()
-                    .find(|f| f.ident.as_ref() == Some(&name))
-                    .expect(
-                        format!("field named {name} is specified as base node but it is not found")
-                            .as_str(),
-                    );
-                (quote!(#name), field)
-            }
-            _ => panic!("mismatches between field specification and struct type"),
-        }
-    };
-
-    let Some(ty) = wrapped_type_of_arc(&field.ty) else {
-        panic!("node_transparent can only be used on field of type Arc<T>");
-    };
-    let crate_name = quote!(crate);
-    let mut where_clause = match where_clause {
-        Some(wc) => {
-            let mut wc = wc.clone();
-            let new_statement = match wc.predicates.len() {
-                0 => parse_quote!(where #ty: #crate_name ::datasrc::Node),
-                _ => parse_quote!(#ty: #crate_name ::datasrc::Node),
-            };
-            wc.predicates.push(new_statement);
-            wc
-        }
-        None => parse_quote!(where #ty: #crate_name ::datasrc::Node),
-    };
-    where_clause.predicates.push(parse_quote!(Self: 'static));
-
-    let name = class.ident;
-    let node_impl: TokenStream = quote!(
-        impl #impl_generics #crate_name ::datasrc::Node for #name #ty_generics #where_clause {
-            #[inline]
-            fn id(&self) -> #crate_name ::datasrc::NodeId {
-                self. #field_name .id()
-            }
-
-            #[inline]
-            fn tree(&self) -> #crate_name ::datasrc::Tree {
-                self.  #field_name .tree()
-            }
-
-            #[inline]
-            fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn #crate_name ::datasrc::Node>) -> #crate_name ::datasrc::NodeStateId {
-                self. #field_name .accept_subscriber(subscriber)
-            }
-
-            #[inline]
-            fn remove_subscriber(&self, subscriber: &#crate_name ::datasrc::NodeId) {
-                self. #field_name .remove_subscriber(subscriber)
-            }
-            #[inline]
-            fn accept_state(&self, id: &#crate_name ::datasrc::NodeId, state: &#crate_name ::datasrc::NodeStateId) {
-                self. #field_name .accept_state(id, state)
-            }
-        }
-    ).into();
-    item.extend(node_impl);
-    item
 }
 
 fn wrapped_type_of_arc(ty: &syn::Type) -> Option<syn::Type> {
@@ -208,35 +119,6 @@ fn wrapped_type_of_arc(ty: &syn::Type) -> Option<syn::Type> {
         _ => return None,
     };
     Some(ty.clone())
-}
-
-fn parse_attrib_for_specify_field(args: TokenStream) -> Option<Either<u16, Ident>> {
-    let args = syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated
-        .parse(args)
-        .unwrap();
-    let arg = match args.len() {
-        0 => return None,
-        1 => args
-            .first()
-            .unwrap()
-            .get_ident()
-            .expect("only identifier is allowed"),
-        _ => panic!("only one argument is allowed"),
-    };
-    if let Ok(n) = arg.to_string().parse() {
-        return Some(Either::Left(n));
-    }
-    let arg_str = arg.to_string();
-    if arg_str.chars().any(|c| !c.is_alphanumeric()) {
-        panic!("only alphanumeric characters are allowed as a field name");
-    }
-    if arg_str.is_empty() {
-        panic!("field name must not be empty");
-    }
-    if arg_str.chars().next().unwrap().is_numeric() {
-        panic!("field name must not start with a number");
-    }
-    Some(Either::Right(arg.clone()))
 }
 
 fn parse_node_attrib_to_specify_field(attribs: &[Attribute]) -> Option<Either<u16, Ident>> {

@@ -9,7 +9,7 @@ use std::{
 
 use maplit::btreeset;
 use moka::sync::{Cache, CacheBuilder};
-use qcore_derive::node_transparent;
+use qcore_derive::Node;
 
 use crate::{
     chrono::CalendarSymVariant,
@@ -53,7 +53,7 @@ impl<S: Node> Node for _Core<S> {
         self.info.remove_subscriber(&subscriber);
     }
 
-    fn accept_state(&self, id: &NodeId, state: &NodeStateId) {
+    fn subscribe(&self, id: &NodeId, state: &NodeStateId) {
         if id != &self.src.id() {
             return;
         }
@@ -89,16 +89,20 @@ impl<S: Node> Node for _Core<S> {
 //
 
 /// Data source for calendars
-#[derive(Debug)]
-#[node_transparent]
-pub struct CalendarSrc<S>(Arc<_Core<S>>);
+#[derive(Debug, Node)]
+#[node(transparent = "core")]
+pub struct CalendarSrc<S> {
+    core: Arc<_Core<S>>,
+}
 
 //
 // construction
 //
 impl<S> Clone for CalendarSrc<S> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self {
+            core: self.core.clone(),
+        }
     }
 }
 
@@ -120,7 +124,7 @@ impl<S: DataSrc<str, Output = Calendar>> CalendarSrc<S> {
             .lock()
             .unwrap()
             .push_back((downstream_state, core.info.state()));
-        Self(core)
+        Self { core }
     }
 }
 
@@ -132,14 +136,14 @@ impl<S: DataSrc<str, Output = Calendar>> DataSrc<CalendarSymbol> for CalendarSrc
     type Err = S::Err;
 
     fn req(&self, key: &CalendarSymbol) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let state = self.0.info.state();
-        if let Some(calendar) = self.0.cache.get(&format!("{}:{}", state, key)) {
+        let state = self.core.info.state();
+        if let Some(calendar) = self.core.cache.get(&format!("{}:{}", state, key)) {
             return Ok((state, calendar));
         }
 
         use CalendarSymVariant::*;
         let cal = match key.dispatch() {
-            Single(s) => self.0.src.req(s).map(|(_, c)| c)?,
+            Single(s) => self.core.src.req(s).map(|(_, c)| c)?,
             AllClosed(syms) | AnyClosed(syms) => {
                 let cals: Vec<Calendar> = syms
                     .iter()
@@ -152,7 +156,7 @@ impl<S: DataSrc<str, Output = Calendar>> DataSrc<CalendarSymbol> for CalendarSrc
                 }
             }
         };
-        self.0
+        self.core
             .cache
             .insert(format!("{}:{}", state, key), cal.clone());
         Ok((state, cal))
@@ -172,7 +176,10 @@ impl<S: TakeSnapshot<str, Output = Calendar>> TakeSnapshot<CalendarSymbol> for C
         for key in keys {
             key.leaves(&mut names);
         }
-        let snapshot = self.0.src.take_snapshot(names.iter().map(|s| s.as_str()))?;
+        let snapshot = self
+            .core
+            .src
+            .take_snapshot(names.iter().map(|s| s.as_str()))?;
         Ok(CalendarSrc::new(snapshot, Cache::builder()))
     }
 }

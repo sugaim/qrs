@@ -1,62 +1,11 @@
 use std::sync::Arc;
 
-use maplit::btreeset;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args, Node, NodeId, NodeInfo,
-    NodeStateId, StateRecorder, TakeSnapshot, TakeSnapshot2Args, Tree,
+    node::DataSrc2Args, private::_UnaryNode, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args,
+    Node, NodeInfo, NodeStateId, StateRecorder, TakeSnapshot, TakeSnapshot2Args,
 };
-
-// -----------------------------------------------------------------------------
-// _Node
-//
-#[derive(Debug)]
-pub struct _Node<S> {
-    src: S,
-    states: StateRecorder<NodeStateId>,
-    info: NodeInfo,
-}
-
-//
-// methods
-//
-impl<S: Node> Node for _Node<S> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.info.id()
-    }
-
-    #[inline]
-    fn tree(&self) -> super::Tree {
-        Tree::Branch {
-            desc: self.info.desc().to_owned(),
-            id: self.id(),
-            state: self.info.state(),
-            children: btreeset![self.src.tree()],
-        }
-    }
-
-    #[inline]
-    fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn Node>) -> super::NodeStateId {
-        self.info.accept_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn remove_subscriber(&self, subscriber: &NodeId) {
-        self.info.remove_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn accept_state(&self, publisher: &super::NodeId, state: &super::NodeStateId) {
-        if publisher != &self.src.id() {
-            return;
-        }
-        let state = self.states.get_or_gen_unwrapped(state);
-        self.info.set_state(state);
-        self.info.notify_all();
-    }
-}
 
 // -----------------------------------------------------------------------------
 // Map
@@ -64,7 +13,7 @@ impl<S: Node> Node for _Node<S> {
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Map<S, F> {
-    core: Arc<_Node<S>>,
+    core: Arc<_UnaryNode<S>>,
     f: Arc<F>,
 }
 
@@ -82,16 +31,17 @@ impl<S, F> Clone for Map<S, F> {
 }
 
 impl<S: Node, F: 'static> Map<S, F> {
-    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
+    fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
         let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_Node { src, states, info });
+        let core = Arc::new(_UnaryNode { src, states, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
-        Self {
-            core,
-            f: Arc::new(f),
-        }
+        Self { core, f }
+    }
+
+    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
+        Self::_new(desc, src, Arc::new(f))
     }
 }
 
@@ -175,14 +125,7 @@ where
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(Map::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -203,14 +146,7 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(Map::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -233,14 +169,7 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(Map::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -250,7 +179,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct MapErr<S, F> {
-    core: Arc<_Node<S>>,
+    core: Arc<_UnaryNode<S>>,
     f: Arc<F>,
 }
 
@@ -268,16 +197,16 @@ impl<S, F> Clone for MapErr<S, F> {
 }
 
 impl<S: Node, F: 'static> MapErr<S, F> {
-    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
+    fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
         let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_Node { src, states, info });
+        let core = Arc::new(_UnaryNode { src, states, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
-        Self {
-            core,
-            f: Arc::new(f),
-        }
+        Self { core, f }
+    }
+    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
+        Self::_new(desc, src, Arc::new(f))
     }
 }
 
@@ -367,14 +296,7 @@ where
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(MapErr::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -395,14 +317,7 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(MapErr::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -425,14 +340,7 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(MapErr::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -442,7 +350,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Convert<S, F> {
-    core: Arc<_Node<S>>,
+    core: Arc<_UnaryNode<S>>,
     f: Arc<F>,
 }
 
@@ -460,16 +368,16 @@ impl<S, F> Clone for Convert<S, F> {
 }
 
 impl<S: Node, F: 'static> Convert<S, F> {
-    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
+    fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
         let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_Node { src, states, info });
+        let core = Arc::new(_UnaryNode { src, states, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
-        Self {
-            core,
-            f: Arc::new(f),
-        }
+        Self { core, f }
+    }
+    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
+        Self::_new(desc, src, Arc::new(f))
     }
 }
 
@@ -559,14 +467,7 @@ where
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(Convert::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -587,14 +488,7 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
+        Ok(Convert::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
@@ -617,211 +511,13 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            f: self.f.clone(),
-        })
-    }
-}
-
-// -----------------------------------------------------------------------------
-// WithLogger
-//
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
-pub struct WithLogger<S, F> {
-    core: Arc<_Node<S>>,
-    logger: Arc<F>,
-}
-
-//
-// construction
-//
-impl<S, F> Clone for WithLogger<S, F> {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            logger: self.logger.clone(),
-        }
-    }
-}
-
-impl<S: Node, F: 'static> WithLogger<S, F> {
-    pub fn new(desc: impl Into<String>, src: S, logger: F) -> Self {
-        let info = NodeInfo::new(desc);
-        let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_Node { src, states, info });
-        let subs = Arc::downgrade(&core);
-        core.src.accept_subscriber(subs);
-        Self {
-            core,
-            logger: Arc::new(logger),
-        }
-    }
-}
-
-//
-// methods
-//
-impl<S, F> WithLogger<S, F> {
-    pub fn downstream(&self) -> &S {
-        &self.core.src
-    }
-}
-
-impl<K, S, F> DataSrc<K> for WithLogger<S, F>
-where
-    K: ?Sized,
-    S: DataSrc<K>,
-    F: Fn(&K, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
-{
-    type Output = S::Output;
-    type Err = S::Err;
-
-    #[inline]
-    fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let result = self.core.src.req(key);
-        (self.logger)(key, &result);
-        result
-    }
-}
-
-impl<K1, K2, S, F> DataSrc2Args<K1, K2> for WithLogger<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: DataSrc2Args<K1, K2>,
-    F: Fn(&K1, &K2, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
-{
-    type Output = S::Output;
-    type Err = S::Err;
-
-    #[inline]
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let result = self.core.src.req(key1, key2);
-        (self.logger)(key1, key2, &result);
-        result
-    }
-}
-
-impl<K1, K2, K3, S, F> DataSrc3Args<K1, K2, K3> for WithLogger<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: DataSrc3Args<K1, K2, K3>,
-    F: Fn(&K1, &K2, &K3, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
-{
-    type Output = S::Output;
-    type Err = S::Err;
-
-    #[inline]
-    fn req(
-        &self,
-        key1: &K1,
-        key2: &K2,
-        key3: &K3,
-    ) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let result = self.core.src.req(key1, key2, key3);
-        (self.logger)(key1, key2, key3, &result);
-        result
-    }
-}
-
-impl<K, S, F> TakeSnapshot<K> for WithLogger<S, F>
-where
-    K: ?Sized,
-    S: TakeSnapshot<K>,
-    F: Fn(&K, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
-{
-    type SnapShot = WithLogger<S::SnapShot, F>;
-    type SnapShotErr = S::SnapShotErr;
-
-    fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
-    where
-        It: IntoIterator<Item = &'a K>,
-        K: 'a,
-    {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            logger: self.logger.clone(),
-        })
-    }
-}
-
-impl<K1, K2, S, F> TakeSnapshot2Args<K1, K2> for WithLogger<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: TakeSnapshot2Args<K1, K2>,
-    F: Fn(&K1, &K2, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
-{
-    type SnapShot = WithLogger<S::SnapShot, F>;
-    type SnapShotErr = S::SnapShotErr;
-
-    fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
-    where
-        It: IntoIterator<Item = (&'a K1, &'a K2)>,
-        K1: 'a,
-        K2: 'a,
-    {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            logger: self.logger.clone(),
-        })
-    }
-}
-
-impl<K1, K2, K3, S, F> TakeSnapshot3Args<K1, K2, K3> for WithLogger<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: TakeSnapshot3Args<K1, K2, K3>,
-    F: Fn(&K1, &K2, &K3, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
-{
-    type SnapShot = WithLogger<S::SnapShot, F>;
-    type SnapShotErr = S::SnapShotErr;
-
-    fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
-    where
-        It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
-        K1: 'a,
-        K2: 'a,
-        K3: 'a,
-    {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger {
-            core: Arc::new(_Node {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            logger: self.logger.clone(),
-        })
+        Ok(Convert::_new(self.core.info.desc(), snap, self.f.clone()))
     }
 }
 
 // =============================================================================
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use maplit::hashmap;
     use rstest::{fixture, rstest};
 
@@ -1076,97 +772,5 @@ mod tests {
 
         assert!(src.req("d", "x", "i").is_err());
         assert!(src.req("d", "x", "i").unwrap_err() == "downstream error");
-    }
-
-    #[rstest]
-    fn test_with_logger_1arg(src_1arg: ImmutableOnMemorySrc<String, i32>) {
-        let (reader, logger) = {
-            let msg = Arc::new(Mutex::new(String::new()));
-            let reader = msg.clone();
-            let logger = move |k: &str, r: &Result<(NodeStateId, i32), anyhow::Error>| {
-                let mut msg = msg.lock().unwrap();
-                match r {
-                    Ok((_, v)) => *msg = format!("[ok] {}: {}", k, v),
-                    Err(_) => *msg = format!("[ng] {}", k),
-                }
-            };
-            (reader, logger)
-        };
-        let src = WithLogger::new("with_logger", src_1arg, logger);
-
-        // ok
-        assert_eq!(src.req("a").unwrap().1, 1);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] a: 1");
-        assert_eq!(src.req("b").unwrap().1, 2);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] b: 2");
-        assert_eq!(src.req("c").unwrap().1, 3);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] c: 3");
-
-        // err
-        assert!(src.req("d").is_err());
-        assert_eq!(reader.lock().unwrap().as_str(), "[ng] d");
-    }
-
-    #[rstest]
-    fn test_with_logger_2args(src_2args: ImmutableOnMemorySrc2Args<String, String, i32>) {
-        let (reader, logger) = {
-            let msg = Arc::new(Mutex::new(String::new()));
-            let reader = msg.clone();
-            let logger =
-                move |k1: &str, k2: &str, r: &Result<(NodeStateId, i32), anyhow::Error>| {
-                    let mut msg = msg.lock().unwrap();
-                    match r {
-                        Ok((_, v)) => *msg = format!("[ok] ({}, {}): {}", k1, k2, v),
-                        Err(_) => *msg = format!("[ng] ({}, {})", k1, k2),
-                    }
-                };
-            (reader, logger)
-        };
-        let src = WithLogger::new("with_logger", src_2args, logger);
-
-        // ok
-        assert_eq!(src.req("a", "x").unwrap().1, 1);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x): 1");
-        assert_eq!(src.req("b", "x").unwrap().1, 3);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x): 3");
-        assert_eq!(src.req("c", "x").unwrap().1, 5);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x): 5");
-
-        // err
-        assert!(src.req("d", "x").is_err());
-        assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x)");
-    }
-
-    #[rstest]
-    fn test_with_logger_3args(src_3args: ImmutableOnMemorySrc3Args<String, String, String, i32>) {
-        let (reader, logger) = {
-            let msg = Arc::new(Mutex::new(String::new()));
-            let reader = msg.clone();
-            let logger =
-                move |k1: &str,
-                      k2: &str,
-                      k3: &str,
-                      r: &Result<(NodeStateId, i32), anyhow::Error>| {
-                    let mut msg = msg.lock().unwrap();
-                    match r {
-                        Ok((_, v)) => *msg = format!("[ok] ({}, {}, {}): {}", k1, k2, k3, v),
-                        Err(_) => *msg = format!("[ng] ({}, {}, {})", k1, k2, k3),
-                    }
-                };
-            (reader, logger)
-        };
-        let src = WithLogger::new("with_logger", src_3args, logger);
-
-        // ok
-        assert_eq!(src.req("a", "x", "i").unwrap().1, 1);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x, i): 1");
-        assert_eq!(src.req("b", "x", "i").unwrap().1, 5);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x, i): 5");
-        assert_eq!(src.req("c", "x", "i").unwrap().1, 9);
-        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x, i): 9");
-
-        // err
-        assert!(src.req("d", "x", "i").is_err());
-        assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x, i)");
     }
 }
