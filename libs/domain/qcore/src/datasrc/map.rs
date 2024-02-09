@@ -820,6 +820,8 @@ where
 // =============================================================================
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use maplit::hashmap;
     use rstest::{fixture, rstest};
 
@@ -1074,5 +1076,97 @@ mod tests {
 
         assert!(src.req("d", "x", "i").is_err());
         assert!(src.req("d", "x", "i").unwrap_err() == "downstream error");
+    }
+
+    #[rstest]
+    fn test_with_logger_1arg(src_1arg: ImmutableOnMemorySrc<String, i32>) {
+        let (reader, logger) = {
+            let msg = Arc::new(Mutex::new(String::new()));
+            let reader = msg.clone();
+            let logger = move |k: &str, r: &Result<(NodeStateId, i32), anyhow::Error>| {
+                let mut msg = msg.lock().unwrap();
+                match r {
+                    Ok((_, v)) => *msg = format!("[ok] {}: {}", k, v),
+                    Err(_) => *msg = format!("[ng] {}", k),
+                }
+            };
+            (reader, logger)
+        };
+        let src = WithLogger::new("with_logger", src_1arg, logger);
+
+        // ok
+        assert_eq!(src.req("a").unwrap().1, 1);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] a: 1");
+        assert_eq!(src.req("b").unwrap().1, 2);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] b: 2");
+        assert_eq!(src.req("c").unwrap().1, 3);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] c: 3");
+
+        // err
+        assert!(src.req("d").is_err());
+        assert_eq!(reader.lock().unwrap().as_str(), "[ng] d");
+    }
+
+    #[rstest]
+    fn test_with_logger_2args(src_2args: ImmutableOnMemorySrc2Args<String, String, i32>) {
+        let (reader, logger) = {
+            let msg = Arc::new(Mutex::new(String::new()));
+            let reader = msg.clone();
+            let logger =
+                move |k1: &str, k2: &str, r: &Result<(NodeStateId, i32), anyhow::Error>| {
+                    let mut msg = msg.lock().unwrap();
+                    match r {
+                        Ok((_, v)) => *msg = format!("[ok] ({}, {}): {}", k1, k2, v),
+                        Err(_) => *msg = format!("[ng] ({}, {})", k1, k2),
+                    }
+                };
+            (reader, logger)
+        };
+        let src = WithLogger::new("with_logger", src_2args, logger);
+
+        // ok
+        assert_eq!(src.req("a", "x").unwrap().1, 1);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x): 1");
+        assert_eq!(src.req("b", "x").unwrap().1, 3);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x): 3");
+        assert_eq!(src.req("c", "x").unwrap().1, 5);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x): 5");
+
+        // err
+        assert!(src.req("d", "x").is_err());
+        assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x)");
+    }
+
+    #[rstest]
+    fn test_with_logger_3args(src_3args: ImmutableOnMemorySrc3Args<String, String, String, i32>) {
+        let (reader, logger) = {
+            let msg = Arc::new(Mutex::new(String::new()));
+            let reader = msg.clone();
+            let logger =
+                move |k1: &str,
+                      k2: &str,
+                      k3: &str,
+                      r: &Result<(NodeStateId, i32), anyhow::Error>| {
+                    let mut msg = msg.lock().unwrap();
+                    match r {
+                        Ok((_, v)) => *msg = format!("[ok] ({}, {}, {}): {}", k1, k2, k3, v),
+                        Err(_) => *msg = format!("[ng] ({}, {}, {})", k1, k2, k3),
+                    }
+                };
+            (reader, logger)
+        };
+        let src = WithLogger::new("with_logger", src_3args, logger);
+
+        // ok
+        assert_eq!(src.req("a", "x", "i").unwrap().1, 1);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x, i): 1");
+        assert_eq!(src.req("b", "x", "i").unwrap().1, 5);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x, i): 5");
+        assert_eq!(src.req("c", "x", "i").unwrap().1, 9);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x, i): 9");
+
+        // err
+        assert!(src.req("d", "x", "i").is_err());
+        assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x, i)");
     }
 }
