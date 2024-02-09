@@ -2,7 +2,9 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssi
 
 use num::{One, Zero};
 
-use super::{Exp, Log, TotalCmpForSort};
+use crate::datasrc::CacheKeyWorkaround;
+
+use super::{Exp, Log};
 
 /// Trait for arithmetic operations.
 /// Intentionally declared loosely, such as no `Copy` requirement.
@@ -87,18 +89,28 @@ impl<T: num::Float + Arithmetic> FloatBased for num::Complex<T> {
 /// assert_impl_all!(f64: Scalar);
 /// ```
 pub trait Scalar:
-    Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
+    Arithmetic
+    + FloatBased
+    + CacheKeyWorkaround
+    + From<Self::BaseFloat>
+    + Exp<Output = Self>
+    + Log<Output = Self>
 {
 }
 
 impl<T> Scalar for T where
-    T: Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
+    T: Arithmetic
+        + FloatBased
+        + CacheKeyWorkaround
+        + From<Self::BaseFloat>
+        + Exp<Output = Self>
+        + Log<Output = Self>
 {
 }
 
 /// Trait for real numbers.
 /// We consider a type `T` as a real number if it is a scalar on a 1-dim line.
 /// Hence, this trait requires total ordering in addition to scalar requirements.
-pub trait Real: Scalar + PartialEq + PartialOrd + TotalCmpForSort {}
+pub trait Real: Scalar + PartialEq + PartialOrd {}
 
-impl<T> Real for T where T: Scalar + PartialEq + PartialOrd + TotalCmpForSort {}
+impl<T> Real for T where T: Scalar + PartialEq + PartialOrd {}

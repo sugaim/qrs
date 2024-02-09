@@ -103,7 +103,7 @@ impl Default for Lerp1dBuilder {
 
 impl<G: RelPos, V: Vector<G::Output>> Interp1dBuilder<G, V> for Lerp1dBuilder {
     type Output = Lerp1d<G, V>;
-    type Error = anyhow::Error;
+    type Err = anyhow::Error;
 
     fn build(self, gs: Vec<G>, vs: Vec<V>) -> Result<Self::Output, anyhow::Error> {
         Lerp1d::new(gs, vs)

@@ -1,4 +1,8 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    ops::{BitAnd, BitOr},
+    sync::Arc,
+};
 
 use anyhow::ensure;
 use chrono::{Datelike, NaiveDate};
@@ -134,7 +138,7 @@ impl Calendar {
     /// # Errors
     /// - If the given extra holidays are not weekdays
     /// - If the given extra business days are not weekends
-    pub fn new(
+    fn _new(
         extra_holds: Vec<NaiveDate>,
         extra_bizds: Vec<NaiveDate>,
         valid_from: NaiveDate,
@@ -145,12 +149,17 @@ impl Calendar {
             .map(Self)
     }
 
+    /// Create a new calendar builder with default values.
+    pub fn builder() -> CalendarBuilder<(), (), ()> {
+        CalendarBuilder::new()
+    }
+
     /// Create a new calendar from multiple caneldars with `AnyClosed` strategy.
     /// This strategy considers a day as a holiday if it is a holiday in any of the given calendars.
     ///
     /// For example, if today is not a holiday of Tokyo but a holiday of New York,
     /// the day is considered as a holiday in the new calendar.
-    pub fn of_any_closed<'a>(cals: impl Iterator<Item = &'a Self>) -> Self {
+    pub fn of_any_closed<'a>(cals: impl IntoIterator<Item = &'a Self>) -> Self {
         let mut extra_holds = HashSet::new();
         let mut extra_bizds: Option<HashSet<_>> = None;
         let mut valid_from = NaiveDate::MIN;
@@ -168,7 +177,7 @@ impl Calendar {
             valid_from = valid_from.max(cal.0.valid_from);
             valid_to = valid_to.min(cal.0.valid_to);
         }
-        Self::new(
+        Self::_new(
             extra_holds.into_iter().collect(),
             extra_bizds.into_iter().flatten().collect(),
             valid_from,
@@ -182,7 +191,7 @@ impl Calendar {
     ///
     /// For example, if today is a holiday of Tokyo but not a holiday of New York,
     /// the day is considered as a business day in the new calendar.
-    pub fn of_all_closed<'a>(cals: impl Iterator<Item = &'a Self>) -> Self {
+    pub fn of_all_closed<'a>(cals: impl IntoIterator<Item = &'a Self>) -> Self {
         let mut extra_holds: Option<HashSet<_>> = None;
         let mut extra_bizds = HashSet::new();
         let mut valid_from = NaiveDate::MIN;
@@ -200,7 +209,7 @@ impl Calendar {
             valid_from = valid_from.max(cal.0.valid_from);
             valid_to = valid_to.min(cal.0.valid_to);
         }
-        Self::new(
+        Self::_new(
             extra_holds.into_iter().flatten().collect(),
             extra_bizds.into_iter().collect(),
             valid_from,
@@ -351,6 +360,73 @@ impl Calendar {
     }
 }
 
+//
+// operators
+//
+impl BitAnd for Calendar {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self::of_all_closed([self, rhs].iter())
+    }
+}
+
+impl BitAnd<Calendar> for &Calendar {
+    type Output = Calendar;
+
+    fn bitand(self, rhs: Calendar) -> Self::Output {
+        Calendar::of_all_closed([self, &rhs])
+    }
+}
+
+impl BitAnd for &Calendar {
+    type Output = Calendar;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Calendar::of_all_closed([self, rhs])
+    }
+}
+
+impl BitAnd<&Calendar> for Calendar {
+    type Output = Calendar;
+
+    fn bitand(self, rhs: &Self) -> Self::Output {
+        Calendar::of_all_closed([&self, rhs])
+    }
+}
+
+impl BitOr for Calendar {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self::of_any_closed([self, rhs].iter())
+    }
+}
+
+impl BitOr<Calendar> for &Calendar {
+    type Output = Calendar;
+
+    fn bitor(self, rhs: Calendar) -> Self::Output {
+        Calendar::of_any_closed([self, &rhs])
+    }
+}
+
+impl BitOr for &Calendar {
+    type Output = Calendar;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Calendar::of_any_closed([self, rhs])
+    }
+}
+
+impl BitOr<&Calendar> for Calendar {
+    type Output = Calendar;
+
+    fn bitor(self, rhs: &Self) -> Self::Output {
+        Calendar::of_any_closed([&self, rhs])
+    }
+}
+
 // -----------------------------------------------------------------------------
 // DateIterator
 //
@@ -385,6 +461,107 @@ impl DoubleEndedIterator for DateIterator {
     }
 }
 
+// -----------------------------------------------------------------------------
+// CalendarBuilder
+//
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CalendarBuilder<H, B, V> {
+    extra_holds: H,
+    extra_bizds: B,
+    valid_from: V,
+    valid_to: V,
+}
+
+//
+// construction
+//
+impl Default for CalendarBuilder<(), (), ()> {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            extra_holds: (),
+            extra_bizds: (),
+            valid_from: (),
+            valid_to: (),
+        }
+    }
+}
+
+impl CalendarBuilder<(), (), ()> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<B, V> CalendarBuilder<(), B, V> {
+    /// Set the extra holidays of the calendar.
+    ///
+    /// As `extra_holds`, this function expects that days which are non-business day weekdays.
+    pub fn with_extra_holidays(
+        self,
+        extra_holds: Vec<NaiveDate>,
+    ) -> CalendarBuilder<Vec<NaiveDate>, B, V> {
+        CalendarBuilder {
+            extra_holds,
+            extra_bizds: self.extra_bizds,
+            valid_from: self.valid_from,
+            valid_to: self.valid_to,
+        }
+    }
+}
+
+impl<H, V> CalendarBuilder<H, (), V> {
+    /// Set the extra business days of the calendar.
+    ///
+    /// As `extra_bizds`, this function expects that days which are business day weekends.
+    pub fn with_extra_business_days(
+        self,
+        extra_bizds: Vec<NaiveDate>,
+    ) -> CalendarBuilder<H, Vec<NaiveDate>, V> {
+        CalendarBuilder {
+            extra_holds: self.extra_holds,
+            extra_bizds,
+            valid_from: self.valid_from,
+            valid_to: self.valid_to,
+        }
+    }
+}
+
+impl<H, B> CalendarBuilder<H, B, ()> {
+    /// Set the valid period of the calendar.
+    ///
+    /// The valid period is a half-open interval `[valid_from, valid_to)` and
+    /// `valid_from <= valid_to` must hold.
+    pub fn with_valid_period(
+        self,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> CalendarBuilder<H, B, NaiveDate> {
+        CalendarBuilder {
+            extra_holds: self.extra_holds,
+            extra_bizds: self.extra_bizds,
+            valid_from: from,
+            valid_to: to,
+        }
+    }
+}
+
+impl CalendarBuilder<Vec<NaiveDate>, Vec<NaiveDate>, NaiveDate> {
+    /// Build a new calendar.
+    ///
+    /// # Errors
+    /// - If the given extra holidays are not weekdays
+    /// - If the given extra business days are not weekends
+    pub fn build(self) -> anyhow::Result<Calendar> {
+        Calendar::_new(
+            self.extra_holds,
+            self.extra_bizds,
+            self.valid_from,
+            self.valid_to,
+        )
+    }
+}
+
 // =============================================================================
 #[cfg(test)]
 mod tests {
@@ -393,7 +570,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -402,7 +579,7 @@ mod tests {
         assert!(cal.is_ok());
 
         // duplicated extra holidays, unsorted extra holidays are allowed
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![
                 NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
                 NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -415,7 +592,7 @@ mod tests {
         assert!(cal.is_ok());
 
         // invalid extra holidays
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![
                 NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
                 NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
@@ -427,7 +604,7 @@ mod tests {
         assert!(cal.is_err());
 
         // invalid extra business days
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![],
             vec![
                 NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -439,7 +616,7 @@ mod tests {
         assert!(cal.is_err());
 
         // invalid valid period
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![],
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
@@ -450,7 +627,7 @@ mod tests {
 
     #[test]
     fn test_serialize() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -487,7 +664,7 @@ mod tests {
 
     #[test]
     fn test_of_any_closed() {
-        let cal1 = Calendar::new(
+        let cal1 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![
                 NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
@@ -497,7 +674,7 @@ mod tests {
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
         )
         .unwrap();
-        let cal2 = Calendar::new(
+        let cal2 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -521,7 +698,7 @@ mod tests {
 
     #[test]
     fn test_of_all_closed() {
-        let cal1 = Calendar::new(
+        let cal1 = Calendar::_new(
             vec![
                 NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
                 NaiveDate::from_ymd_opt(2021, 1, 5).unwrap(),
@@ -531,7 +708,7 @@ mod tests {
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
         )
         .unwrap();
-        let cal2 = Calendar::new(
+        let cal2 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -555,7 +732,7 @@ mod tests {
 
     #[test]
     fn test_valid_period() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![],
             vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -573,7 +750,7 @@ mod tests {
 
     #[test]
     fn test_does_support() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![],
             vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -589,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_is_holiday() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -649,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_is_business_day() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -701,7 +878,7 @@ mod tests {
 
     #[test]
     fn test_iter_bizdays() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
@@ -769,7 +946,7 @@ mod tests {
 
     #[test]
     fn test_iter_holidays() {
-        let cal = Calendar::new(
+        let cal = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
             vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),

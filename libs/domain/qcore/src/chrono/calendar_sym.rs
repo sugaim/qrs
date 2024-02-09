@@ -1,4 +1,8 @@
-use std::{collections::BTreeSet, fmt::Display, str::FromStr};
+use std::{
+    collections::{BTreeSet, HashSet},
+    fmt::Display,
+    str::FromStr,
+};
 
 use anyhow::bail;
 use serde::Serialize;
@@ -288,6 +292,35 @@ impl CalendarSymbol {
     pub fn take_dispatch(self) -> CalendarSymVariant {
         self.0
     }
+
+    /// Collect all the leaves of the calendar symbol.
+    ///
+    /// Instead of returning a collection, this method takes a mutable reference to a set
+    /// to reduce allocation costs because this operation can be necessary for multiple symbols.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::collections::HashSet;
+    /// use qcore::chrono::CalendarSymbol;
+    ///
+    /// let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
+    /// let mut set = HashSet::new();
+    /// sym.leaves(&mut set);
+    /// assert_eq!(set, ["TK", "NY", "LN"].into_iter().map(ToOwned::to_owned).collect::<HashSet<_>>());
+    /// ```
+    #[inline]
+    pub fn leaves(&self, set: &mut HashSet<String>) {
+        match &self.0 {
+            CalendarSymVariant::Single(s) => {
+                set.insert(s.clone());
+            }
+            CalendarSymVariant::AnyClosed(c) | CalendarSymVariant::AllClosed(c) => {
+                for sym in c {
+                    sym.leaves(set);
+                }
+            }
+        }
+    }
 }
 
 //
@@ -498,5 +531,16 @@ mod tests {
             sym,
             CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap()
         );
+    }
+
+    #[test]
+    fn test_leaves() {
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
+        let mut set = HashSet::new();
+        sym.leaves(&mut set);
+        assert_eq!(set.len(), 3);
+        assert!(set.contains("TK"));
+        assert!(set.contains("NY"));
+        assert!(set.contains("LN"));
     }
 }

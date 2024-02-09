@@ -6,11 +6,20 @@ edition.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
+derivative = { workspace = true }
+dyn-clone = { workspace = true }
 num = { workspace = true }
+maplit = { workspace = true }
+moka = { workspace = true }
 serde = { workspace = true }
 static_assertions = { workspace = true }
 rust_decimal = { workspace = true }
+thiserror = { workspace = true }
 peg = { workspace = true }
+uuid = { workspace = true }
+
+# internal
+qcore_derive = { path = "qcore_derive" }
 
 [dev-dependencies]
 approx = { workspace = true }

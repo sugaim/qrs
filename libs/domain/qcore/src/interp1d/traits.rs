@@ -27,9 +27,9 @@ impl<F: Interp1d> Func1d<F::Grid> for F {
 
 pub trait Interp1dBuilder<G, V> {
     type Output: Interp1d<Grid = G, Value = V>;
-    type Error;
+    type Err;
 
-    fn build(self, grids: Vec<G>, values: Vec<V>) -> Result<Self::Output, Self::Error>;
+    fn build(self, grids: Vec<G>, values: Vec<V>) -> Result<Self::Output, Self::Err>;
 }
 
 pub trait DestructibleInterp1d: Interp1d {
