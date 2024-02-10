@@ -15,9 +15,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - shell: bash
-      run: |
-        curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: llvm-tools-preview
