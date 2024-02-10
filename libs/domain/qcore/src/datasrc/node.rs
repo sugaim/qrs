@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeSet,
     fmt::Display,
+    ops::{BitXor, BitXorAssign},
     sync::{Mutex, Weak},
 };
 
@@ -74,21 +75,49 @@ impl NodeStateId {
     pub fn gen() -> Self {
         NodeStateId(Uuid::new_v4())
     }
+}
 
-    /// Combine multiple `NodeStateId`s into one.
-    ///
-    /// This may be useful when we want to generate a new state id
-    /// from multiple state ids and want to ensure that the same inputs
-    /// always produce the same output.
-    pub fn combine<'a, It>(state: &Self, states: It) -> Self
-    where
-        It: IntoIterator<Item = &'a NodeStateId>,
-    {
-        let mut val = state.0.as_u128();
-        for s in states {
-            val ^= s.0.as_u128();
-        }
-        NodeStateId(Uuid::from_u128(val))
+impl BitXor for NodeStateId {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+    }
+}
+
+impl BitXor for &NodeStateId {
+    type Output = NodeStateId;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        NodeStateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+    }
+}
+
+impl BitXor<&NodeStateId> for NodeStateId {
+    type Output = NodeStateId;
+
+    fn bitxor(self, rhs: &NodeStateId) -> Self::Output {
+        NodeStateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+    }
+}
+
+impl BitXor<NodeStateId> for &NodeStateId {
+    type Output = NodeStateId;
+
+    fn bitxor(self, rhs: NodeStateId) -> Self::Output {
+        NodeStateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+    }
+}
+
+impl BitXorAssign for NodeStateId {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = *self ^ rhs;
+    }
+}
+
+impl BitXorAssign<&NodeStateId> for NodeStateId {
+    fn bitxor_assign(&mut self, rhs: &Self) {
+        *self = *self ^ rhs;
     }
 }
 
@@ -145,6 +174,17 @@ impl NodeInfo {
     #[inline]
     pub fn set_state(&self, state: NodeStateId) {
         *self.state.lock().unwrap() = state;
+
+        // notify to all subscribers
+        let id = self.id();
+        let mut children = self.children.lock().unwrap();
+        children.retain(|child| match &child.upgrade() {
+            Some(child) => {
+                child.subscribe(&id, &state);
+                true
+            }
+            None => false,
+        });
     }
     #[inline]
     pub fn accept_subscriber(&self, subscriber: Weak<dyn Node>) -> NodeStateId {
@@ -163,18 +203,6 @@ impl NodeInfo {
                 Some(id) => id != subscriber,
                 None => false,
             });
-    }
-    pub fn notify_all(&self) {
-        let id = self.id();
-        let state = self.state();
-        let mut children = self.children.lock().unwrap();
-        children.retain(|child| match &child.upgrade() {
-            Some(child) => {
-                child.subscribe(&id, &state);
-                true
-            }
-            None => false,
-        });
     }
     #[inline]
     pub fn make_tree_as_leaf(&self) -> Tree {

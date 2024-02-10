@@ -615,7 +615,6 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
     pub fn insert(&mut self, key: K, value: V) {
         self._data().lock().unwrap().insert(key, value);
         self._info().set_state(NodeStateId::gen());
-        self._info().notify_all();
     }
 
     pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
@@ -626,7 +625,6 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
         let res = self._data().lock().unwrap().remove(key);
         if res.is_some() {
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
         res
     }
@@ -637,7 +635,6 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
         data.retain(f);
         if orig_len != data.len() {
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 
@@ -652,7 +649,6 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
         if !data.is_empty() {
             data.clear();
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 }
@@ -664,7 +660,6 @@ impl<K: Eq + Hash, V> Extend<(K, V)> for OnMemorySrc<K, V> {
         data.extend(iter);
         if orig_len != data.len() {
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 }
@@ -843,7 +838,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
             .or_insert_with(HashMap::new)
             .insert(key2, value);
         self._info().set_state(NodeStateId::gen());
-        self._info().notify_all();
     }
 
     pub fn remove<Q1, Q2>(&mut self, key1: &Q1, key2: &Q2) -> Option<V>
@@ -858,7 +852,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         if res.is_some() {
             data.retain(|_, m| !m.is_empty());
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
         res
     }
@@ -876,7 +869,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         data.retain(|_, m| !m.is_empty());
         if has_modified {
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 
@@ -891,7 +883,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         if !data.is_empty() {
             data.clear();
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 }
@@ -1098,7 +1089,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
             .or_insert_with(HashMap::new)
             .insert(key3, value);
         self._info().set_state(NodeStateId::gen());
-        self._info().notify_all();
     }
 
     pub fn remove<Q1, Q2, Q3>(&mut self, key1: &Q1, key2: &Q2, key3: &Q3) -> Option<V>
@@ -1119,7 +1109,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
                 .for_each(|(_, m1)| m1.retain(|_, m2| !m2.is_empty()));
             data.retain(|_, m1| !m1.is_empty());
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
         res
     }
@@ -1140,7 +1129,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
         if has_modified {
             data.retain(|_, m1| !m1.is_empty());
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 
@@ -1155,7 +1143,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
         if !data.is_empty() {
             data.clear();
             self._info().set_state(NodeStateId::gen());
-            self._info().notify_all();
         }
     }
 }

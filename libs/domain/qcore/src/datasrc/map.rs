@@ -3,8 +3,8 @@ use std::sync::Arc;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, private::_UnaryPassThroughNode, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Node, NodeInfo, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
+    _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
+    DataSrc3Args, Node, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
@@ -31,14 +31,15 @@ impl<S, F> Clone for Map<S, F> {
 }
 
 impl<S: Node, F: 'static> Map<S, F> {
+    #[inline]
     fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
-        let info = NodeInfo::new(desc);
-        let core = Arc::new(_UnaryPassThroughNode { src, info });
-        let subs = Arc::downgrade(&core);
-        core.src.accept_subscriber(subs);
-        Self { core, f }
+        Self {
+            core: _UnaryPassThroughNode::new(src, desc),
+            f,
+        }
     }
 
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
         Self::_new(desc, src, Arc::new(f))
     }
@@ -48,6 +49,7 @@ impl<S: Node, F: 'static> Map<S, F> {
 // methods
 //
 impl<S, F> Map<S, F> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -65,7 +67,7 @@ where
     #[inline]
     fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
         let (_, output) = self.core.src.req(key)?;
-        Ok((self.core.info.state(), (self.f)(output)))
+        Ok((self.core.state(), (self.f)(output)))
     }
 }
 
@@ -82,7 +84,7 @@ where
     #[inline]
     fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
         let (_, output) = self.core.src.req(key1, key2)?;
-        Ok((self.core.info.state(), (self.f)(output)))
+        Ok((self.core.state(), (self.f)(output)))
     }
 }
 
@@ -105,7 +107,7 @@ where
         key3: &K3,
     ) -> Result<(NodeStateId, Self::Output), Self::Err> {
         let (_, output) = self.core.src.req(key1, key2, key3)?;
-        Ok((self.core.info.state(), (self.f)(output)))
+        Ok((self.core.state(), (self.f)(output)))
     }
 }
 
@@ -118,13 +120,14 @@ where
     type SnapShot = Map<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = &'a K>,
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(Map::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -138,6 +141,7 @@ where
     type SnapShot = Map<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = (&'a K1, &'a K2)>,
@@ -145,7 +149,7 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(Map::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -160,6 +164,7 @@ where
     type SnapShot = Map<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
@@ -168,7 +173,7 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(Map::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -196,13 +201,15 @@ impl<S, F> Clone for MapErr<S, F> {
 }
 
 impl<S: Node, F: 'static> MapErr<S, F> {
+    #[inline]
     fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
-        let info = NodeInfo::new(desc);
-        let core = Arc::new(_UnaryPassThroughNode { src, info });
-        let subs = Arc::downgrade(&core);
-        core.src.accept_subscriber(subs);
-        Self { core, f }
+        Self {
+            core: _UnaryPassThroughNode::new(src, desc),
+            f,
+        }
     }
+
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
         Self::_new(desc, src, Arc::new(f))
     }
@@ -288,13 +295,14 @@ where
     type SnapShot = MapErr<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = &'a K>,
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(MapErr::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -308,6 +316,7 @@ where
     type SnapShot = MapErr<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = (&'a K1, &'a K2)>,
@@ -315,7 +324,7 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(MapErr::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -330,6 +339,7 @@ where
     type SnapShot = MapErr<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
@@ -338,7 +348,7 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(MapErr::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -367,12 +377,13 @@ impl<S, F> Clone for Convert<S, F> {
 
 impl<S: Node, F: 'static> Convert<S, F> {
     fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
-        let info = NodeInfo::new(desc);
-        let core = Arc::new(_UnaryPassThroughNode { src, info });
-        let subs = Arc::downgrade(&core);
-        core.src.accept_subscriber(subs);
-        Self { core, f }
+        Self {
+            core: _UnaryPassThroughNode::new(src, desc),
+            f,
+        }
     }
+
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
         Self::_new(desc, src, Arc::new(f))
     }
@@ -382,6 +393,7 @@ impl<S: Node, F: 'static> Convert<S, F> {
 // methods
 //
 impl<S, F> Convert<S, F> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -399,8 +411,8 @@ where
     #[inline]
     fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
         match self.core.src.req(key) {
-            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.info.state(), output)),
-            Err(err) => (self.f)(Err(err)).map(|o| (self.core.info.state(), o)),
+            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.state(), output)),
+            Err(err) => (self.f)(Err(err)).map(|o| (self.core.state(), o)),
         }
     }
 }
@@ -418,8 +430,8 @@ where
     #[inline]
     fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
         match self.core.src.req(key1, key2) {
-            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.info.state(), output)),
-            Err(err) => (self.f)(Err(err)).map(|o| (self.core.info.state(), o)),
+            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.state(), output)),
+            Err(err) => (self.f)(Err(err)).map(|o| (self.core.state(), o)),
         }
     }
 }
@@ -443,8 +455,8 @@ where
         key3: &K3,
     ) -> Result<(NodeStateId, Self::Output), Self::Err> {
         match self.core.src.req(key1, key2, key3) {
-            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.info.state(), output)),
-            Err(err) => (self.f)(Err(err)).map(|o| (self.core.info.state(), o)),
+            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.state(), output)),
+            Err(err) => (self.f)(Err(err)).map(|o| (self.core.state(), o)),
         }
     }
 }
@@ -458,13 +470,14 @@ where
     type SnapShot = Convert<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = &'a K>,
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(Convert::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -478,6 +491,7 @@ where
     type SnapShot = Convert<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = (&'a K1, &'a K2)>,
@@ -485,7 +499,7 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(Convert::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 
@@ -500,6 +514,7 @@ where
     type SnapShot = Convert<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
+    #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
         It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
@@ -508,7 +523,7 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert::_new(self.core.info.desc(), snap, self.f.clone()))
+        Ok(Convert::_new(self.core.desc(), snap, self.f.clone()))
     }
 }
 

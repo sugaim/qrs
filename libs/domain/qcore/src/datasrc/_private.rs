@@ -1,24 +1,54 @@
+use std::sync::Arc;
+
 use maplit::btreeset;
 
-use super::{Node, NodeId, NodeInfo, Tree};
+use super::{Node, NodeId, NodeInfo, NodeStateId, Tree};
 
 // -----------------------------------------------------------------------------
 // _Node
 //
 
 /// Typical node implementation which does not have any state changing event.
-///
-/// Since this does not have state changing, this node uses
-/// a state id of downstream node as its own state id.
 #[derive(Debug)]
 pub(super) struct _UnaryPassThroughNode<S> {
     pub(super) src: S,
-    pub(super) info: NodeInfo,
+    info: NodeInfo,
+    self_state: NodeStateId, // invariant becuase this node itself does not have state changing event
+}
+
+//
+// construction
+//
+impl<S: Node> _UnaryPassThroughNode<S> {
+    #[inline]
+    pub(super) fn new(src: S, desc: impl Into<String>) -> Arc<Self> {
+        let res = Arc::new(Self {
+            src,
+            info: NodeInfo::new(desc),
+            self_state: NodeStateId::gen(),
+        });
+        let subsc = Arc::downgrade(&res);
+        let downstream_state = res.src.accept_subscriber(subsc);
+        res.info.set_state(downstream_state ^ res.self_state);
+        res
+    }
+
+    #[inline]
+    pub(super) fn desc(&self) -> &str {
+        self.info.desc()
+    }
 }
 
 //
 // methods
 //
+impl<S> _UnaryPassThroughNode<S> {
+    #[inline]
+    pub(super) fn state(&self) -> NodeStateId {
+        self.info.state()
+    }
+}
+
 impl<S: Node> Node for _UnaryPassThroughNode<S> {
     #[inline]
     fn id(&self) -> NodeId {
@@ -50,7 +80,6 @@ impl<S: Node> Node for _UnaryPassThroughNode<S> {
         if publisher != &self.src.id() {
             return;
         }
-        self.info.set_state(*state);
-        self.info.notify_all();
+        self.info.set_state(state ^ self.self_state);
     }
 }

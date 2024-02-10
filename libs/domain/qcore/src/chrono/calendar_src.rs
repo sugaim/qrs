@@ -3,8 +3,8 @@
 //
 
 use std::{
-    collections::{HashSet, VecDeque},
-    sync::{Arc, Mutex, Weak},
+    collections::HashSet,
+    sync::{Arc, Weak},
 };
 
 use maplit::btreeset;
@@ -24,9 +24,9 @@ use super::{Calendar, CalendarSymbol};
 #[derive(Debug)]
 struct _Core<S> {
     src: S,
-    state_map: Mutex<VecDeque<(NodeStateId, NodeStateId)>>,
     cache: Cache<String, Calendar>,
     info: NodeInfo,
+    self_state: NodeStateId, // invariant because this node itself does not have state
 }
 
 //
@@ -53,34 +53,12 @@ impl<S: Node> Node for _Core<S> {
         self.info.remove_subscriber(&subscriber);
     }
 
+    #[inline]
     fn subscribe(&self, id: &NodeId, state: &NodeStateId) {
         if id != &self.src.id() {
             return;
         }
-        let mut states = self.state_map.lock().unwrap();
-        let state = match states.iter().rev().find(|(d, _)| d == state) {
-            Some((_, upstream_state)) => *upstream_state,
-            None => {
-                let new = NodeStateId::gen();
-                states.push_back((state.clone(), new));
-                new
-            }
-        };
-        if self.info.state() == state {
-            return;
-        }
-        const MAX_STATE_CACHE: usize = 10;
-        while MAX_STATE_CACHE < states.len() {
-            let Some((_, state)) = states.pop_front() else {
-                unreachable!();
-            };
-            let state = state.to_string();
-            let _ = self
-                .cache
-                .invalidate_entries_if(move |key, _| key.starts_with(&state));
-        }
-        self.info.set_state(state);
-        self.info.notify_all();
+        self.info.set_state(self.self_state ^ state);
     }
 }
 
@@ -111,19 +89,15 @@ impl<S: DataSrc<str, Output = Calendar>> CalendarSrc<S> {
         src: S,
         cache_builder: CacheBuilder<String, Calendar, Cache<String, Calendar>>,
     ) -> Self {
-        let info = NodeInfo::new("calendar");
         let core = Arc::new(_Core {
             src,
-            state_map: VecDeque::new().into(),
-            cache: cache_builder.support_invalidation_closures().build(),
-            info,
+            cache: cache_builder.build(),
+            info: NodeInfo::new("calendar"),
+            self_state: NodeStateId::gen(),
         });
-        let subscriber = Arc::downgrade(&core);
-        let downstream_state = core.src.accept_subscriber(subscriber);
-        core.state_map
-            .lock()
-            .unwrap()
-            .push_back((downstream_state, core.info.state()));
+        let subsc = Arc::downgrade(&core);
+        let downstream_state = core.src.accept_subscriber(subsc);
+        core.info.set_state(downstream_state ^ core.self_state);
         Self { core }
     }
 }

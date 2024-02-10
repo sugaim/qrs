@@ -3,8 +3,8 @@ use std::sync::Arc;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, private::_UnaryPassThroughNode, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Node, NodeInfo, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
+    _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
+    DataSrc3Args, Node, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
@@ -31,13 +31,12 @@ impl<S, F> Clone for WithLogger<S, F> {
 }
 
 impl<S: Node, F: 'static> WithLogger<S, F> {
+    #[inline]
     fn _new(desc: impl Into<String>, src: S, logger: Arc<F>) -> Self {
-        let info = NodeInfo::new(desc);
-        let core = Arc::new(_UnaryPassThroughNode { src, info });
-        let subs = Arc::downgrade(&core);
-        core.src.accept_subscriber(subs);
+        let core = _UnaryPassThroughNode::new(src, desc);
         Self { core, logger }
     }
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S, logger: F) -> Self {
         Self::_new(desc, src, Arc::new(logger))
     }
@@ -127,7 +126,7 @@ where
     {
         let snap = self.core.src.take_snapshot(keys)?;
         Ok(WithLogger::_new(
-            self.core.info.desc(),
+            self.core.desc(),
             snap,
             self.logger.clone(),
         ))
@@ -152,7 +151,7 @@ where
     {
         let snap = self.core.src.take_snapshot(keys)?;
         Ok(WithLogger::_new(
-            self.core.info.desc(),
+            self.core.desc(),
             snap,
             self.logger.clone(),
         ))
@@ -179,7 +178,7 @@ where
     {
         let snap = self.core.src.take_snapshot(keys)?;
         Ok(WithLogger::_new(
-            self.core.info.desc(),
+            self.core.desc(),
             snap,
             self.logger.clone(),
         ))

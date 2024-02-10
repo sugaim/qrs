@@ -1,0 +1,10 @@
+{
+    "recommendations": [
+        "vadimcn.vscode-lldb",
+        "serayuzgur.crates",
+        "tamasfe.even-better-toml",
+        "rust-lang.rust-analyzer",
+        "github.copilot",
+        "github.copilot-chat"
+    ]
+}

@@ -1,99 +1,192 @@
-use std::{
-    borrow::Borrow,
-    collections::{HashMap, VecDeque},
-    hash::Hash,
-    sync::{Arc, Mutex},
-};
+use std::{borrow::Borrow, collections::HashMap, hash::Hash, sync::Arc, vec};
 
-use maplit::btreeset;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, private::_UnaryPassThroughNode, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Node, NodeId, NodeInfo, NodeStateId, TakeSnapshot, TakeSnapshot2Args, Tree,
+    _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
+    DataSrc3Args, Node, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
 // _Node
 //
-#[derive(Debug)]
-struct _Node<S> {
-    src: S,
-    info: NodeInfo,
-    // state ids for override layers
-    states: Mutex<VecDeque<NodeStateId>>,
-    tail_state: Mutex<NodeStateId>,
-}
+mod _node {
+    use std::sync::{Arc, Mutex};
 
-//
-// construction
-//
-impl<S: Node> _Node<S> {
-    pub fn new(desc: impl Into<String>, src: S) -> Self {
-        Self {
-            src,
-            info: NodeInfo::new(desc),
-            states: Mutex::new(VecDeque::new()),
-            tail_state: Mutex::new(NodeStateId::gen()),
-        }
-    }
-}
+    use maplit::btreeset;
 
-//
-// methods
-//
-impl<S> _Node<S> {
-    fn pop(&self) {
-        if let Some(state) = self.states.lock().unwrap().pop_back() {
-            *self.tail_state.lock().unwrap() = state;
-        } else {
-            // maybe unreachable
-            *self.tail_state.lock().unwrap() = NodeStateId::gen();
-        }
-    }
-    fn push(&self) {
-        let mut state = self.tail_state.lock().unwrap();
-        self.states.lock().unwrap().push_back(*state);
-        *state = NodeStateId::gen();
-    }
-}
+    use crate::datasrc::{Node, NodeId, NodeInfo, NodeStateId, Tree};
 
-impl<S: Node> Node for _Node<S> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.info.id()
+    #[derive(Debug)]
+    pub(super) struct _Node<S, L> {
+        pub src: S,
+
+        // as node state id, we use the combined value of the current override layer state
+        // and the downstream state id.
+        info: NodeInfo,
+
+        // state ids for override layers. To represent the layer structure,
+        // we use stack(vec) to store the state ids.
+        // the first element is for id when no override layer is applied.
+        // the second element is for id when the first override layer is applied and so on.
+        // hence, the last element is for the id when all override layers are applied
+        // and the current state of the node.
+        // if the top of override layer is popped, the state id is also popped.
+        override_state: Mutex<Vec<NodeStateId>>,
+
+        // override layers
+        layers: Mutex<Vec<L>>,
     }
 
-    #[inline]
-    fn tree(&self) -> Tree {
-        Tree::Branch {
-            desc: self.info.desc().to_owned(),
-            id: self.id(),
-            state: self.info.state(),
-            children: btreeset![self.src.tree()],
+    //
+    // construction
+    //
+    impl<S: Node, L: 'static> _Node<S, L> {
+        pub fn new(desc: impl Into<String>, src: S) -> Arc<Self> {
+            let res = Arc::new(Self {
+                src,
+                info: NodeInfo::new(desc),
+                override_state: Mutex::new(vec![NodeStateId::gen()]),
+                layers: Mutex::new(Vec::new()),
+            });
+
+            // state id of this node = state id of downstream node ^ state id of override layer
+            let subsc = Arc::downgrade(&res);
+            let downstream_state = res.src.accept_subscriber(subsc);
+            let state = downstream_state ^ *res.override_state.lock().unwrap().last().unwrap();
+            res.info.set_state(state);
+            res
         }
     }
 
-    #[inline]
-    fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn Node>) -> NodeStateId {
-        self.info.accept_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn remove_subscriber(&self, subscriber: &NodeId) {
-        self.info.remove_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn subscribe(&self, publisher: &NodeId, state: &NodeStateId) {
-        if publisher != &self.src.id() {
-            return;
+    //
+    // methods
+    //
+    impl<S, L> _Node<S, L> {
+        /// Get the state id of the node.
+        pub fn state(&self) -> NodeStateId {
+            self.info.state()
         }
-        self.info.set_state(NodeStateId::combine(
-            &self.tail_state.lock().unwrap(),
-            [state],
-        ));
-        self.info.notify_all();
+
+        /// Desc
+        pub fn desc(&self) -> &str {
+            self.info.desc()
+        }
+
+        /// Pop the top override layer.
+        ///
+        /// The state id of the node after the layer is popped is also returned.
+        pub fn pop(&self) -> Option<(NodeStateId, L)> {
+            let popped = self.layers.lock().unwrap().pop();
+            if popped.is_none() {
+                return None;
+            }
+            let prev_state = self.override_state.lock().unwrap().pop().unwrap();
+            let new_state = self.override_state.lock().unwrap().last().unwrap().clone();
+            let mut node_state = self.info.state();
+
+            // remove prev state(see bitxor property) and reflect new state
+            node_state ^= prev_state;
+            node_state ^= new_state;
+            self.info.set_state(node_state);
+            Some((node_state, popped.unwrap()))
+        }
+
+        /// Push a new override layer.
+        ///
+        /// The state id of the node after the layer is pushed is returned.
+        pub fn push(&self, layer: L) -> NodeStateId {
+            let prev_state = self.override_state.lock().unwrap().last().unwrap().clone();
+            let new_state = NodeStateId::gen();
+            let mut node_state = self.info.state();
+
+            // remove prev state(see bitxor property) and reflect new state
+            node_state ^= prev_state;
+            node_state ^= new_state;
+            self.info.set_state(node_state);
+            self.override_state.lock().unwrap().push(new_state);
+            self.layers.lock().unwrap().push(layer);
+            node_state
+        }
+
+        pub fn clear(&self) -> NodeStateId {
+            let mut layers = self.layers.lock().unwrap();
+            if layers.is_empty() {
+                return self.info.state();
+            }
+            let mut states = self.override_state.lock().unwrap();
+            layers.clear();
+
+            let prev_state = states.pop().unwrap();
+            let new_state = states.first().unwrap().clone();
+            states.truncate(1);
+
+            let mut node_state = self.info.state();
+            node_state ^= prev_state;
+            node_state ^= new_state;
+            self.info.set_state(node_state);
+            node_state
+        }
+
+        /// Get a value from the override layers.
+        /// The value is found from the top layer to the bottom layer.
+        pub fn get_from_top<O>(&self, f: impl Fn(&L) -> Option<O>) -> Option<O> {
+            self.layers.lock().unwrap().iter().rev().find_map(f)
+        }
+
+        /// Get a value from the override layers.
+        /// The value is found from the bottom layer to the top layer.
+        pub fn get_from_bottom<O>(&self, f: impl Fn(&L) -> Option<O>) -> Option<O> {
+            self.layers.lock().unwrap().iter().find_map(f)
+        }
+
+        #[inline]
+        pub fn num_layers(&self) -> usize {
+            self.layers.lock().unwrap().len()
+        }
+
+        #[inline]
+        pub fn extend(&self, layers: Vec<L>) {
+            layers.into_iter().for_each(|layer| {
+                self.push(layer);
+            });
+        }
+    }
+
+    impl<S: Node, L: 'static> Node for _Node<S, L> {
+        #[inline]
+        fn id(&self) -> NodeId {
+            self.info.id()
+        }
+
+        #[inline]
+        fn tree(&self) -> Tree {
+            Tree::Branch {
+                desc: self.info.desc().to_owned(),
+                id: self.id(),
+                state: self.info.state(),
+                children: btreeset![self.src.tree()],
+            }
+        }
+
+        #[inline]
+        fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn Node>) -> NodeStateId {
+            self.info.accept_subscriber(subscriber)
+        }
+
+        #[inline]
+        fn remove_subscriber(&self, subscriber: &NodeId) {
+            self.info.remove_subscriber(subscriber)
+        }
+
+        #[inline]
+        fn subscribe(&self, publisher: &NodeId, state: &NodeStateId) {
+            if publisher != &self.src.id() {
+                return;
+            }
+            let new_state = state ^ *self.override_state.lock().unwrap().last().unwrap();
+            self.info.set_state(new_state);
+        }
     }
 }
 
@@ -111,19 +204,17 @@ pub struct Overriden<S, K, V> {
 // construction
 //
 impl<S: Node, K, V> Overriden<S, K, V> {
+    #[inline]
     pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K, V>) -> Self {
-        let info = NodeInfo::new(desc);
-        let core = Arc::new(_UnaryPassThroughNode { src, info });
-        let subsc = Arc::downgrade(&core);
-        core.src.accept_subscriber(subsc);
         Self {
-            core,
+            core: _UnaryPassThroughNode::new(src, desc),
             layer: Arc::new(layer),
         }
     }
 }
 
 impl<S, K, V> Clone for Overriden<S, K, V> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
@@ -136,6 +227,7 @@ impl<S, K, V> Clone for Overriden<S, K, V> {
 // methods
 //
 impl<S, K, V> Overriden<S, K, V> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -151,9 +243,10 @@ where
     type Output = S::Output;
     type Err = S::Err;
 
+    #[inline]
     fn req(&self, key: &Q) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
         if let Some(val) = self.layer.get(key) {
-            return Ok((self.core.info.state(), val.clone().into()));
+            return Ok((self.core.state(), val.clone().into()));
         }
         self.core.src.req(key)
     }
@@ -179,11 +272,7 @@ where
 
         let contained = items.iter().filter_map(|k| self.layer.get_key_value(k));
         let layer = contained.map(|(k, v)| (k.clone(), v.clone())).collect();
-        Ok(Overriden::with_layer(
-            self.core.info.desc(),
-            snapshot,
-            layer,
-        ))
+        Ok(Overriden::with_layer(self.core.desc(), snapshot, layer))
     }
 }
 
@@ -193,37 +282,34 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overridable<S, K, V> {
-    core: Arc<_Node<S>>,
-    layers: Arc<Mutex<Vec<HashMap<K, V>>>>,
+    core: Arc<_node::_Node<S, HashMap<K, V>>>,
 }
 
 //
 // construction
 //
-impl<S: Node, K, V> Overridable<S, K, V> {
+impl<S: Node, K: 'static, V: 'static> Overridable<S, K, V> {
+    #[inline]
     pub fn _new(desc: impl Into<String>, src: S, layers: Vec<HashMap<K, V>>) -> Self {
-        let core = Arc::new(_Node::new(desc, src));
-        for _ in 0..layers.len() {
-            core.push();
-        }
-        let subsc = Arc::downgrade(&core);
-        core.src.accept_subscriber(subsc);
-        let layers = Arc::new(Mutex::new(layers));
-        Self { core, layers }
+        let core = _node::_Node::new(desc, src);
+        core.extend(layers);
+        Self { core }
     }
+    #[inline]
     pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K, V>) -> Self {
         Self::_new(desc, src, vec![layer])
     }
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S) -> Self {
         Self::_new(desc, src, Vec::new())
     }
 }
 
 impl<S, K, V> Clone for Overridable<S, K, V> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
-            layers: self.layers.clone(),
         }
     }
 }
@@ -232,6 +318,7 @@ impl<S, K, V> Clone for Overridable<S, K, V> {
 // methods
 //
 impl<S, K, V> Overridable<S, K, V> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -248,11 +335,8 @@ where
     type Err = S::Err;
 
     fn req(&self, key: &Q) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        let layer = self.layers.lock().unwrap();
-        for map in layer.iter().rev() {
-            if let Some(val) = map.get(key) {
-                return Ok((self.core.info.state(), val.clone().into()));
-            }
+        if let Some(val) = self.core.get_from_top(|layer| layer.get(key).cloned()) {
+            return Ok((self.core.state(), val.into()));
         }
         self.core.src.req(key)
     }
@@ -275,55 +359,47 @@ where
     {
         let items = keys.into_iter().collect::<Vec<_>>();
         let snapshot = self.core.src.take_snapshot(items.iter().map(|q| *q))?;
-        let mut layer = HashMap::new();
 
-        for l in self.layers.lock().unwrap().iter() {
-            // extend from lower layer to upper layer
-            let contained = items.iter().filter_map(|k| l.get_key_value(k));
-            layer.extend(contained.map(|(k, v)| (k.clone(), v.clone())));
-        }
+        let layer = items.iter().filter_map(|k| {
+            self.core.get_from_bottom(|layer| {
+                layer.get_key_value(k).map(|(k, v)| (k.clone(), v.clone()))
+            })
+        });
+
         Ok(Overriden::with_layer(
-            self.core.info.desc(),
+            self.core.desc(),
             snapshot,
-            layer,
+            layer.collect(),
         ))
     }
 }
 
 impl<S, K, V> Overridable<S, K, V> {
-    pub fn push_layer(&mut self, layer: HashMap<K, V>) {
-        self.layers.lock().unwrap().push(layer);
-        self.core.states.clear();
-        self.core.info.set_state(NodeStateId::gen());
-        self.core.info.notify_all();
+    /// Push a new override layer.
+    /// The state id of the node after the layer is pushed is returned.
+    #[inline]
+    pub fn push_layer(&mut self, layer: HashMap<K, V>) -> NodeStateId {
+        self.core.push(layer)
     }
 
-    pub fn pop_layer(&mut self) -> Option<HashMap<K, V>> {
-        let Some(res) = self.layers.lock().unwrap().pop() else {
-            return None;
-        };
-        self.core.states.clear();
-        self.core.info.set_state(NodeStateId::gen());
-        self.core.info.notify_all();
-        Some(res)
+    /// Pop the top override layer.
+    /// The state id of the node after the layer is popped is also returned.
+    #[inline]
+    pub fn pop_layer(&mut self) -> Option<(NodeStateId, HashMap<K, V>)> {
+        self.core.pop()
     }
 
-    pub fn clear_layers(&mut self) {
-        {
-            let mut layers = self.layers.lock().unwrap();
-            if layers.is_empty() {
-                return;
-            }
-            layers.clear();
-        }
-        self.core.states.clear();
-        self.core.info.set_state(NodeStateId::gen());
-        self.core.info.notify_all();
+    /// Clear all override layers.
+    /// The state id of the node after the layers are cleared is returned.
+    #[inline]
+    pub fn clear_layers(&mut self) -> NodeStateId {
+        self.core.clear()
     }
 
+    /// Num of override layers
     #[inline]
     pub fn num_layers(&self) -> usize {
-        self.layers.lock().unwrap().len()
+        self.core.num_layers()
     }
 }
 
@@ -345,24 +421,12 @@ where
     K1: Eq + Hash,
     K2: Eq + Hash,
 {
-    fn _new(desc: impl Into<String>, src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
-        let core = Arc::new(_UnaryPassThroughNode {
-            src,
-            info: NodeInfo::new(desc),
-        });
-        let subsc = Arc::downgrade(&core);
-        core.src.accept_subscriber(subsc);
+    #[inline]
+    fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
         Self {
-            core,
+            core: _UnaryPassThroughNode::new(src, desc),
             layer: Arc::new(layer),
         }
-    }
-    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<(K1, K2), V>) -> Self {
-        let mut nested = HashMap::new();
-        for (k1, k2, v) in layer.into_iter().map(|(k, v)| (k.0, k.1, v)) {
-            nested.entry(k1).or_insert_with(HashMap::new).insert(k2, v);
-        }
-        Self::_new(desc, src, nested)
     }
 }
 
@@ -380,6 +444,7 @@ impl<S, K1, K2, V> Clone for Overriden2Args<S, K1, K2, V> {
 // methods
 //
 impl<S, K1, K2, V> Overriden2Args<S, K1, K2, V> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -399,7 +464,7 @@ where
 
     fn req(&self, key1: &Q1, key2: &Q2) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
         if let Some(v) = self.layer.get(key1).and_then(|m| m.get(key2)) {
-            return Ok((self.core.info.state(), v.clone().into()));
+            return Ok((self.core.state(), v.clone().into()));
         }
         self.core.src.req(key1, key2)
     }
@@ -430,9 +495,8 @@ where
             .take_snapshot(items.iter().map(|(q1, q2)| (*q1, *q2)))?;
 
         let contained = items.iter().filter_map(|(k1, k2)| {
-            self.layer
-                .get_key_value(k1)
-                .and_then(|(k1, m)| m.get_key_value(k2).map(|(k2, v)| (k1, k2, v)))
+            let fst = self.layer.get_key_value(k1);
+            fst.and_then(|(k1, m)| m.get_key_value(k2).map(|(k2, v)| (k1, k2, v)))
         });
         let mut layer = HashMap::new();
 
@@ -442,7 +506,11 @@ where
                 .or_insert_with(HashMap::new)
                 .insert(k2.clone(), v.clone());
         }
-        Ok(Overriden2Args::_new(self.core.info.desc(), snapshot, layer))
+        Ok(Overriden2Args::with_layer(
+            self.core.desc(),
+            snapshot,
+            layer,
+        ))
     }
 }
 
@@ -452,8 +520,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overridable2Args<S, K1, K2, V> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    layers: Arc<Mutex<Vec<HashMap<K1, HashMap<K2, V>>>>>,
+    core: Arc<_node::_Node<S, HashMap<K1, HashMap<K2, V>>>>,
 }
 
 //
@@ -461,32 +528,21 @@ pub struct Overridable2Args<S, K1, K2, V> {
 //
 impl<S: Node, K1, K2, V> Overridable2Args<S, K1, K2, V>
 where
-    K1: Eq + Hash,
-    K2: Eq + Hash,
+    K1: 'static + Eq + Hash,
+    K2: 'static + Eq + Hash,
+    V: 'static,
 {
+    #[inline]
     fn _new(desc: impl Into<String>, src: S, layers: Vec<HashMap<K1, HashMap<K2, V>>>) -> Self {
-        let core = Arc::new(_UnaryPassThroughNode {
-            src,
-            states: StateRecorder::new(Some(64)),
-            info: NodeInfo::new(desc),
-        });
-        let subsc = Arc::downgrade(&core);
-        core.info.set_state(
-            core.states
-                .get_or_gen_unwrapped(&core.src.accept_subscriber(subsc)),
-        );
-        Self {
-            core,
-            layers: Arc::new(Mutex::new(layers)),
-        }
+        let core = _node::_Node::new(desc, src);
+        core.extend(layers);
+        Self { core }
     }
-    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<(K1, K2), V>) -> Self {
-        let mut nested = HashMap::new();
-        for (k1, k2, v) in layer.into_iter().map(|(k, v)| (k.0, k.1, v)) {
-            nested.entry(k1).or_insert_with(HashMap::new).insert(k2, v);
-        }
-        Self::_new(desc, src, vec![nested])
+    #[inline]
+    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
+        Self::_new(desc, src, vec![layer])
     }
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S) -> Self {
         Self::_new(desc, src, Vec::new())
     }
@@ -497,7 +553,6 @@ impl<S, K1, K2, V> Clone for Overridable2Args<S, K1, K2, V> {
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
-            layers: self.layers.clone(),
         }
     }
 }
@@ -506,6 +561,7 @@ impl<S, K1, K2, V> Clone for Overridable2Args<S, K1, K2, V> {
 // methods
 //
 impl<S, K1, K2, V> Overridable2Args<S, K1, K2, V> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -524,11 +580,11 @@ where
     type Err = S::Err;
 
     fn req(&self, key1: &Q1, key2: &Q2) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        let layer = self.layers.lock().unwrap();
-        for map in layer.iter().rev() {
-            if let Some(v) = map.get(key1).and_then(|m| m.get(key2)) {
-                return Ok((self.core.info.state(), v.clone().into()));
-            }
+        if let Some(v) = self
+            .core
+            .get_from_top(|layer| layer.get(key1).and_then(|m| m.get(key2).cloned()))
+        {
+            return Ok((self.core.state(), v.into()));
         }
         self.core.src.req(key1, key2)
     }
@@ -557,21 +613,26 @@ where
             .core
             .src
             .take_snapshot(items.iter().map(|(q1, q2)| (*q1, *q2)))?;
+
         let mut layer = HashMap::new();
 
-        for l in self.layers.lock().unwrap().iter() {
-            let contained = items.iter().filter_map(|(k1, k2)| {
-                l.get_key_value(k1)
-                    .and_then(|(k1, m)| m.get_key_value(k2).map(|(k2, v)| (k1, k2, v)))
-            });
-            for (k1, k2, v) in contained {
-                layer
-                    .entry(k1.clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(k2.clone(), v.clone());
-            }
+        let contained = items.iter().filter_map(|(k1, k2)| {
+            self.core.get_from_bottom(|layer| {
+                let fst = layer.get_key_value(k1);
+                fst.and_then(|(k1, m)| {
+                    let snd = m.get_key_value(k2);
+                    snd.map(|(k2, v)| (k1.clone(), k2.clone(), v.clone()))
+                })
+            })
+        });
+        for (k1, k2, v) in contained {
+            layer.entry(k1).or_insert_with(HashMap::new).insert(k2, v);
         }
-        Ok(Overriden2Args::_new(self.core.info.desc(), snapshot, layer))
+        Ok(Overriden2Args::with_layer(
+            self.core.desc(),
+            snapshot,
+            layer,
+        ))
     }
 }
 
@@ -580,44 +641,29 @@ where
     K1: Eq + Hash + Clone,
     K2: Eq + Hash + Clone,
 {
-    pub fn push_layer(&mut self, layer: HashMap<(K1, K2), V>) {
-        let mut nested = HashMap::new();
-        for (k1, k2, v) in layer.into_iter().map(|(k, v)| (k.0, k.1, v)) {
-            nested.entry(k1).or_insert_with(HashMap::new).insert(k2, v);
-        }
-        self.layers.lock().unwrap().push(nested);
-        self.core.states.clear();
-        self.core.info.set_state(NodeStateId::gen());
-        self.core.info.notify_all();
+    /// Push a new override layer.
+    /// The state id of the node after the layer is pushed is returned.
+    #[inline]
+    pub fn push_layer(&mut self, layer: HashMap<K1, HashMap<K2, V>>) -> NodeStateId {
+        self.core.push(layer)
     }
 
-    pub fn pop_layer(&mut self) -> Option<HashMap<(K1, K2), V>> {
-        let Some(res) = self.layers.lock().unwrap().pop() else {
-            return None;
-        };
-        self.core.states.clear();
-        self.core.info.set_state(NodeStateId::gen());
-        self.core.info.notify_all();
-        Some(
-            res.into_iter()
-                .flat_map(|(k1, m)| m.into_iter().map(move |(k2, v)| ((k1.clone(), k2), v)))
-                .collect(),
-        )
+    /// Pop the top override layer.
+    /// The state id of the node after the layer is popped is also returned.
+    #[inline]
+    pub fn pop_layer(&mut self) -> Option<(NodeStateId, HashMap<K1, HashMap<K2, V>>)> {
+        self.core.pop()
     }
 
-    pub fn clear_layers(&mut self) {
-        let mut layers = self.layers.lock().unwrap();
-        if !layers.is_empty() {
-            layers.clear();
-            self.core.states.clear();
-            self.core.info.set_state(NodeStateId::gen());
-            self.core.info.notify_all();
-        }
+    /// Clear all override layers.
+    #[inline]
+    pub fn clear_layers(&mut self) -> NodeStateId {
+        self.core.clear()
     }
 
     #[inline]
     pub fn num_layers(&self) -> usize {
-        self.layers.lock().unwrap().len()
+        self.core.num_layers()
     }
 }
 
@@ -640,31 +686,16 @@ where
     K2: Eq + Hash,
     K3: Eq + Hash,
 {
-    fn _new(
+    #[inline]
+    fn with_layer(
         desc: impl Into<String>,
         src: S,
         layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
     ) -> Self {
-        let info = NodeInfo::new(desc);
-        let core = Arc::new(_UnaryPassThroughNode { src, info });
-        let subsc = Arc::downgrade(&core);
-        core.src.accept_subscriber(subsc);
         Self {
-            core,
+            core: _UnaryPassThroughNode::new(src, desc),
             layer: Arc::new(layer),
         }
-    }
-    pub fn new(desc: impl Into<String>, src: S, layer: HashMap<(K1, K2, K3), V>) -> Self {
-        let mut nested = HashMap::new();
-        for (k1, k2, k3, v) in layer.into_iter().map(|(k, v)| (k.0, k.1, k.2, v)) {
-            nested
-                .entry(k1)
-                .or_insert_with(HashMap::new)
-                .entry(k2)
-                .or_insert_with(HashMap::new)
-                .insert(k3, v);
-        }
-        Self::_new(desc, src, nested)
     }
 }
 
@@ -682,6 +713,7 @@ impl<S, K1, K2, K3, V> Clone for Overriden3Args<S, K1, K2, K3, V> {
 // methods
 //
 impl<S, K1, K2, K3, V> Overriden3Args<S, K1, K2, K3, V> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -713,7 +745,7 @@ where
             .and_then(|m1| m1.get(key2))
             .and_then(|m2| m2.get(key3))
         {
-            return Ok((self.core.info.state(), v.clone().into()));
+            return Ok((self.core.state(), v.clone().into()));
         }
         self.core.src.req(key1, key2, key3)
     }
@@ -749,20 +781,28 @@ where
         let mut layer = HashMap::new();
 
         let contained = items.iter().filter_map(|(k1, k2, k3)| {
-            self.layer.get_key_value(k1).and_then(|(k1, m1)| {
-                m1.get_key_value(k2)
-                    .and_then(|(k2, m2)| m2.get_key_value(k3).map(|(k3, v)| (k1, k2, k3, v)))
+            let fst = self.layer.get_key_value(k1);
+            fst.and_then(|(k1, m1)| {
+                let snd = m1.get_key_value(k2);
+                snd.and_then(|(k2, m2)| {
+                    let thd = m2.get_key_value(k3);
+                    thd.map(|(k3, v)| (k1.clone(), k2.clone(), k3.clone(), v.clone()))
+                })
             })
         });
         for (k1, k2, k3, v) in contained {
             layer
-                .entry(k1.clone())
+                .entry(k1)
                 .or_insert_with(HashMap::new)
-                .entry(k2.clone())
+                .entry(k2)
                 .or_insert_with(HashMap::new)
-                .insert(k3.clone(), v.clone());
+                .insert(k3, v);
         }
-        Ok(Overriden3Args::_new(self.core.info.desc(), snapshot, layer))
+        Ok(Overriden3Args::with_layer(
+            self.core.desc(),
+            snapshot,
+            layer,
+        ))
     }
 }
 
@@ -772,8 +812,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overridable3Args<S, K1, K2, K3, V> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    layers: Arc<Mutex<Vec<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>>>,
+    core: Arc<_node::_Node<S, HashMap<K1, HashMap<K2, HashMap<K3, V>>>>>,
 }
 
 //
@@ -781,44 +820,24 @@ pub struct Overridable3Args<S, K1, K2, K3, V> {
 //
 impl<S: Node, K1, K2, K3, V> Overridable3Args<S, K1, K2, K3, V>
 where
-    K1: Eq + Hash,
-    K2: Eq + Hash,
-    K3: Eq + Hash,
+    K1: 'static + Eq + Hash,
+    K2: 'static + Eq + Hash,
+    K3: 'static + Eq + Hash,
+    V: 'static,
 {
-    fn _new(
+    #[inline]
+    fn with_layer(
         desc: impl Into<String>,
         src: S,
         layers: Vec<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>,
     ) -> Self {
-        let core = Arc::new(_UnaryPassThroughNode {
-            src,
-            states: StateRecorder::new(Some(64)),
-            info: NodeInfo::new(desc),
-        });
-        let subsc = Arc::downgrade(&core);
-        core.info.set_state(
-            core.states
-                .get_or_gen_unwrapped(&core.src.accept_subscriber(subsc)),
-        );
-        Self {
-            core,
-            layers: Arc::new(Mutex::new(layers)),
-        }
+        let core = _node::_Node::new(desc, src);
+        core.extend(layers);
+        Self { core }
     }
-    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<(K1, K2, K3), V>) -> Self {
-        let mut nested = HashMap::new();
-        for (k1, k2, k3, v) in layer.into_iter().map(|(k, v)| (k.0, k.1, k.2, v)) {
-            nested
-                .entry(k1)
-                .or_insert_with(HashMap::new)
-                .entry(k2)
-                .or_insert_with(HashMap::new)
-                .insert(k3, v);
-        }
-        Self::_new(desc, src, vec![nested])
-    }
+    #[inline]
     pub fn new(desc: impl Into<String>, src: S) -> Self {
-        Self::_new(desc, src, Vec::new())
+        Self::with_layer(desc, src, Vec::new())
     }
 }
 
@@ -827,7 +846,6 @@ impl<S, K1, K2, K3, V> Clone for Overridable3Args<S, K1, K2, K3, V> {
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
-            layers: self.layers.clone(),
         }
     }
 }
@@ -836,6 +854,7 @@ impl<S, K1, K2, K3, V> Clone for Overridable3Args<S, K1, K2, K3, V> {
 // methods
 //
 impl<S, K1, K2, K3, V> Overridable3Args<S, K1, K2, K3, V> {
+    #[inline]
     pub fn downstream(&self) -> &S {
         &self.core.src
     }
@@ -861,15 +880,12 @@ where
         key2: &Q2,
         key3: &Q3,
     ) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        let layer = self.layers.lock().unwrap();
-        for map in layer.iter().rev() {
-            if let Some(v) = map
-                .get(key1)
-                .and_then(|m1| m1.get(key2))
-                .and_then(|m2| m2.get(key3))
-            {
-                return Ok((self.core.info.state(), v.clone().into()));
-            }
+        if let Some(v) = self.core.get_from_top(|layer| {
+            let fst = layer.get(key1);
+            let snd = fst.and_then(|m1| m1.get(key2));
+            snd.and_then(|m2| m2.get(key3).cloned())
+        }) {
+            return Ok((self.core.state(), v.clone().into()));
         }
         self.core.src.req(key1, key2, key3)
     }
@@ -904,23 +920,31 @@ where
             .take_snapshot(items.iter().map(|(q1, q2, q3)| (*q1, *q2, *q3)))?;
         let mut layer = HashMap::new();
 
-        for l in self.layers.lock().unwrap().iter() {
-            let contained = items.iter().filter_map(|(k1, k2, k3)| {
-                l.get_key_value(k1).and_then(|(k1, m1)| {
-                    m1.get_key_value(k2)
-                        .and_then(|(k2, m2)| m2.get_key_value(k3).map(|(k3, v)| (k1, k2, k3, v)))
+        let contained = items.iter().filter_map(|(k1, k2, k3)| {
+            self.core.get_from_bottom(|layer| {
+                let fst = layer.get_key_value(k1);
+                fst.and_then(|(k1, m1)| {
+                    let snd = m1.get_key_value(k2);
+                    snd.and_then(|(k2, m2)| {
+                        let trd = m2.get_key_value(k3);
+                        trd.map(|(k3, v)| (k1.clone(), k2.clone(), k3.clone(), v.clone()))
+                    })
                 })
-            });
-            for (k1, k2, k3, v) in contained {
-                layer
-                    .entry(k1.clone())
-                    .or_insert_with(HashMap::new)
-                    .entry(k2.clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(k3.clone(), v.clone());
-            }
+            })
+        });
+        for (k1, k2, k3, v) in contained {
+            layer
+                .entry(k1)
+                .or_insert_with(HashMap::new)
+                .entry(k2)
+                .or_insert_with(HashMap::new)
+                .insert(k3, v);
         }
-        Ok(Overriden3Args::_new(self.core.info.desc(), snapshot, layer))
+        Ok(Overriden3Args::with_layer(
+            self.core.desc(),
+            snapshot,
+            layer,
+        ))
     }
 }
 
@@ -930,34 +954,26 @@ where
     K2: Eq + Hash + Clone,
     K3: Eq + Hash + Clone,
 {
-    pub fn push_layer(&mut self, layer: HashMap<(K1, K2, K3), V>) {
-        let mut nested = HashMap::new();
-        for (k1, k2, k3, v) in layer.into_iter().map(|(k, v)| (k.0, k.1, k.2, v)) {
-            nested
-                .entry(k1)
-                .or_insert_with(HashMap::new)
-                .entry(k2)
-                .or_insert_with(HashMap::new)
-                .insert(k3, v);
-        }
-        self.layers.lock().unwrap().push(nested);
-        self.core.states.clear();
-        self.core.info.set_state(NodeStateId::gen());
-        self.core.info.notify_all();
+    /// Push a new override layer.
+    #[inline]
+    pub fn push_layer(&mut self, layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>) -> NodeStateId {
+        self.core.push(layer)
     }
 
-    pub fn clear_layers(&mut self) {
-        let mut layers = self.layers.lock().unwrap();
-        if !layers.is_empty() {
-            layers.clear();
-            self.core.states.clear();
-            self.core.info.set_state(NodeStateId::gen());
-            self.core.info.notify_all();
-        }
+    /// Pop the top override layer.
+    #[inline]
+    pub fn pop_layer(&mut self) -> Option<(NodeStateId, HashMap<K1, HashMap<K2, HashMap<K3, V>>>)> {
+        self.core.pop()
+    }
+
+    /// Pop the top override layer.
+    #[inline]
+    pub fn clear_layers(&mut self) -> NodeStateId {
+        self.core.clear()
     }
 
     #[inline]
     pub fn num_layers(&self) -> usize {
-        self.layers.lock().unwrap().len()
+        self.core.num_layers()
     }
 }

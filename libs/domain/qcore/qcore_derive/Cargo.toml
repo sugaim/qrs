@@ -3,7 +3,6 @@ name = "qcore_derive"
 version.workspace = true
 edition.workspace = true
 
-
 [lib]
 proc-macro = true
 
