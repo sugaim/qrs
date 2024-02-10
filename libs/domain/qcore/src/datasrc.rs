@@ -8,7 +8,7 @@ mod snapshot;
 mod with_logger;
 
 pub use map::{Convert, Map, MapErr};
-pub use node::{DataSrc, DataSrc3Args, Node, NodeId, NodeInfo, NodeStateId, StateRecorder, Tree};
+pub use node::{DataSrc, DataSrc3Args, Node, NodeId, NodeInfo, NodeStateId, Tree};
 pub use on_memory::{
     ImmutableOnMemorySrc, ImmutableOnMemorySrc2Args, ImmutableOnMemorySrc3Args, OnMemorySrc,
     OnMemorySrc2Args, OnMemorySrc3Args,

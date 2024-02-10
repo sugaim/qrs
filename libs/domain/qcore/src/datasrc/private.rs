@@ -1,21 +1,25 @@
 use maplit::btreeset;
 
-use super::{Node, NodeId, NodeInfo, NodeStateId, StateRecorder, Tree};
+use super::{Node, NodeId, NodeInfo, Tree};
 
 // -----------------------------------------------------------------------------
 // _Node
 //
+
+/// Typical node implementation which does not have any state changing event.
+///
+/// Since this does not have state changing, this node uses
+/// a state id of downstream node as its own state id.
 #[derive(Debug)]
-pub(super) struct _UnaryNode<S> {
+pub(super) struct _UnaryPassThroughNode<S> {
     pub(super) src: S,
-    pub(super) states: StateRecorder<NodeStateId>,
     pub(super) info: NodeInfo,
 }
 
 //
 // methods
 //
-impl<S: Node> Node for _UnaryNode<S> {
+impl<S: Node> Node for _UnaryPassThroughNode<S> {
     #[inline]
     fn id(&self) -> NodeId {
         self.info.id()
@@ -46,8 +50,7 @@ impl<S: Node> Node for _UnaryNode<S> {
         if publisher != &self.src.id() {
             return;
         }
-        let state = self.states.get_or_gen_unwrapped(state);
-        self.info.set_state(state);
+        self.info.set_state(*state);
         self.info.notify_all();
     }
 }

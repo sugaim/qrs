@@ -1,16 +1,101 @@
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     hash::Hash,
     sync::{Arc, Mutex},
 };
 
+use maplit::btreeset;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, private::_UnaryNode, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args,
-    Node, NodeInfo, NodeStateId, StateRecorder, TakeSnapshot, TakeSnapshot2Args,
+    node::DataSrc2Args, private::_UnaryPassThroughNode, snapshot::TakeSnapshot3Args, DataSrc,
+    DataSrc3Args, Node, NodeId, NodeInfo, NodeStateId, TakeSnapshot, TakeSnapshot2Args, Tree,
 };
+
+// -----------------------------------------------------------------------------
+// _Node
+//
+#[derive(Debug)]
+struct _Node<S> {
+    src: S,
+    info: NodeInfo,
+    // state ids for override layers
+    states: Mutex<VecDeque<NodeStateId>>,
+    tail_state: Mutex<NodeStateId>,
+}
+
+//
+// construction
+//
+impl<S: Node> _Node<S> {
+    pub fn new(desc: impl Into<String>, src: S) -> Self {
+        Self {
+            src,
+            info: NodeInfo::new(desc),
+            states: Mutex::new(VecDeque::new()),
+            tail_state: Mutex::new(NodeStateId::gen()),
+        }
+    }
+}
+
+//
+// methods
+//
+impl<S> _Node<S> {
+    fn pop(&self) {
+        if let Some(state) = self.states.lock().unwrap().pop_back() {
+            *self.tail_state.lock().unwrap() = state;
+        } else {
+            // maybe unreachable
+            *self.tail_state.lock().unwrap() = NodeStateId::gen();
+        }
+    }
+    fn push(&self) {
+        let mut state = self.tail_state.lock().unwrap();
+        self.states.lock().unwrap().push_back(*state);
+        *state = NodeStateId::gen();
+    }
+}
+
+impl<S: Node> Node for _Node<S> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.info.id()
+    }
+
+    #[inline]
+    fn tree(&self) -> Tree {
+        Tree::Branch {
+            desc: self.info.desc().to_owned(),
+            id: self.id(),
+            state: self.info.state(),
+            children: btreeset![self.src.tree()],
+        }
+    }
+
+    #[inline]
+    fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn Node>) -> NodeStateId {
+        self.info.accept_subscriber(subscriber)
+    }
+
+    #[inline]
+    fn remove_subscriber(&self, subscriber: &NodeId) {
+        self.info.remove_subscriber(subscriber)
+    }
+
+    #[inline]
+    fn subscribe(&self, publisher: &NodeId, state: &NodeStateId) {
+        if publisher != &self.src.id() {
+            return;
+        }
+        self.info.set_state(NodeStateId::combine(
+            &self.tail_state.lock().unwrap(),
+            [state],
+        ));
+        self.info.notify_all();
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Overriden
@@ -18,7 +103,7 @@ use super::{
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overriden<S, K, V> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     layer: Arc<HashMap<K, V>>,
 }
 
@@ -27,16 +112,10 @@ pub struct Overriden<S, K, V> {
 //
 impl<S: Node, K, V> Overriden<S, K, V> {
     pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K, V>) -> Self {
-        let core = Arc::new(_UnaryNode {
-            src,
-            states: StateRecorder::new(Some(64)),
-            info: NodeInfo::new(desc),
-        });
+        let info = NodeInfo::new(desc);
+        let core = Arc::new(_UnaryPassThroughNode { src, info });
         let subsc = Arc::downgrade(&core);
-        core.info.set_state(
-            core.states
-                .get_or_gen_unwrapped(&core.src.accept_subscriber(subsc)),
-        );
+        core.src.accept_subscriber(subsc);
         Self {
             core,
             layer: Arc::new(layer),
@@ -114,7 +193,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overridable<S, K, V> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_Node<S>>,
     layers: Arc<Mutex<Vec<HashMap<K, V>>>>,
 }
 
@@ -123,20 +202,14 @@ pub struct Overridable<S, K, V> {
 //
 impl<S: Node, K, V> Overridable<S, K, V> {
     pub fn _new(desc: impl Into<String>, src: S, layers: Vec<HashMap<K, V>>) -> Self {
-        let core = Arc::new(_UnaryNode {
-            src,
-            states: StateRecorder::new(Some(64)),
-            info: NodeInfo::new(desc),
-        });
-        let subsc = Arc::downgrade(&core);
-        core.info.set_state(
-            core.states
-                .get_or_gen_unwrapped(&core.src.accept_subscriber(subsc)),
-        );
-        Self {
-            core,
-            layers: Arc::new(Mutex::new(layers)),
+        let core = Arc::new(_Node::new(desc, src));
+        for _ in 0..layers.len() {
+            core.push();
         }
+        let subsc = Arc::downgrade(&core);
+        core.src.accept_subscriber(subsc);
+        let layers = Arc::new(Mutex::new(layers));
+        Self { core, layers }
     }
     pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K, V>) -> Self {
         Self::_new(desc, src, vec![layer])
@@ -260,7 +333,7 @@ impl<S, K, V> Overridable<S, K, V> {
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overriden2Args<S, K1, K2, V> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     layer: Arc<HashMap<K1, HashMap<K2, V>>>,
 }
 
@@ -273,16 +346,12 @@ where
     K2: Eq + Hash,
 {
     fn _new(desc: impl Into<String>, src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
-        let core = Arc::new(_UnaryNode {
+        let core = Arc::new(_UnaryPassThroughNode {
             src,
-            states: StateRecorder::new(Some(64)),
             info: NodeInfo::new(desc),
         });
         let subsc = Arc::downgrade(&core);
-        core.info.set_state(
-            core.states
-                .get_or_gen_unwrapped(&core.src.accept_subscriber(subsc)),
-        );
+        core.src.accept_subscriber(subsc);
         Self {
             core,
             layer: Arc::new(layer),
@@ -383,7 +452,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overridable2Args<S, K1, K2, V> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     layers: Arc<Mutex<Vec<HashMap<K1, HashMap<K2, V>>>>>,
 }
 
@@ -396,7 +465,7 @@ where
     K2: Eq + Hash,
 {
     fn _new(desc: impl Into<String>, src: S, layers: Vec<HashMap<K1, HashMap<K2, V>>>) -> Self {
-        let core = Arc::new(_UnaryNode {
+        let core = Arc::new(_UnaryPassThroughNode {
             src,
             states: StateRecorder::new(Some(64)),
             info: NodeInfo::new(desc),
@@ -558,7 +627,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overriden3Args<S, K1, K2, K3, V> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     layer: Arc<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>,
 }
 
@@ -576,16 +645,10 @@ where
         src: S,
         layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
     ) -> Self {
-        let core = Arc::new(_UnaryNode {
-            src,
-            states: StateRecorder::new(Some(64)),
-            info: NodeInfo::new(desc),
-        });
+        let info = NodeInfo::new(desc);
+        let core = Arc::new(_UnaryPassThroughNode { src, info });
         let subsc = Arc::downgrade(&core);
-        core.info.set_state(
-            core.states
-                .get_or_gen_unwrapped(&core.src.accept_subscriber(subsc)),
-        );
+        core.src.accept_subscriber(subsc);
         Self {
             core,
             layer: Arc::new(layer),
@@ -709,7 +772,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Overridable3Args<S, K1, K2, K3, V> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     layers: Arc<Mutex<Vec<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>>>,
 }
 
@@ -727,7 +790,7 @@ where
         src: S,
         layers: Vec<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>,
     ) -> Self {
-        let core = Arc::new(_UnaryNode {
+        let core = Arc::new(_UnaryPassThroughNode {
             src,
             states: StateRecorder::new(Some(64)),
             info: NodeInfo::new(desc),

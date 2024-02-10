@@ -3,8 +3,8 @@ use std::sync::Arc;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, private::_UnaryNode, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args,
-    Node, NodeInfo, NodeStateId, StateRecorder, TakeSnapshot, TakeSnapshot2Args,
+    node::DataSrc2Args, private::_UnaryPassThroughNode, snapshot::TakeSnapshot3Args, DataSrc,
+    DataSrc3Args, Node, NodeInfo, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
@@ -13,7 +13,7 @@ use super::{
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct WithLogger<S, F> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     logger: Arc<F>,
 }
 
@@ -31,16 +31,15 @@ impl<S, F> Clone for WithLogger<S, F> {
 }
 
 impl<S: Node, F: 'static> WithLogger<S, F> {
-    pub fn new(desc: impl Into<String>, src: S, logger: F) -> Self {
+    fn _new(desc: impl Into<String>, src: S, logger: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
-        let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_UnaryNode { src, states, info });
+        let core = Arc::new(_UnaryPassThroughNode { src, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
-        Self {
-            core,
-            logger: Arc::new(logger),
-        }
+        Self { core, logger }
+    }
+    pub fn new(desc: impl Into<String>, src: S, logger: F) -> Self {
+        Self::_new(desc, src, Arc::new(logger))
     }
 }
 
@@ -127,14 +126,11 @@ where
         K: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger {
-            core: Arc::new(_UnaryNode {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            logger: self.logger.clone(),
-        })
+        Ok(WithLogger::_new(
+            self.core.info.desc(),
+            snap,
+            self.logger.clone(),
+        ))
     }
 }
 
@@ -155,14 +151,11 @@ where
         K2: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger {
-            core: Arc::new(_UnaryNode {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            logger: self.logger.clone(),
-        })
+        Ok(WithLogger::_new(
+            self.core.info.desc(),
+            snap,
+            self.logger.clone(),
+        ))
     }
 }
 
@@ -185,14 +178,11 @@ where
         K3: 'a,
     {
         let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger {
-            core: Arc::new(_UnaryNode {
-                src: snap,
-                states: StateRecorder::new(Some(64)),
-                info: NodeInfo::new(self.core.info.desc()),
-            }),
-            logger: self.logger.clone(),
-        })
+        Ok(WithLogger::_new(
+            self.core.info.desc(),
+            snap,
+            self.logger.clone(),
+        ))
     }
 }
 

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use qcore_derive::Node;
 
 use super::{
-    node::DataSrc2Args, private::_UnaryNode, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args,
-    Node, NodeInfo, NodeStateId, StateRecorder, TakeSnapshot, TakeSnapshot2Args,
+    node::DataSrc2Args, private::_UnaryPassThroughNode, snapshot::TakeSnapshot3Args, DataSrc,
+    DataSrc3Args, Node, NodeInfo, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
@@ -13,7 +13,7 @@ use super::{
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Map<S, F> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     f: Arc<F>,
 }
 
@@ -33,8 +33,7 @@ impl<S, F> Clone for Map<S, F> {
 impl<S: Node, F: 'static> Map<S, F> {
     fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
-        let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_UnaryNode { src, states, info });
+        let core = Arc::new(_UnaryPassThroughNode { src, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
         Self { core, f }
@@ -179,7 +178,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct MapErr<S, F> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     f: Arc<F>,
 }
 
@@ -199,8 +198,7 @@ impl<S, F> Clone for MapErr<S, F> {
 impl<S: Node, F: 'static> MapErr<S, F> {
     fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
-        let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_UnaryNode { src, states, info });
+        let core = Arc::new(_UnaryPassThroughNode { src, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
         Self { core, f }
@@ -350,7 +348,7 @@ where
 #[derive(Debug, Node)]
 #[node(transparent = "core")]
 pub struct Convert<S, F> {
-    core: Arc<_UnaryNode<S>>,
+    core: Arc<_UnaryPassThroughNode<S>>,
     f: Arc<F>,
 }
 
@@ -370,8 +368,7 @@ impl<S, F> Clone for Convert<S, F> {
 impl<S: Node, F: 'static> Convert<S, F> {
     fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
         let info = NodeInfo::new(desc);
-        let states = StateRecorder::new(Some(64));
-        let core = Arc::new(_UnaryNode { src, states, info });
+        let core = Arc::new(_UnaryPassThroughNode { src, info });
         let subs = Arc::downgrade(&core);
         core.src.accept_subscriber(subs);
         Self { core, f }

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::BTreeSet,
     fmt::Display,
     sync::{Mutex, Weak},
 };
@@ -73,6 +73,22 @@ impl NodeStateId {
     /// that the `NodeStateId` is almost surely unique.
     pub fn gen() -> Self {
         NodeStateId(Uuid::new_v4())
+    }
+
+    /// Combine multiple `NodeStateId`s into one.
+    ///
+    /// This may be useful when we want to generate a new state id
+    /// from multiple state ids and want to ensure that the same inputs
+    /// always produce the same output.
+    pub fn combine<'a, It>(state: &Self, states: It) -> Self
+    where
+        It: IntoIterator<Item = &'a NodeStateId>,
+    {
+        let mut val = state.0.as_u128();
+        for s in states {
+            val ^= s.0.as_u128();
+        }
+        NodeStateId(Uuid::from_u128(val))
     }
 }
 
@@ -176,63 +192,6 @@ impl NodeInfo {
             state: self.state(),
             children,
         }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// StateRecorder
-//
-#[derive(Debug)]
-pub struct StateRecorder<K> {
-    max: Option<u64>,
-    data: Mutex<VecDeque<(K, NodeStateId)>>,
-}
-
-//
-// construction
-//
-impl<K> StateRecorder<K> {
-    pub fn new(max_capacity: Option<u64>) -> Self {
-        Self {
-            max: max_capacity,
-            data: Mutex::new(VecDeque::new()),
-        }
-    }
-}
-
-//
-// methods
-//
-impl<K: Eq + Clone> StateRecorder<K> {
-    /// Get the state id of the node with the given key.
-    ///
-    /// - `Ok`: when state is already recorded
-    /// - `Err`: when state is not recorded. New state id is generated and returned.
-    pub fn get_or_gen(&self, key: &K) -> Result<NodeStateId, NodeStateId> {
-        if self.max == Some(0) {
-            return Err(NodeStateId::gen());
-        }
-        let mut data = self.data.lock().unwrap();
-        if let Some(id) = data.iter().rev().find(|(k, _)| k == key).map(|(_, id)| *id) {
-            return Ok(id);
-        }
-        let new = NodeStateId::gen();
-        data.push_back((key.clone(), new));
-        if let Some(max) = self.max {
-            let max = max as usize;
-            while max < data.len() {
-                data.pop_front();
-            }
-        }
-        Err(new)
-    }
-
-    pub fn get_or_gen_unwrapped(&self, key: &K) -> NodeStateId {
-        self.get_or_gen(key).unwrap_or_else(|id| id)
-    }
-
-    pub fn clear(&self) {
-        self.data.lock().unwrap().clear();
     }
 }
 
