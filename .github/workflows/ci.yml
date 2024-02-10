@@ -10,38 +10,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  ci-ubuntu:
+  CI:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Install nextest
-      shell: bash
+    - uses: actions/checkout@v3
+    - shell: bash
       run: |
         curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
-    - name: Build
-      run: cargo build --verbose -r --workspace
-    - name: Run tests
-      run: cargo nextest run -r --workspace --verbose --retries 1
-
-  coverage:
-    needs: ci-ubuntu
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@nightly
       with:
         components: llvm-tools-preview
     - uses: taiki-e/install-action@cargo-llvm-cov
     - uses: taiki-e/install-action@nextest
-    - name: Collect coverage data (including doctests)
-      run: |
+    - run: cargo nextest run -r --workspace --verbose --retries 1
+    - run: |
         cargo llvm-cov --no-report nextest
         cargo llvm-cov --no-report --doc
         cargo llvm-cov report --doctests --lcov --output-path lcov.info
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v3
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
