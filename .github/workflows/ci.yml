@@ -15,12 +15,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - run: curl -LsSF https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+    - shell: bash
+      run: |
+        curl -LsSF https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
     - run: cargo nextest run -r --workspace
 
   coverage:
     runs-on: ubuntu-latest
-    needs: ci
 
     steps:
     - uses: actions/checkout@v4
