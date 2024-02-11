@@ -15,9 +15,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - shell: bash
-      run: |
-        curl -LsSF https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+    - uses: taiki-e/install-action@nextest
     - run: cargo nextest run -r --workspace
 
   coverage:
