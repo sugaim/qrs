@@ -417,6 +417,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_debug() {
+        // fixed offset
+        let dt: DateTime<_> =
+            chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
+                .unwrap()
+                .into();
+        assert_eq!(format!("{:?}", dt), "2021-01-01T10:42:11+09:00");
+
+        // utc
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
+        assert_eq!(format!("{:?}", dt), "2021-01-01T10:42:11Z");
+
+        // IANA
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        assert_eq!(format!("{:?}", dt), "2021-01-01T05:42:11EST");
+    }
+
+    #[test]
     fn test_display() {
         // fixed offset
         let dt: DateTime<_> =
@@ -702,6 +725,28 @@ mod tests {
             assert_eq!(dt.iso_week(), chrono_dt.iso_week());
             assert_eq!(dt.day0(), chrono_dt.day0());
             assert_eq!(dt.ordinal0(), chrono_dt.ordinal0());
+            assert_eq!(dt.with_day(1), chrono_dt.with_day(1).map(|dt| dt.into()));
+            assert_eq!(dt.with_day0(0), chrono_dt.with_day0(0).map(|dt| dt.into()));
+            assert_eq!(
+                dt.with_month(4),
+                chrono_dt.with_month(4).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_month0(3),
+                chrono_dt.with_month0(3).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_year(2022),
+                chrono_dt.with_year(2022).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_ordinal(365),
+                chrono_dt.with_ordinal(365).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_ordinal0(364),
+                chrono_dt.with_ordinal0(364).map(|dt| dt.into())
+            );
         }
 
         // utc
@@ -721,6 +766,28 @@ mod tests {
             assert_eq!(dt.iso_week(), chrono_dt.iso_week());
             assert_eq!(dt.day0(), chrono_dt.day0());
             assert_eq!(dt.ordinal0(), chrono_dt.ordinal0());
+            assert_eq!(dt.with_day(1), chrono_dt.with_day(1).map(|dt| dt.into()));
+            assert_eq!(dt.with_day0(0), chrono_dt.with_day0(0).map(|dt| dt.into()));
+            assert_eq!(
+                dt.with_month(4),
+                chrono_dt.with_month(4).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_month0(3),
+                chrono_dt.with_month0(3).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_year(2022),
+                chrono_dt.with_year(2022).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_ordinal(365),
+                chrono_dt.with_ordinal(365).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_ordinal0(364),
+                chrono_dt.with_ordinal0(364).map(|dt| dt.into())
+            );
         }
 
         // IANA
@@ -746,6 +813,28 @@ mod tests {
             assert_eq!(dt.iso_week(), chrono_dt.iso_week());
             assert_eq!(dt.day0(), chrono_dt.day0());
             assert_eq!(dt.ordinal0(), chrono_dt.ordinal0());
+            assert_eq!(dt.with_day(1), chrono_dt.with_day(1).map(|dt| dt.into()));
+            assert_eq!(dt.with_day0(0), chrono_dt.with_day0(0).map(|dt| dt.into()));
+            assert_eq!(
+                dt.with_month(4),
+                chrono_dt.with_month(4).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_month0(3),
+                chrono_dt.with_month0(3).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_year(2022),
+                chrono_dt.with_year(2022).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_ordinal(365),
+                chrono_dt.with_ordinal(365).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_ordinal0(364),
+                chrono_dt.with_ordinal0(364).map(|dt| dt.into())
+            );
         }
     }
 
@@ -763,6 +852,19 @@ mod tests {
             assert_eq!(dt.minute(), chrono_dt.minute());
             assert_eq!(dt.second(), chrono_dt.second());
             assert_eq!(dt.nanosecond(), chrono_dt.nanosecond());
+            assert_eq!(dt.with_hour(1), chrono_dt.with_hour(1).map(|dt| dt.into()));
+            assert_eq!(
+                dt.with_minute(1),
+                chrono_dt.with_minute(1).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_second(1),
+                chrono_dt.with_second(1).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_nanosecond(1),
+                chrono_dt.with_nanosecond(1).map(|dt| dt.into())
+            );
         }
 
         // utc
@@ -777,6 +879,19 @@ mod tests {
             assert_eq!(dt.minute(), chrono_dt.minute());
             assert_eq!(dt.second(), chrono_dt.second());
             assert_eq!(dt.nanosecond(), chrono_dt.nanosecond());
+            assert_eq!(dt.with_hour(1), chrono_dt.with_hour(1).map(|dt| dt.into()));
+            assert_eq!(
+                dt.with_minute(1),
+                chrono_dt.with_minute(1).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_second(1),
+                chrono_dt.with_second(1).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_nanosecond(1),
+                chrono_dt.with_nanosecond(1).map(|dt| dt.into())
+            );
         }
 
         // IANA
@@ -797,6 +912,19 @@ mod tests {
             assert_eq!(dt.minute(), chrono_dt.minute());
             assert_eq!(dt.second(), chrono_dt.second());
             assert_eq!(dt.nanosecond(), chrono_dt.nanosecond());
+            assert_eq!(dt.with_hour(1), chrono_dt.with_hour(1).map(|dt| dt.into()));
+            assert_eq!(
+                dt.with_minute(1),
+                chrono_dt.with_minute(1).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_second(1),
+                chrono_dt.with_second(1).map(|dt| dt.into())
+            );
+            assert_eq!(
+                dt.with_nanosecond(1),
+                chrono_dt.with_nanosecond(1).map(|dt| dt.into())
+            );
         }
     }
 }
