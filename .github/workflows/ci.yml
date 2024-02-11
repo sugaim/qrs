@@ -21,8 +21,8 @@ jobs:
     - uses: taiki-e/install-action@cargo-llvm-cov
     - uses: taiki-e/install-action@nextest
     - run: |
-        cargo llvm-cov -r --no-report nextest
-        cargo llvm-cov -r --no-report --doc
+        cargo llvm-cov --no-report nextest
+        cargo llvm-cov --no-report --doc
         cargo llvm-cov report --doctests --lcov --output-path lcov.info --ignore-filename-regex scripts/*
     - uses: codecov/codecov-action@v3
       env:
