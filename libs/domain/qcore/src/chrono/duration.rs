@@ -27,14 +27,50 @@ pub struct Duration {
 impl Debug for Duration {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.internal, f)
+        Display::fmt(&self, f)
     }
 }
 
 impl Display for Duration {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.internal, f)
+        let mut secs = self.internal.num_seconds();
+        let mut sub_nanosecs = self.internal.subsec_nanos();
+
+        let sign = if secs < 0 || sub_nanosecs < 0 {
+            secs = -secs;
+            sub_nanosecs = -sub_nanosecs;
+            "-"
+        } else {
+            ""
+        };
+
+        let days = secs / (24 * 60 * 60);
+        secs %= 24 * 60 * 60;
+        let hours = secs / (60 * 60);
+        secs %= 60 * 60;
+        let mins = secs / 60;
+        secs %= 60;
+
+        if days != 0 {
+            write!(f, "{}P{}D", sign, days)?;
+        } else {
+            write!(f, "{}P", sign)?;
+        }
+        if hours != 0 || mins != 0 || secs != 0 || sub_nanosecs != 0 {
+            write!(f, "T")?;
+        }
+        if hours != 0 {
+            write!(f, "{}H", hours)?;
+        }
+        if mins != 0 {
+            write!(f, "{}M", mins)?;
+        }
+        if secs != 0 || sub_nanosecs != 0 {
+            let secs = Decimal::new(secs, 0) + Decimal::new(sub_nanosecs as _, 9);
+            write!(f, "{}S", secs)?;
+        }
+        Ok(())
     }
 }
 
@@ -721,14 +757,19 @@ mod tests {
     #[template]
     #[rstest]
     #[case::d("P1D", Some(Duration::with_days(1)))]
+    #[case::d("P+1D", Some(Duration::with_days(1)))]
     #[case::d("P-2D", Some(-Duration::with_days(2)))]
     #[case::w("P1W", Some(Duration::with_days(7)))]
+    #[case::w("P+1W", Some(Duration::with_days(7)))]
     #[case::w("P-2W", Some(-Duration::with_days(14)))]
     #[case::h("PT1H", Some(Duration::with_hours(1)))]
+    #[case::h("PT+1H", Some(Duration::with_hours(1)))]
     #[case::h("PT-2H", Some(-Duration::with_hours(2)))]
     #[case::m("PT1M", Some(Duration::with_mins(1)))]
+    #[case::m("PT+1M", Some(Duration::with_mins(1)))]
     #[case::m("PT-2M", Some(-Duration::with_mins(2)))]
     #[case::s("PT1S", Some(Duration::with_secs(1)))]
+    #[case::s("PT+1S", Some(Duration::with_secs(1)))]
     #[case::s("PT-2S", Some(-Duration::with_secs(2)))]
     #[case::s("PT1.5S", Some(Duration::with_nanosecs(1_500_000_000)))]
     #[case::s("PT-2.5S", Some(-Duration::with_nanosecs(2_500_000_000)))]
@@ -806,6 +847,21 @@ mod tests {
         let qcore_obj = Duration::with_days(1);
         let chrono_obj: chrono::Duration = qcore_obj.into();
         assert_eq!(chrono_obj, chrono::Duration::days(1));
+    }
+
+    #[test]
+    fn test_debug() {
+        let d = Duration::with_days(1);
+        assert_eq!(format!("{:?}", d), "P1D");
+        assert_eq!(format!("{:?}", -d), "-P1D");
+
+        let d = Duration::with_hours(1);
+        assert_eq!(format!("{:?}", d), "PT1H");
+        assert_eq!(format!("{:?}", -d), "-PT1H");
+
+        let d = Duration::with_nanosecs(1);
+        assert_eq!(format!("{:?}", d), "PT0.000000001S");
+        assert_eq!(format!("{:?}", -d), "-PT0.000000001S");
     }
 
     #[apply(cases_for_parse)]
