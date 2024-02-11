@@ -91,6 +91,18 @@ impl<Tz: TimeZone> DateTime<Tz>
 where
     Tz::Offset: Display,
 {
+    /// Formats the combined date and time with the specified format string.
+    /// See [chrono::DateTime::format] for more details.
+    ///
+    /// # Examples
+    /// ```
+    /// use qcore::chrono::DateTime;
+    /// use std::str::FromStr;
+    ///
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// assert_eq!(format!("{}", dt.format("%Y-%m-%d %H:%M:%S %:z")), "2021-01-01 10:42:11 +09:00");
+    /// assert_eq!(format!("{}", dt.format("%Y%m%dT%H%M%S%z")), "20210101T104211+0900")
+    /// ```
     #[inline]
     pub fn format<'a>(&self, fmt: &'a str) -> DelayedFormat<chrono::format::StrftimeItems<'a>> {
         self.internal.format(fmt)
@@ -383,6 +395,22 @@ impl<Tz: TimeZone + Clone> Sub<&DateTime<Tz>> for DateTime<Tz> {
         (self.internal - rhs.internal.clone()).into()
     }
 }
+impl<Tz: TimeZone + Clone> Sub<DateTime<Tz>> for &DateTime<Tz> {
+    type Output = super::Duration;
+
+    #[inline]
+    fn sub(self, rhs: DateTime<Tz>) -> Self::Output {
+        (self.internal.clone() - rhs.internal).into()
+    }
+}
+impl<Tz: TimeZone + Clone> Sub<&DateTime<Tz>> for &DateTime<Tz> {
+    type Output = super::Duration;
+
+    #[inline]
+    fn sub(self, rhs: &DateTime<Tz>) -> Self::Output {
+        (self.internal.clone() - rhs.internal.clone()).into()
+    }
+}
 
 macro_rules! define_self_duration_op {
     ($op:ident, $op_fn:ident) => {
@@ -505,6 +533,41 @@ mod tests {
     }
 
     #[test]
+    fn test_new() {
+        // fixed offset
+        let dt = DateTime::<chrono::FixedOffset>::new(
+            chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
+            chrono::FixedOffset::east_opt(9 * 3600).unwrap(),
+        );
+        let chrono_dt: chrono::DateTime<_> = dt.into();
+        let expected =
+            chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        assert_eq!(chrono_dt, expected);
+
+        // utc
+        let dt = DateTime::<chrono::Utc>::new(
+            chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
+            chrono::Utc,
+        );
+        let chrono_dt: chrono::DateTime<_> = dt.into();
+        let expected = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z").unwrap();
+        assert_eq!(chrono_dt, expected);
+
+        // IANA
+        let dt = DateTime::<chrono::Utc>::new(
+            chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
+            chrono::Utc,
+        )
+        .with_timezone(&chrono_tz::Tz::America__New_York);
+
+        let chrono_dt: chrono::DateTime<_> = dt.into();
+        let expected = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York);
+        assert_eq!(chrono_dt, expected);
+    }
+
+    #[test]
     fn test_sub() {
         // fixed offset
         let dt1: DateTime<_> =
@@ -516,6 +579,9 @@ mod tests {
                 .unwrap()
                 .into();
         assert_eq!(dt1 - dt2, Duration::zero());
+        assert_eq!(&dt1 - &dt2, dt1 - dt2);
+        assert_eq!(dt1 - &dt2, dt1 - dt2);
+        assert_eq!(&dt1 - dt2, dt1 - dt2);
 
         let dt1: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
@@ -527,6 +593,9 @@ mod tests {
                 .unwrap()
                 .into();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
+        assert_eq!(&dt1 - &dt2, dt1 - dt2);
+        assert_eq!(dt1 - &dt2, dt1 - dt2);
+        assert_eq!(&dt1 - dt2, dt1 - dt2);
 
         // utc
         let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
@@ -536,6 +605,9 @@ mod tests {
             .unwrap()
             .into();
         assert_eq!(dt1 - dt2, Duration::zero());
+        assert_eq!(dt1 - &dt2, dt1 - dt2);
+        assert_eq!(&dt1 - dt2, dt1 - dt2);
+        assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
         let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
@@ -544,6 +616,9 @@ mod tests {
             .unwrap()
             .into();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
+        assert_eq!(dt1 - &dt2, dt1 - dt2);
+        assert_eq!(&dt1 - dt2, dt1 - dt2);
+        assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
         // IANA
         let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
@@ -555,6 +630,9 @@ mod tests {
             .with_timezone(&chrono_tz::Tz::America__New_York)
             .into();
         assert_eq!(dt1 - dt2, Duration::zero());
+        assert_eq!(dt1 - &dt2, dt1 - dt2);
+        assert_eq!(&dt1 - dt2, dt1 - dt2);
+        assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
         let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
@@ -565,6 +643,9 @@ mod tests {
             .with_timezone(&chrono_tz::Tz::America__New_York)
             .into();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
+        assert_eq!(dt1 - &dt2, dt1 - dt2);
+        assert_eq!(&dt1 - dt2, dt1 - dt2);
+        assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
         // between summer time and winter time
         let dt1: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-13T08:30:00")
@@ -580,6 +661,9 @@ mod tests {
             .unwrap()
             .into();
         assert_eq!(dt2 - dt1, Duration::with_secs(23 * 60 * 60));
+        assert_eq!(&dt2 - &dt1, dt2 - dt1);
+        assert_eq!(dt2 - &dt1, dt2 - dt1);
+        assert_eq!(&dt2 - dt1, dt2 - dt1);
     }
 
     #[test]
@@ -591,7 +675,9 @@ mod tests {
                 .into();
         let duration = Duration::zero();
         assert_eq!(dt + duration, dt);
+        assert_eq!(dt + &duration, dt);
         assert_eq!(dt - duration, dt);
+        assert_eq!(dt - &duration, dt);
 
         let dt: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
@@ -604,12 +690,14 @@ mod tests {
                 .unwrap()
                 .into()
         );
+        assert_eq!(dt + &duration, dt + duration);
         assert_eq!(
             dt - duration,
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:10+09:00")
                 .unwrap()
                 .into()
         );
+        assert_eq!(dt - &duration, dt - duration);
 
         // utc
         let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
@@ -617,7 +705,9 @@ mod tests {
             .into();
         let duration = Duration::zero();
         assert_eq!(dt + duration, dt);
+        assert_eq!(dt + &duration, dt);
         assert_eq!(dt - duration, dt);
+        assert_eq!(dt - &duration, dt);
 
         let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
@@ -629,12 +719,14 @@ mod tests {
                 .unwrap()
                 .into()
         );
+        assert_eq!(dt + &duration, dt + duration);
         assert_eq!(
             dt - duration,
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:10Z")
                 .unwrap()
                 .into()
         );
+        assert_eq!(dt - &duration, dt - duration);
 
         // IANA
         let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
@@ -643,6 +735,7 @@ mod tests {
             .into();
         let duration = Duration::zero();
         assert_eq!(dt + duration, dt);
+        assert_eq!(dt + &duration, dt);
 
         let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
@@ -656,6 +749,7 @@ mod tests {
                 .with_timezone(&chrono_tz::Tz::America__New_York)
                 .into()
         );
+        assert_eq!(dt + &duration, dt + duration);
 
         let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
@@ -669,6 +763,7 @@ mod tests {
                 .with_timezone(&chrono_tz::Tz::America__New_York)
                 .into()
         );
+        assert_eq!(dt - &duration, dt - duration);
 
         // between summer time and winter time
         let dt: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-13T08:30:00")
@@ -687,6 +782,7 @@ mod tests {
                 .unwrap()
                 .into()
         );
+        assert_eq!(dt + &duration, dt + duration);
 
         let dt: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-14T08:30:00")
             .unwrap()
@@ -704,6 +800,7 @@ mod tests {
                 .unwrap()
                 .into()
         );
+        assert_eq!(dt - &duration, dt - duration);
     }
 
     #[test]
