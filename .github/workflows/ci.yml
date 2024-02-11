@@ -19,7 +19,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    after: ci
+    needs: ci
 
     steps:
     - uses: actions/checkout@v4
