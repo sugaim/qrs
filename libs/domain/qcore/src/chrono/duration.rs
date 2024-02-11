@@ -37,6 +37,10 @@ impl Display for Duration {
         let mut secs = self.internal.num_seconds();
         let mut sub_nanosecs = self.internal.subsec_nanos();
 
+        if secs == 0 && sub_nanosecs == 0 {
+            return write!(f, "PT0S");
+        }
+
         let sign = if secs < 0 || sub_nanosecs < 0 {
             secs = -secs;
             sub_nanosecs = -sub_nanosecs;
@@ -55,8 +59,13 @@ impl Display for Duration {
         if days != 0 {
             write!(f, "{}P{}D", sign, days)?;
         } else {
+            debug_assert!(
+                hours != 0 || mins != 0 || secs != 0 || sub_nanosecs != 0,
+                "0 duration is checked at the beginning of the function."
+            );
             write!(f, "{}P", sign)?;
         }
+
         if hours != 0 || mins != 0 || secs != 0 || sub_nanosecs != 0 {
             write!(f, "T")?;
         }
