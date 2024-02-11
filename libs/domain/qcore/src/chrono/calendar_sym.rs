@@ -851,7 +851,7 @@ mod tests {
         let sym = sym & CalendarSymbol::of_any_closed(["NY", "LN"].into_iter()).unwrap();
         assert_eq!(
             sym,
-            CalendarSymbol::of_all_closed(["TK", "NY", "LN"].into_iter()).unwrap()
+            CalendarSymbol::of_all_closed(["TK", "NY|LN"].into_iter()).unwrap()
         );
 
         let sym = CalendarSymbol::of_single("TK").unwrap();
