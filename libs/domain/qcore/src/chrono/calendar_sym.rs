@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::bail;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 // -----------------------------------------------------------------------------
@@ -132,6 +133,27 @@ impl<'de> serde::Deserialize<'de> for CalendarSymbol {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         CalendarSymbol::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+impl JsonSchema for CalendarSymbol {
+    fn schema_name() -> String {
+        "CalendarSymbol".to_owned()
+    }
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "qcore::chrono::CalendarSymbol".into()
+    }
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let mut sch = <String as JsonSchema>::json_schema(gen).into_object();
+        sch.metadata().description = Some("A symbol for a calendar.".to_owned());
+        sch.metadata().title = Some(Self::schema_name());
+        sch.metadata().id = Some(Self::schema_id().into_owned());
+        sch.metadata().examples = vec![
+            "TK".into(),
+            "TK|NY".into(),
+            "TK&NY".into(),
+            "(TK|NY)&(LN|TK)".into(),
+        ];
+        sch.into()
     }
 }
 
@@ -352,10 +374,154 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_of_single() {
+        let sym = CalendarSymbol::of_single("TK");
+        assert_eq!(sym.unwrap(), CalendarSymbol::of_single("TK").unwrap());
+
+        let sym = CalendarSymbol::of_single("TK|NY");
+        assert!(sym.is_err());
+
+        let sym = CalendarSymbol::of_single("(TK)");
+        assert!(sym.is_err());
+
+        let sym = CalendarSymbol::of_single("");
+        assert!(sym.is_err());
+
+        let sym = CalendarSymbol::of_single(" ");
+        assert!(sym.is_err());
+
+        let sym = CalendarSymbol::of_single("😃");
+        assert!(sym.is_err());
+    }
+
+    #[test]
+    fn test_of_all_closed() {
+        let sym = CalendarSymbol::of_all_closed(["TK"].into_iter());
+        assert_eq!(sym.unwrap(), CalendarSymbol::of_single("TK").unwrap());
+
+        let sym = CalendarSymbol::of_all_closed(["TK", "NY"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AllClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 2);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+
+        let sym = CalendarSymbol::of_all_closed(["TK", "NY", "LN"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AllClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 3);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("LN").unwrap()));
+
+        let sym = CalendarSymbol::of_all_closed(["TK", "NY", "NY"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AllClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 2);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+
+        let sym = CalendarSymbol::of_all_closed(["TK", "NY&LN"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AllClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 3);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("LN").unwrap()));
+
+        let sym = CalendarSymbol::of_all_closed(["TK", "NY|LN"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AllClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 2);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_any_closed(["NY", "LN"].into_iter()).unwrap()));
+
+        // error
+        let sym = CalendarSymbol::of_all_closed(["", "TK"].into_iter());
+        assert!(sym.is_err());
+
+        let sym = CalendarSymbol::of_all_closed(Vec::<&str>::new().into_iter());
+        assert!(sym.is_err());
+    }
+
+    #[test]
+    fn test_of_any_closed() {
+        let sym = CalendarSymbol::of_any_closed(["TK"].into_iter());
+        assert_eq!(sym.unwrap(), CalendarSymbol::of_single("TK").unwrap());
+
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AnyClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 2);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY", "LN"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AnyClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 3);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("LN").unwrap()));
+
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY", "NY"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AnyClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 2);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AnyClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 2);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_all_closed(["NY", "LN"].into_iter()).unwrap()));
+
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY|LN"].into_iter());
+        assert!(sym.is_ok());
+        let CalendarSymVariant::AnyClosed(c) = sym.unwrap().take_dispatch() else {
+            unreachable!();
+        };
+        assert_eq!(c.len(), 3);
+        assert!(c.contains(&CalendarSymbol::of_single("TK").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("NY").unwrap()));
+        assert!(c.contains(&CalendarSymbol::of_single("LN").unwrap()));
+
+        // error
+        let sym = CalendarSymbol::of_any_closed(["", "TK"].into_iter());
+        assert!(sym.is_err());
+
+        let sym = CalendarSymbol::of_any_closed(Vec::<&str>::new().into_iter());
+        assert!(sym.is_err());
+    }
+
+    #[test]
     fn test_from_str() {
         // single
         let parsed = CalendarSymbol::from_str("TK");
         assert_eq!(parsed.unwrap(), CalendarSymbol::of_single("TK").unwrap());
+
+        let parsed = CalendarSymbol::from_str("(NY)");
+        assert_eq!(parsed.unwrap(), CalendarSymbol::of_single("NY").unwrap());
 
         // one binary operator
         let parsed = CalendarSymbol::from_str("TK|NY");
@@ -434,6 +600,18 @@ mod tests {
         );
 
         // error
+        let parsed = CalendarSymbol::from_str("");
+        assert!(parsed.is_err());
+
+        let parsed = CalendarSymbol::from_str(" ");
+        assert!(parsed.is_err());
+
+        let parsed = CalendarSymbol::from_str("😃");
+        assert!(parsed.is_err());
+
+        let parsed = CalendarSymbol::from_str("<TK>");
+        assert!(parsed.is_err());
+
         let parsed = CalendarSymbol::from_str("TK|NY&");
         assert!(parsed.is_err());
 
@@ -445,6 +623,98 @@ mod tests {
 
         let parsed = CalendarSymbol::from_str("()");
         assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_conversion_between_variant() {
+        // into variant
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let var: CalendarSymVariant = sym.clone().into();
+        assert_eq!(var, CalendarSymVariant::Single("TK".to_owned()));
+        assert_eq!(sym.dispatch(), &var);
+        assert_eq!(sym.take_dispatch(), var);
+
+        let sym = CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap();
+        let var: CalendarSymVariant = sym.clone().into();
+        assert_eq!(
+            var,
+            CalendarSymVariant::AnyClosed(
+                ["TK", "NY"]
+                    .into_iter()
+                    .map(|s| CalendarSymbol::of_single(s).unwrap())
+                    .collect()
+            )
+        );
+        assert_eq!(sym.dispatch(), &var);
+        assert_eq!(sym.take_dispatch(), var);
+
+        let sym = CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap();
+        let var: CalendarSymVariant = sym.clone().into();
+        assert_eq!(
+            var,
+            CalendarSymVariant::AllClosed(
+                ["TK", "NY"]
+                    .into_iter()
+                    .map(|s| CalendarSymbol::of_single(s).unwrap())
+                    .collect()
+            )
+        );
+        assert_eq!(sym.dispatch(), &var);
+        assert_eq!(sym.take_dispatch(), var);
+
+        // try from variant
+        let var = CalendarSymVariant::Single("TK".to_owned());
+        let sym: CalendarSymbol = var.try_into().unwrap();
+        assert_eq!(sym, CalendarSymbol::of_single("TK").unwrap());
+
+        let var = CalendarSymVariant::AnyClosed(
+            ["TK", "NY"]
+                .into_iter()
+                .map(|s| CalendarSymbol::of_single(s).unwrap())
+                .collect(),
+        );
+        let sym: CalendarSymbol = var.try_into().unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap()
+        );
+
+        let var = CalendarSymVariant::AllClosed(
+            ["TK", "NY"]
+                .into_iter()
+                .map(|s| CalendarSymbol::of_single(s).unwrap())
+                .collect(),
+        );
+        let sym: CalendarSymbol = var.try_into().unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap()
+        );
+
+        // error
+        let var = CalendarSymVariant::Single("TK|NY".to_owned());
+        let sym: Result<CalendarSymbol, _> = var.try_into();
+        assert!(sym.is_err());
+
+        let var = CalendarSymVariant::Single("".to_owned());
+        let sym: Result<CalendarSymbol, _> = var.try_into();
+        assert!(sym.is_err());
+
+        let var = CalendarSymVariant::Single(" ".to_owned());
+        let sym: Result<CalendarSymbol, _> = var.try_into();
+        assert!(sym.is_err());
+
+        let var = CalendarSymVariant::Single("(TK)".to_owned());
+        let sym: Result<CalendarSymbol, _> = var.try_into();
+        assert!(sym.is_err());
+
+        let var = CalendarSymVariant::AnyClosed(BTreeSet::new());
+        let sym: Result<CalendarSymbol, _> = var.try_into();
+        assert!(sym.is_err());
+
+        let var = CalendarSymVariant::AllClosed(BTreeSet::new());
+        let sym: Result<CalendarSymbol, _> = var.try_into();
+        assert!(sym.is_err());
     }
 
     #[test]
@@ -542,5 +812,53 @@ mod tests {
         assert!(set.contains("TK"));
         assert!(set.contains("NY"));
         assert!(set.contains("LN"));
+    }
+
+    #[test]
+    fn test_bitor() {
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let sym = sym | CalendarSymbol::of_single("NY").unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap()
+        );
+
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let sym = sym | CalendarSymbol::of_any_closed(["NY", "LN"].into_iter()).unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_any_closed(["TK", "NY", "LN"].into_iter()).unwrap()
+        );
+
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let sym = sym | CalendarSymbol::of_all_closed(["NY", "LN"].into_iter()).unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_bitand() {
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let sym = sym & CalendarSymbol::of_single("NY").unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap()
+        );
+
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let sym = sym & CalendarSymbol::of_any_closed(["NY", "LN"].into_iter()).unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_all_closed(["TK", "NY", "LN"].into_iter()).unwrap()
+        );
+
+        let sym = CalendarSymbol::of_single("TK").unwrap();
+        let sym = sym & CalendarSymbol::of_all_closed(["NY", "LN"].into_iter()).unwrap();
+        assert_eq!(
+            sym,
+            CalendarSymbol::of_all_closed(["TK", "NY", "LN"].into_iter()).unwrap()
+        );
     }
 }

@@ -21,6 +21,7 @@ pub fn gen_schema() -> anyhow::Result<()> {
         dir.push("qcore");
         std::fs::create_dir_all(&dir)?;
         gen_schema_single::<qcore::chrono::Calendar>(&dir)?;
+        gen_schema_single::<qcore::chrono::CalendarSymbol>(&dir)?;
     }
     Ok(())
 }
@@ -83,6 +84,7 @@ mod tests {
             let mut dir = root_dir.clone();
             dir.push("qcore");
             check_same_schema::<qcore::chrono::Calendar>(&dir);
+            check_same_schema::<qcore::chrono::CalendarSymbol>(&dir);
         }
     }
 }
