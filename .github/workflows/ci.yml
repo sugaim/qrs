@@ -10,8 +10,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  CI:
+  ci:
     runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - run: cargo nextest run -r --workspace
+
+  coverage:
+    runs-on: ubuntu-latest
+    after: ci
 
     steps:
     - uses: actions/checkout@v4
@@ -27,4 +35,3 @@ jobs:
     - uses: codecov/codecov-action@v4
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: true
