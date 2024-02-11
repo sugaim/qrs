@@ -1012,4 +1012,94 @@ mod tests {
         );
         assert_eq!(iter.next(), None);
     }
+
+    #[test]
+    fn test_bitor() {
+        let cal1 = Calendar::_new(
+            vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
+            vec![
+                NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
+                NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(),
+            ],
+            NaiveDate::from_ymd_opt(2020, 12, 31).unwrap(),
+            NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
+        )
+        .unwrap();
+        let cal2 = Calendar::_new(
+            vec![NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()],
+            vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
+            NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2021, 1, 15).unwrap(),
+        )
+        .unwrap();
+
+        let cal = &cal1 | &cal2;
+        assert_eq!(
+            cal.extra_holidays(),
+            &[
+                NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()
+            ]
+        );
+        assert_eq!(
+            cal.extra_business_days(),
+            &[NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),]
+        );
+        assert_eq!(
+            cal.valid_period(),
+            (
+                NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2021, 1, 10).unwrap()
+            )
+        );
+
+        assert_eq!(cal, &cal1 | cal2.clone());
+        assert_eq!(cal, cal1.clone() | &cal2);
+        assert_eq!(cal, cal1 | cal2);
+    }
+
+    #[test]
+    fn test_bitand() {
+        let cal1 = Calendar::_new(
+            vec![
+                NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2021, 1, 5).unwrap(),
+            ],
+            vec![NaiveDate::from_ymd_opt(2021, 1, 3).unwrap()],
+            NaiveDate::from_ymd_opt(2020, 12, 31).unwrap(),
+            NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
+        )
+        .unwrap();
+        let cal2 = Calendar::_new(
+            vec![NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()],
+            vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
+            NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2021, 1, 15).unwrap(),
+        )
+        .unwrap();
+
+        let cal = &cal1 & &cal2;
+        assert_eq!(
+            cal.extra_holidays(),
+            &[NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()]
+        );
+        assert_eq!(
+            cal.extra_business_days(),
+            &[
+                NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
+                NaiveDate::from_ymd_opt(2021, 1, 3).unwrap()
+            ]
+        );
+        assert_eq!(
+            cal.valid_period(),
+            (
+                NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2021, 1, 10).unwrap()
+            )
+        );
+
+        assert_eq!(cal, &cal1 & cal2.clone());
+        assert_eq!(cal, cal1.clone() & &cal2);
+        assert_eq!(cal, cal1 & cal2);
+    }
 }
