@@ -6,20 +6,27 @@ use std::{
 
 use anyhow::ensure;
 use chrono::{Datelike, NaiveDate};
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 
 // -----------------------------------------------------------------------------
 // CalendarData
 //
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
 struct CalendarData {
+    /// The extra holidays of the calendar. These days are non-business day weekdays.
     #[serde(rename = "extra_holidays")]
     extra_holds: Vec<NaiveDate>,
+
+    /// The extra business days of the calendar. These days are business day weekends.
     #[serde(rename = "extra_business_days")]
     extra_bizds: Vec<NaiveDate>,
 
-    valid_from: NaiveDate, // inclusive
-    valid_to: NaiveDate,   // exclusive
+    /// The valid period of the calendar. include `valid_from`.
+    valid_from: NaiveDate,
+
+    /// The valid period of the calendar. exclude `valid_to`.
+    valid_to: NaiveDate,
 }
 
 //
@@ -119,6 +126,18 @@ impl<'de> Deserialize<'de> for Calendar {
     {
         let data = CalendarData::deserialize(deserializer)?;
         Ok(Calendar(Arc::new(data)))
+    }
+}
+
+impl JsonSchema for Calendar {
+    fn schema_name() -> String {
+        "Calendar".to_string()
+    }
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "qcore::chrono::Calendar".into()
+    }
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        <CalendarData as JsonSchema>::json_schema(gen)
     }
 }
 

@@ -1,6 +1,7 @@
 use std::ops::{Div, Sub};
 
 use num::{One, Zero};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -10,12 +11,41 @@ use crate::{
 
 use super::{DestructibleInterp1d, Interp1d, Interp1dBuilder, _knots::Knots};
 
-#[derive(Clone, Debug, PartialEq)]
+// -----------------------------------------------------------------------------
+// Lerp1d
+//
+
+/// 1-dimensional linear interpolation.
+///
+/// # Example
+/// ```
+/// use qcore::interp1d::Interp1d;
+///
+/// let grids = vec![0.0, 1.0, 2.0];
+/// let values = vec![0.0, 1.0, 0.0];
+///
+/// let interp = qcore::interp1d::Lerp1d::new(grids, values).unwrap();
+///
+/// assert_eq!(interp.interp(&-0.5), -0.5);
+/// assert_eq!(interp.interp(&0.5), 0.5);
+/// assert_eq!(interp.interp(&1.0), 1.0);
+/// ```
+#[derive(Clone, Debug, PartialEq, JsonSchema)]
 pub struct Lerp1d<G, V> {
     knots: Knots<G, V>,
 }
 
+//
+// construction
+//
 impl<G: PartialOrd, V> Lerp1d<G, V> {
+    /// Create a new `Lerp1d` interpolation.
+    ///
+    /// # Errors
+    /// - If the length of `gs` is less than 2.
+    /// - If the length of `gs` and `vs` are not equal.
+    /// - If `gs` is not sorted in ascending order.
+    #[inline]
     pub fn new(gs: Vec<G>, vs: Vec<V>) -> Result<Self, anyhow::Error> {
         Knots::new(gs, vs).map(|knots| Self { knots })
     }
@@ -25,6 +55,7 @@ impl<G: RelPos, V: Vector<G::Output>> Interp1d for Lerp1d<G, V> {
     type Grid = G;
     type Value = V;
 
+    #[inline]
     fn knots(&self) -> (&[G], &[V]) {
         (self.knots.grids(), self.knots.values())
     }
@@ -216,5 +247,33 @@ mod tests {
         assert_abs_diff_eq!(lerp.der2(&2.), 0., epsilon = eps);
         assert_abs_diff_eq!(lerp.der2(&2.5), 0., epsilon = eps);
         assert_abs_diff_eq!(lerp.der2(&3.), 0., epsilon = eps);
+    }
+
+    #[test]
+    fn test_lerp1d_destruct() {
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 3., 2.];
+
+        let lerp = Lerp1d::new(grids, values).unwrap();
+        let (builder, grids, values) = lerp.destruct();
+
+        assert_eq!(builder, Lerp1dBuilder);
+        assert_eq!(grids, vec![0., 1., 2.]);
+        assert_eq!(values, vec![0., 3., 2.]);
+    }
+
+    #[test]
+    fn test_lerp1d_build() {
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 3., 2.];
+
+        let lerp = Lerp1dBuilder.build(grids.clone(), values.clone()).unwrap();
+        assert_eq!(lerp.knots().0, grids.as_slice());
+        assert_eq!(lerp.knots().1, values.as_slice());
+
+        let (builder, grids, values) = lerp.destruct();
+        assert_eq!(builder, Lerp1dBuilder);
+        assert_eq!(grids, vec![0., 1., 2.]);
+        assert_eq!(values, vec![0., 3., 2.]);
     }
 }

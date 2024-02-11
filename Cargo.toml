@@ -2,9 +2,15 @@
 version = "0.1.0"
 edition = "2021"
 
+exclude = ["scripts/**"]
+
 [workspace]
 resolver = "2"
-members = ["libs/domain/qcore", "libs/domain/qcore/qcore_derive"]
+members = [
+    "libs/domain/qcore",
+    "libs/domain/qcore/qcore_derive",
+    "scripts/qrs-scripts",
+]
 
 [workspace.dependencies]
 # external
@@ -14,6 +20,8 @@ chrono = { version = "0.4.33", features = ["serde"] }
 derivative = { version = "2.2.0" }
 dyn-clone = { version = "1.0.16" }
 either = { version = "1.9.0" }
+env_logger = { version = "0.11.1" }
+log = { version = "0.4.20" }
 num = { version = "0.4.1" }
 maplit = { version = "1.0.2" }
 moka = { version = "0.12.5", features = ["sync"] }
@@ -22,6 +30,7 @@ rstest_reuse = { version = "0.6.0" }
 rust_decimal = { version = "1.34.2" }
 peg = { version = "0.8.2" }
 proc-macro2 = { version = "1.0.78" }
+schemars = { version = "0.8.16", features = ["chrono", "uuid1"] }
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 static_assertions = { version = "1.1.0" }
