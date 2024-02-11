@@ -7,6 +7,7 @@ exclude.workspace = true
 [dependencies]
 # external
 anyhow = { workspace = true }
+chrono = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 schemars = { workspace = true }

@@ -17,6 +17,7 @@ members = [
 anyhow = { version = "1.0.79" }
 approx = { version = "0.5.1" }
 chrono = { version = "0.4.33", features = ["serde"] }
+chrono-tz = { version = "0.8.5", features = ["serde"] }
 derivative = { version = "2.2.0" }
 dyn-clone = { version = "1.0.16" }
 either = { version = "1.9.0" }

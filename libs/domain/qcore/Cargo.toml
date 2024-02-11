@@ -10,6 +10,7 @@ derive = ["qcore_derive"]
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
 derivative = { workspace = true }
 dyn-clone = { workspace = true }
 num = { workspace = true }
