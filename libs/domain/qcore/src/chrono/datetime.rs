@@ -326,7 +326,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// let dt_utc = dt.with_timezone(&chrono::Utc);
     ///
-    /// assert_eq!(dt_utc.to_string(), "2021-01-01T01:42:11+00:00");
+    /// assert_eq!(dt_utc, chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T01:42:11Z").unwrap().into());
     /// ```
     #[inline]
     pub fn with_timezone<U: TimeZone>(&self, tz: &U) -> DateTime<U> {
