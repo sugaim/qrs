@@ -732,6 +732,8 @@ mod tests {
     #[case::s("PT-2S", Some(-Duration::with_secs(2)))]
     #[case::s("PT1.5S", Some(Duration::with_nanosecs(1_500_000_000)))]
     #[case::s("PT-2.5S", Some(-Duration::with_nanosecs(2_500_000_000)))]
+    #[case::s("PT0.000000042S", Some(Duration::with_nanosecs(42)))]
+    #[case::s("PT-0.000000042S", Some(Duration::with_nanosecs(-42)))]
     #[case::mix("PT1H1M1S", Some(Duration::with_hours(1) + Duration::with_mins(1) + Duration::with_secs(1)))]
     #[case::mix("PT2H-2M-2S", Some(Duration::with_hours(2) - Duration::with_mins(2) - Duration::with_secs(2)))]
     #[case::mix("PT1H1M1.5S", Some(Duration::with_hours(1) + Duration::with_mins(1) + Duration::with_nanosecs(1_500_000_000)))]
@@ -743,9 +745,13 @@ mod tests {
     #[case::invalid("", None)] // empty
     #[case::invalid("P", None)] // no date or time part
     #[case::invalid("P1", None)] // no date or time part
+    #[case::invalid("PT3HT4S", None)] // multiple time part
     #[case::invalid("P1D1D", None)] // multiple date part
     #[case::invalid("P1W1W", None)] // multiple date part
     #[case::invalid("P1D1W", None)] // multiple date part
+    #[case::invalid("P1H1H", None)] // multiple time part
+    #[case::invalid("P1M1M", None)] // multiple time part
+    #[case::invalid("P1S1S", None)] // multiple time part
     #[case::invalid("P1H", None)] // no time specifier 'T'
     #[case::invalid("P1S", None)] // no time specifier 'T'
     #[case::invalid(" P1D", None)] // leading space
@@ -758,6 +764,10 @@ mod tests {
     #[case::invalid("P1DT1Y1M", None)] // year is not supported
     #[case::invalid("P1DT1Y1M1H", None)] // year is not supported
     #[case::invalid("P1DT1Y1M1H1S", None)] // year is not supported
+    #[case::invalid("PxD", None)] // invalid characters
+    #[case::invalid("PTxH", None)] // invalid characters
+    #[case::invalid("PTxM", None)] // invalid characters
+    #[case::invalid("PTxS", None)] // invalid characters
     fn cases_for_parse(#[case] s: &str, #[case] expected: Option<Duration>) {}
 
     #[template]
@@ -779,6 +789,24 @@ mod tests {
     #[case(Duration::with_nanosecs(2))]
     #[case(Duration::with_secs(1) + Duration::with_nanosecs(1011))]
     fn cases_for_display(#[case] d: Duration) {}
+
+    #[test]
+    fn test_default() {
+        assert_eq!(Duration::default(), Duration::zero());
+    }
+
+    #[test]
+    fn test_conversion() {
+        // chrono -> qrs
+        let chrono_obj = chrono::Duration::days(1);
+        let qcore_obj = Duration::from(chrono_obj);
+        assert_eq!(qcore_obj, Duration::with_days(1));
+
+        // qrs -> chrono
+        let qcore_obj = Duration::with_days(1);
+        let chrono_obj: chrono::Duration = qcore_obj.into();
+        assert_eq!(chrono_obj, chrono::Duration::days(1));
+    }
 
     #[apply(cases_for_parse)]
     fn test_from_str(s: &str, expected: Option<Duration>) {
@@ -846,5 +874,187 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_neg() {
+        let tested = -Duration::with_days(1);
+        let expected = Duration::with_days(-1);
+        assert_eq!(tested, expected);
+
+        let tested = -Duration::with_days(-1);
+        let expected = Duration::with_days(1);
+        assert_eq!(tested, expected);
+
+        let tested = -Duration::zero();
+        let expected = Duration::zero();
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_add() {
+        let tested = Duration::with_days(1) + Duration::with_days(2);
+        let expected = Duration::with_days(3);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(1) + Duration::with_days(-2);
+        let expected = Duration::with_days(-1);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(-1) + Duration::with_days(2);
+        let expected = Duration::with_days(1);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(-1) + Duration::with_days(-2);
+        let expected = Duration::with_days(-3);
+        assert_eq!(tested, expected);
+
+        // days + seconds
+        let tested = Duration::with_days(1) + Duration::with_secs(1);
+        let expected = Duration::with_secs(24 * 60 * 60 + 1);
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_sub() {
+        let tested = Duration::with_days(1) - Duration::with_days(2);
+        let expected = Duration::with_days(-1);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(1) - Duration::with_days(-2);
+        let expected = Duration::with_days(3);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(-1) - Duration::with_days(2);
+        let expected = Duration::with_days(-3);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(-1) - Duration::with_days(-2);
+        let expected = Duration::with_days(1);
+        assert_eq!(tested, expected);
+
+        // days - seconds
+        let tested = Duration::with_days(1) - Duration::with_secs(1);
+        let expected = Duration::with_secs(24 * 60 * 60 - 1);
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_add_assign() {
+        let mut tested = Duration::with_days(1);
+        tested += Duration::with_days(2);
+        let expected = Duration::with_days(3);
+        assert_eq!(tested, expected);
+
+        let mut tested = Duration::with_days(1);
+        tested += Duration::with_days(-2);
+        let expected = Duration::with_days(-1);
+        assert_eq!(tested, expected);
+
+        let mut tested = Duration::with_days(-1);
+        tested += Duration::with_days(2);
+        let expected = Duration::with_days(1);
+        assert_eq!(tested, expected);
+
+        let mut tested = Duration::with_days(-1);
+        tested += Duration::with_days(-2);
+        let expected = Duration::with_days(-3);
+        assert_eq!(tested, expected);
+
+        // days and second
+        let mut tested = Duration::with_days(1);
+        tested += Duration::with_secs(1);
+        let expected = Duration::with_secs(24 * 60 * 60 + 1);
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_sub_assign() {
+        let mut tested = Duration::with_days(1);
+        tested -= Duration::with_days(2);
+        let expected = Duration::with_days(-1);
+        assert_eq!(tested, expected);
+
+        let mut tested = Duration::with_days(1);
+        tested -= Duration::with_days(-2);
+        let expected = Duration::with_days(3);
+        assert_eq!(tested, expected);
+
+        let mut tested = Duration::with_days(-1);
+        tested -= Duration::with_days(2);
+        let expected = Duration::with_days(-3);
+        assert_eq!(tested, expected);
+
+        let mut tested = Duration::with_days(-1);
+        tested -= Duration::with_days(-2);
+        let expected = Duration::with_days(1);
+        assert_eq!(tested, expected);
+
+        // days and second
+        let mut tested = Duration::with_days(1);
+        tested -= Duration::with_secs(1);
+        let expected = Duration::with_secs(24 * 60 * 60 - 1);
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_mul() {
+        let tested = Duration::with_days(1) * 2;
+        let expected = Duration::with_days(2);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(1) * -2;
+        let expected = Duration::with_days(-2);
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_div() {
+        let tested = Duration::with_days(2) / 2;
+        let expected = Duration::with_days(1);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(2) / -2;
+        let expected = Duration::with_days(-1);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(1) / 2;
+        let expected = Duration::with_hours(12);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_days(1) / -2;
+        let expected = Duration::with_hours(-12);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_hours(1) / 2;
+        let expected = Duration::with_mins(30);
+        assert_eq!(tested, expected);
+
+        let tested = Duration::with_hours(1) / -2;
+        let expected = Duration::with_mins(-30);
+        assert_eq!(tested, expected);
+    }
+
+    #[test]
+    fn test_velocity() {
+        let tested = 1.0 / Duration::with_secs(1);
+        let expected = Velocity::new(1.0, Duration::with_secs(1));
+        assert_eq!(tested, expected);
+
+        let tested = 1.0 / &Duration::with_secs(1);
+        let expected = Velocity::new(1.0, Duration::with_secs(1));
+        assert_eq!(tested, expected);
+
+        let tested = 1.0 / Duration::with_mins(1);
+        let expected = Velocity::new(1.0, Duration::with_mins(1));
+        assert_eq!(tested, expected);
+
+        let tested = 1.0 / &Duration::with_mins(1);
+        let expected = Velocity::new(1.0, Duration::with_mins(1));
+        assert_eq!(tested, expected);
+
+        let tested = 1.0 / Duration::with_days(1);
+        let expected = Velocity::new(1.0, Duration::with_days(1));
+        assert_eq!(tested, expected);
     }
 }
