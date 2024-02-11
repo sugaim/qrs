@@ -978,6 +978,15 @@ mod tests {
         let tested = Duration::with_days(1) + Duration::with_secs(1);
         let expected = Duration::with_secs(24 * 60 * 60 + 1);
         assert_eq!(tested, expected);
+
+        // datetime + duration
+        let base_date =
+            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z").unwrap();
+        let dur = Duration::with_days(1);
+        let expected =
+            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z").unwrap();
+        assert_eq!(base_date + dur, expected);
+        assert_eq!(base_date + &dur, expected);
     }
 
     #[test]
@@ -1002,6 +1011,15 @@ mod tests {
         let tested = Duration::with_days(1) - Duration::with_secs(1);
         let expected = Duration::with_secs(24 * 60 * 60 - 1);
         assert_eq!(tested, expected);
+
+        // datetime - duration
+        let base_date =
+            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z").unwrap();
+        let dur = Duration::with_days(1);
+        let expected =
+            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z").unwrap();
+        assert_eq!(base_date - dur, expected);
+        assert_eq!(base_date - &dur, expected);
     }
 
     #[test]
@@ -1068,7 +1086,7 @@ mod tests {
         let expected = Duration::with_days(2);
         assert_eq!(tested, expected);
 
-        let tested = Duration::with_days(1) * -2;
+        let tested = Duration::with_days(1) * &-2;
         let expected = Duration::with_days(-2);
         assert_eq!(tested, expected);
     }
@@ -1079,7 +1097,7 @@ mod tests {
         let expected = Duration::with_days(1);
         assert_eq!(tested, expected);
 
-        let tested = Duration::with_days(2) / -2;
+        let tested = Duration::with_days(2) / &-2;
         let expected = Duration::with_days(-1);
         assert_eq!(tested, expected);
 
@@ -1087,11 +1105,11 @@ mod tests {
         let expected = Duration::with_hours(12);
         assert_eq!(tested, expected);
 
-        let tested = Duration::with_days(1) / -2;
+        let tested = Duration::with_days(1) / &-2;
         let expected = Duration::with_hours(-12);
         assert_eq!(tested, expected);
 
-        let tested = Duration::with_hours(1) / 2;
+        let tested = Duration::with_hours(1) / &2;
         let expected = Duration::with_mins(30);
         assert_eq!(tested, expected);
 
