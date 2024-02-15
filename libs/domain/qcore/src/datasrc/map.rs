@@ -3,17 +3,19 @@
 use std::sync::{Arc, Mutex, Weak};
 
 use maplit::btreeset;
-use qcore_derive::Listener;
+use qcore_derive::{Listener, Node};
 
 use super::{
     DataSrc, Listener, NodeId, Notifier, StateId, Tree, _private::_UnaryPassThroughNode,
-    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc3Args, TakeSnapshot, TakeSnapshot2Args,
+    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc3Args, Node, TakeSnapshot,
+    TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
 // Map
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Map<S, F> {
     node: Arc<Mutex<_UnaryPassThroughNode>>,
@@ -52,6 +54,11 @@ impl<S, F> Map<S, F> {
     }
 
     #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
     pub fn into_inner(self) -> S {
         self.src
     }
@@ -62,11 +69,6 @@ where
     S: Notifier,
     F: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.node.lock().unwrap().state()
@@ -216,7 +218,8 @@ where
 // -----------------------------------------------------------------------------
 // MapErr
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct MapErr<S, F> {
     node: Arc<Mutex<_UnaryPassThroughNode>>,
@@ -271,11 +274,6 @@ where
     S: Notifier,
     F: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.node.lock().unwrap().state()
@@ -425,7 +423,8 @@ where
 // -----------------------------------------------------------------------------
 // Convert
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Convert<S, F> {
     node: Arc<Mutex<_UnaryPassThroughNode>>,
@@ -476,11 +475,6 @@ impl<S, F> Convert<S, F> {
 }
 
 impl<S: Notifier, F: 'static + Send + Sync> Notifier for Convert<S, F> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.node.lock().unwrap().state()
@@ -726,6 +720,48 @@ mod tests {
     }
 
     #[rstest]
+    fn test_map_clone(src_1arg: OnMemorySrc<String, i32>) {
+        let mut src = src_1arg.map("map", |x| x * 2);
+        let src_clone = src.clone();
+
+        let id = src.id();
+        let id_clone = src_clone.id();
+        let state = src.state();
+        let state_clone = src_clone.state();
+
+        assert_ne!(id, id_clone);
+
+        // cloned instance is independent from the original instance.
+        src.inner_mut().insert("a".to_owned(), 100);
+        assert_eq!(id, src.id());
+        assert_eq!(id_clone, src_clone.id());
+        assert_ne!(state, src.state());
+        assert_eq!(state_clone, src_clone.state());
+        assert_eq!(src.req(&"a".to_owned()).unwrap(), 200);
+        assert_eq!(src_clone.req(&"a".to_owned()).unwrap(), 2);
+    }
+
+    #[rstest]
+    fn test_map_tree(src_1arg: OnMemorySrc<String, i32>) {
+        let src = src_1arg.map("hogehoge map", |x| x * 2);
+        let Tree::Branch {
+            desc,
+            id,
+            state,
+            children,
+        } = src.tree()
+        else {
+            panic!("unexpected tree");
+        };
+
+        assert_eq!(desc, "hogehoge map");
+        assert_eq!(id, src.id());
+        assert_eq!(state, src.state());
+        assert_eq!(children.len(), 1);
+        assert_eq!(children.iter().next().unwrap(), &src.inner().tree());
+    }
+
+    #[rstest]
     fn test_map_1arg(src_1arg: OnMemorySrc<String, i32>) {
         let src_1arg = Arc::new(Mutex::new(src_1arg));
         let src = src_1arg.clone().map("map", |x| x * 2);
@@ -882,6 +918,104 @@ mod tests {
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 2);
         assert_eq!(new_val, 200);
+    }
+
+    #[rstest]
+    fn test_map_take_snapshot_1arg(src_1arg: OnMemorySrc<String, i32>) {
+        let src = src_1arg.map("map", |x| x * 2);
+        let snap = src
+            .take_snapshot(&["a".to_owned(), "b".to_owned()])
+            .unwrap();
+
+        assert_eq!(snap.req(&"a".to_owned()).unwrap(), 2);
+        assert_eq!(snap.req(&"b".to_owned()).unwrap(), 4);
+        assert!(snap.req(&"c".to_owned()).is_err());
+    }
+
+    #[rstest]
+    fn test_map_take_snapshot_2arg(src_2args: OnMemorySrc2Args<String, String, i32>) {
+        let src = src_2args.map("map", |x| x * 2);
+
+        let keys = [
+            ("a".to_owned(), "x".to_owned()),
+            ("b".to_owned(), "x".to_owned()),
+        ];
+        let snap = src
+            .take_snapshot(keys.iter().map(|(k1, k2)| (k1, k2)))
+            .unwrap();
+
+        assert_eq!(snap.req(&"a".to_owned(), &"x".to_owned()).unwrap(), 2);
+        assert_eq!(snap.req(&"b".to_owned(), &"x".to_owned()).unwrap(), 6);
+        assert!(snap.req(&"c".to_owned(), &"x".to_owned()).is_err());
+    }
+
+    #[rstest]
+    fn test_map_take_snapshot_3arg(src_3args: OnMemorySrc3Args<String, String, String, i32>) {
+        let src = src_3args.map("map", |x| x * 2);
+
+        let keys = [
+            ("a".to_owned(), "x".to_owned(), "i".to_owned()),
+            ("b".to_owned(), "y".to_owned(), "j".to_owned()),
+        ];
+        let snap = src
+            .take_snapshot(keys.iter().map(|(k1, k2, k3)| (k1, k2, k3)))
+            .unwrap();
+
+        assert_eq!(
+            snap.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            snap.req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap(),
+            16
+        );
+        assert!(snap
+            .req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+    }
+
+    #[rstest]
+    fn test_map_err_clone(src_1arg: OnMemorySrc<String, i32>) {
+        let mut src = src_1arg.map_err("map", |_| "error".to_owned());
+        let src_clone = src.clone();
+
+        let id = src.id();
+        let id_clone = src_clone.id();
+        let state = src.state();
+        let state_clone = src_clone.state();
+
+        assert_ne!(id, id_clone);
+
+        // cloned instance is independent from the original instance.
+        src.inner_mut().insert("a".to_owned(), 100);
+        assert_eq!(id, src.id());
+        assert_eq!(id_clone, src_clone.id());
+        assert_ne!(state, src.state());
+        assert_eq!(state_clone, src_clone.state());
+        assert_eq!(src.req(&"a".to_owned()).unwrap(), 100);
+        assert_eq!(src_clone.req(&"a".to_owned()).unwrap(), 1);
+    }
+
+    #[rstest]
+    fn test_map_err_tree(src_1arg: OnMemorySrc<String, i32>) {
+        let src = src_1arg.map_err("hogehoge map", |_| "error".to_owned());
+        let Tree::Branch {
+            desc,
+            id,
+            state,
+            children,
+        } = src.tree()
+        else {
+            panic!("unexpected tree");
+        };
+
+        assert_eq!(desc, "hogehoge map");
+        assert_eq!(id, src.id());
+        assert_eq!(state, src.state());
+        assert_eq!(children.len(), 1);
+        assert_eq!(children.iter().next().unwrap(), &src.inner().tree());
     }
 
     #[rstest]
@@ -1061,6 +1195,107 @@ mod tests {
     }
 
     #[rstest]
+    fn test_map_err_take_snapshot_1arg(src_1arg: OnMemorySrc<String, i32>) {
+        let src = src_1arg.map_err("map", |_| "error".to_owned());
+        let snap = src
+            .take_snapshot(&["a".to_owned(), "b".to_owned()])
+            .unwrap();
+
+        assert_eq!(snap.req(&"a".to_owned()).unwrap(), 1);
+        assert!(snap.req(&"c".to_owned()).is_err());
+        assert_eq!(snap.req(&"c".to_owned()).unwrap_err(), "error");
+    }
+
+    #[rstest]
+    fn test_map_err_take_snapshot_2arg(src_2args: OnMemorySrc2Args<String, String, i32>) {
+        let src = src_2args.map_err("map", |_| "error".to_owned());
+
+        let keys = [
+            ("a".to_owned(), "x".to_owned()),
+            ("b".to_owned(), "x".to_owned()),
+        ];
+        let snap = src
+            .take_snapshot(keys.iter().map(|(k1, k2)| (k1, k2)))
+            .unwrap();
+
+        assert_eq!(snap.req(&"a".to_owned(), &"x".to_owned()).unwrap(), 1);
+        assert!(snap.req(&"c".to_owned(), &"x".to_owned()).is_err());
+        assert_eq!(
+            snap.req(&"c".to_owned(), &"x".to_owned()).unwrap_err(),
+            "error"
+        );
+    }
+
+    #[rstest]
+    fn test_map_err_take_snapshot_3arg(src_3args: OnMemorySrc3Args<String, String, String, i32>) {
+        let src = src_3args.map_err("map", |_| "error".to_owned());
+
+        let keys = [
+            ("a".to_owned(), "x".to_owned(), "i".to_owned()),
+            ("b".to_owned(), "y".to_owned(), "j".to_owned()),
+        ];
+        let snap = src
+            .take_snapshot(keys.iter().map(|(k1, k2, k3)| (k1, k2, k3)))
+            .unwrap();
+
+        assert_eq!(
+            snap.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap(),
+            1
+        );
+        assert!(snap
+            .req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            snap.req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "error"
+        );
+    }
+
+    #[rstest]
+    fn test_convert_clone(src_1arg: OnMemorySrc<String, i32>) {
+        let mut src = src_1arg.convert("convert", |_, r| r);
+        let src_clone = src.clone();
+
+        let id = src.id();
+        let id_clone = src_clone.id();
+        let state = src.state();
+        let state_clone = src_clone.state();
+
+        assert_ne!(id, id_clone);
+
+        // cloned instance is independent from the original instance.
+        src.inner_mut().insert("a".to_owned(), 100);
+        assert_eq!(id, src.id());
+        assert_eq!(id_clone, src_clone.id());
+        assert_ne!(state, src.state());
+        assert_eq!(state_clone, src_clone.state());
+        assert_eq!(src.req(&"a".to_owned()).unwrap(), 100);
+        assert_eq!(src_clone.req(&"a".to_owned()).unwrap(), 1);
+    }
+
+    #[rstest]
+    fn test_convert_tree(src_1arg: OnMemorySrc<String, i32>) {
+        let src = src_1arg.convert("hogehoge convert", |_, r| r);
+        let Tree::Branch {
+            desc,
+            id,
+            state,
+            children,
+        } = src.tree()
+        else {
+            panic!("unexpected tree");
+        };
+
+        assert_eq!(desc, "hogehoge convert");
+        assert_eq!(id, src.id());
+        assert_eq!(state, src.state());
+        assert_eq!(children.len(), 1);
+        assert_eq!(children.iter().next().unwrap(), &src.inner().tree());
+    }
+
+    #[rstest]
     fn test_convert_1arg(src_1arg: OnMemorySrc<String, i32>) {
         let src_1arg = Arc::new(Mutex::new(src_1arg));
         let src = src_1arg.clone().convert("convert", |s, r| match r {
@@ -1231,5 +1466,82 @@ mod tests {
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 6);
         assert_eq!(new_val, 300);
+    }
+
+    #[rstest]
+    fn test_convert_take_snapshot_1arg(src_1arg: OnMemorySrc<String, i32>) {
+        let src = src_1arg.convert("convert", |k, r| match r {
+            Ok(_) => Err(k.to_owned()),
+            Err(_) => Ok(42),
+        });
+        let snap = src
+            .take_snapshot(&["a".to_owned(), "b".to_owned()])
+            .unwrap();
+
+        assert!(snap.req(&"a".to_owned()).is_err());
+        assert!(snap.req(&"a".to_owned()).unwrap_err() == "a");
+        assert!(snap.req(&"b".to_owned()).is_err());
+        assert!(snap.req(&"b".to_owned()).unwrap_err() == "b");
+        assert_eq!(snap.req(&"c".to_owned()).unwrap(), 42);
+    }
+
+    #[rstest]
+    fn test_convert_take_snapshot_2arg(src_2args: OnMemorySrc2Args<String, String, i32>) {
+        let src = src_2args.convert("convert", |k1, k2, r| match r {
+            Ok(_) => Err(format!("{}{}", k1, k2)),
+            Err(_) => Ok(42),
+        });
+
+        let keys = [
+            ("a".to_owned(), "x".to_owned()),
+            ("b".to_owned(), "x".to_owned()),
+        ];
+        let snap = src
+            .take_snapshot(keys.iter().map(|(k1, k2)| (k1, k2)))
+            .unwrap();
+
+        assert!(snap.req(&"a".to_owned(), &"x".to_owned()).is_err());
+        assert!(snap.req(&"a".to_owned(), &"x".to_owned()).unwrap_err() == "ax");
+        assert!(snap.req(&"b".to_owned(), &"x".to_owned()).is_err());
+        assert!(snap.req(&"b".to_owned(), &"x".to_owned()).unwrap_err() == "bx");
+        assert_eq!(snap.req(&"c".to_owned(), &"x".to_owned()).unwrap(), 42);
+    }
+
+    #[rstest]
+    fn test_convert_take_snapshot_3arg(src_3args: OnMemorySrc3Args<String, String, String, i32>) {
+        let src = src_3args.convert("convert", |k1, k2, k3, r| match r {
+            Ok(_) => Err(format!("{}{}{}", k1, k2, k3)),
+            Err(_) => Ok(42),
+        });
+
+        let keys = [
+            ("a".to_owned(), "x".to_owned(), "i".to_owned()),
+            ("b".to_owned(), "y".to_owned(), "j".to_owned()),
+        ];
+        let snap = src
+            .take_snapshot(keys.iter().map(|(k1, k2, k3)| (k1, k2, k3)))
+            .unwrap();
+
+        assert!(snap
+            .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            snap.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "axi"
+        );
+        assert!(snap
+            .req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
+            .is_err());
+        assert!(
+            snap.req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap_err()
+                == "byj"
+        );
+        assert_eq!(
+            snap.req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap(),
+            42
+        );
     }
 }

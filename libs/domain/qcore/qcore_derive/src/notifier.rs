@@ -69,11 +69,6 @@ pub fn derive_notifier(input: TokenStream) -> TokenStream {
     quote!(
         impl #impl_generics #root ::datasrc::Notifier for #name #ty_generics #where_clause {
             #[inline]
-            fn id(&self) -> #root ::datasrc::NodeId {
-                self. #field_name .id()
-            }
-
-            #[inline]
             fn state(&self) -> #root ::datasrc::StateId {
                 self. #field_name .state()
             }

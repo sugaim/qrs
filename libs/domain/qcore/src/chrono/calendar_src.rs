@@ -8,10 +8,13 @@ use std::{
 };
 
 use maplit::btreeset;
+use qcore_derive::{Listener, Node};
 
 use crate::{
     chrono::CalendarSymVariant,
-    datasrc::{DataSrc, Listener, NodeId, Notifier, PublisherState, StateId, TakeSnapshot, Tree},
+    datasrc::{
+        DataSrc, Listener, Node, NodeId, Notifier, PublisherState, StateId, TakeSnapshot, Tree,
+    },
 };
 
 use super::{Calendar, CalendarSymbol};
@@ -30,12 +33,14 @@ struct _Node {
 //
 // methods
 //
-impl Listener for _Node {
+impl Node for _Node {
     #[inline]
     fn id(&self) -> NodeId {
         self.info.id()
     }
+}
 
+impl Listener for _Node {
     #[inline]
     fn listen(&mut self, publisher: &NodeId, state: &StateId) {
         if publisher != &self.src_id {
@@ -51,7 +56,9 @@ impl Listener for _Node {
 //
 
 /// Data source for calendars
-#[derive(Debug)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
+#[listener(transparent = "node")]
 pub struct CalendarSrc<S> {
     src: S,
     node: Arc<Mutex<_Node>>,
@@ -88,11 +95,6 @@ impl<S: Clone + Notifier> Clone for CalendarSrc<S> {
 // methods
 //
 impl<S: Notifier> Notifier for CalendarSrc<S> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.node.lock().unwrap().info.id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.node.lock().unwrap().info.state()
@@ -181,15 +183,16 @@ mod tests {
     };
 
     use chrono::NaiveDate;
-    use qcore_derive::Notifier;
+    use qcore_derive::{Node, Notifier};
     use rstest::{fixture, rstest};
 
     use crate::{
         chrono::{Calendar, CalendarSymbol},
-        datasrc::{DataSrc, Notifier, OnMemorySrc},
+        datasrc::{DataSrc, Node, Notifier, OnMemorySrc},
     };
 
-    #[derive(Debug, Clone, Notifier)]
+    #[derive(Debug, Clone, Node, Notifier)]
+    #[node(transparent = 0)]
     #[notifier(transparent = 0)]
     struct MockSrc(OnMemorySrc<String, Calendar>);
 

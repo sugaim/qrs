@@ -68,11 +68,6 @@ pub fn derive_listener(input: TokenStream) -> TokenStream {
     quote!(
         impl #impl_generics #root ::datasrc::Listener for #name #ty_generics #where_clause {
             #[inline]
-            fn id(&self) -> #root ::datasrc::NodeId {
-                self. #field_name .id()
-            }
-
-            #[inline]
             fn listen(&mut self, id: &#root ::datasrc::NodeId, state: &#root ::datasrc::StateId) {
                 self. #field_name .listen(id, state)
             }

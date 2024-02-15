@@ -244,15 +244,32 @@ pub enum Tree {
 //
 
 /// Node of dependency graph
+pub trait Node: 'static + Send + Sync {
+    /// Get the `NodeId` of this node.
+    /// Implementations must ensure that the `NodeId` is immutable.
+    fn id(&self) -> NodeId;
+}
+
+impl<P: Node> Node for Mutex<P> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.lock().unwrap().id()
+    }
+}
+
+impl<P: Node> Node for Arc<Mutex<P>> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.lock().unwrap().id()
+    }
+}
+
+/// Node of dependency graph
 ///
 /// Each node should have a immutable `NodeId`and a mutable `NodeStateId`.
 /// When the state changing event occurs, the node should notify it
 /// to all subscribers.
-pub trait Notifier: 'static + Send + Sync {
-    /// Get the `NodeId` of this node.
-    /// Implementations must ensure that the `NodeId` is immutable.
-    fn id(&self) -> NodeId;
-
+pub trait Notifier: Node {
     /// Get the `StateId` of this node.
     fn state(&self) -> StateId;
 
@@ -268,11 +285,6 @@ pub trait Notifier: 'static + Send + Sync {
 }
 
 impl<P: Notifier> Notifier for Mutex<P> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.lock().unwrap().state()
@@ -295,11 +307,6 @@ impl<P: Notifier> Notifier for Mutex<P> {
 }
 
 impl<P: Notifier> Notifier for Arc<Mutex<P>> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.lock().unwrap().state()
@@ -325,20 +332,12 @@ impl<P: Notifier> Notifier for Arc<Mutex<P>> {
 // Listener
 //
 
-pub trait Listener: 'static + Send + Sync {
-    /// Get the `NodeId` of the node
-    fn id(&self) -> NodeId;
-
+pub trait Listener: Node {
     /// Accept the state changing event from the publisher
     fn listen(&mut self, publisher: &NodeId, state: &StateId);
 }
 
 impl<S: Listener> Listener for Mutex<S> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.lock().unwrap().id()
-    }
-
     #[inline]
     fn listen(&mut self, publisher: &NodeId, state: &StateId) {
         self.lock().unwrap().listen(publisher, state)
@@ -346,11 +345,6 @@ impl<S: Listener> Listener for Mutex<S> {
 }
 
 impl<S: Listener> Listener for Arc<Mutex<S>> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.lock().unwrap().id()
-    }
-
     #[inline]
     fn listen(&mut self, publisher: &NodeId, state: &StateId) {
         self.lock().unwrap().listen(publisher, state)
@@ -611,5 +605,64 @@ impl<T: DataSrc3Args> DataSrc3Args for Arc<Mutex<T>> {
         key3: &Self::Key3,
     ) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key1, key2, key3)
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use uuid::Uuid;
+
+    #[test]
+    fn test_nodeid_display() {
+        let id = super::NodeId(Uuid::from_u128(u128::MAX));
+        assert_eq!(format!("{}", id), format!("{}", id.uuid()));
+
+        let id = super::NodeId(Uuid::from_u128(u128::MIN));
+        assert_eq!(format!("{}", id), format!("{}", id.uuid()));
+
+        let id = super::NodeId(Uuid::from_u128(u128::MAX / 2));
+        assert_eq!(format!("{}", id), format!("{}", id.uuid()));
+    }
+
+    #[test]
+    fn test_stateid_display() {
+        let id = super::StateId(Uuid::from_u128(u128::MAX));
+        assert_eq!(format!("{}", id), format!("{}", id.uuid()));
+
+        let id = super::StateId(Uuid::from_u128(u128::MIN));
+        assert_eq!(format!("{}", id), format!("{}", id.uuid()));
+
+        let id = super::StateId(Uuid::from_u128(u128::MAX / 2));
+        assert_eq!(format!("{}", id), format!("{}", id.uuid()));
+    }
+
+    #[test]
+    fn test_stateid_bitxor() {
+        let id1 = super::StateId(Uuid::from_u128(u128::MAX));
+        let id2 = super::StateId(Uuid::from_u128(u128::MIN));
+        let id3 = super::StateId(Uuid::from_u128(u128::MAX / 2));
+
+        for lhs in &[id1, id2, id3] {
+            // self is inverse of itself
+            assert_eq!(lhs ^ lhs, super::StateId(Uuid::from_u128(0)));
+            for rhs in &[id1, id2, id3] {
+                assert_eq!(
+                    (lhs ^ rhs).uuid().as_u128(),
+                    (lhs.uuid().as_u128() ^ rhs.uuid().as_u128())
+                );
+                // commutative
+                assert_eq!(lhs ^ rhs, rhs ^ lhs);
+
+                assert_eq!(lhs ^ rhs, *lhs ^ rhs);
+                assert_eq!(lhs ^ rhs, lhs ^ *rhs);
+                assert_eq!(lhs ^ rhs, *lhs ^ *rhs);
+
+                for mid in &[id1, id2, id3] {
+                    // associative
+                    assert_eq!((lhs ^ rhs) ^ mid, lhs ^ (rhs ^ mid));
+                }
+            }
+        }
     }
 }

@@ -8,7 +8,7 @@ use std::{
 use anyhow::anyhow;
 
 use super::{
-    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args, Listener, NodeId,
+    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc, DataSrc3Args, Listener, Node, NodeId,
     Notifier, PublisherState, StateId, TakeSnapshot, TakeSnapshot2Args, Tree,
 };
 
@@ -56,12 +56,18 @@ impl<K: Clone, V: Clone> Clone for OnMemorySrc<K, V> {
 //
 // methods
 //
-impl<K: 'static + Send + Sync, V: 'static + Send + Sync> Notifier for OnMemorySrc<K, V> {
+impl<K, V> Node for OnMemorySrc<K, V>
+where
+    K: 'static + Send + Sync,
+    V: 'static + Send + Sync,
+{
     #[inline]
     fn id(&self) -> NodeId {
         self.state.id()
     }
+}
 
+impl<K: 'static + Send + Sync, V: 'static + Send + Sync> Notifier for OnMemorySrc<K, V> {
     #[inline]
     fn state(&self) -> StateId {
         self.state.state()
@@ -256,7 +262,7 @@ impl<K1: Clone, K2: Clone, V: Clone> Clone for OnMemorySrc2Args<K1, K2, V> {
 //
 // methods
 //
-impl<K1, K2, V> Notifier for OnMemorySrc2Args<K1, K2, V>
+impl<K1, K2, V> Node for OnMemorySrc2Args<K1, K2, V>
 where
     K1: 'static + Send + Sync,
     K2: 'static + Send + Sync,
@@ -266,7 +272,14 @@ where
     fn id(&self) -> NodeId {
         self.state.id()
     }
+}
 
+impl<K1, K2, V> Notifier for OnMemorySrc2Args<K1, K2, V>
+where
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    V: 'static + Send + Sync,
+{
     #[inline]
     fn state(&self) -> StateId {
         self.state.state()
@@ -511,7 +524,7 @@ impl<K1: Clone, K2: Clone, K3: Clone, V: Clone> Clone for OnMemorySrc3Args<K1, K
 //
 // methods
 //
-impl<K1, K2, K3, V> Notifier for OnMemorySrc3Args<K1, K2, K3, V>
+impl<K1, K2, K3, V> Node for OnMemorySrc3Args<K1, K2, K3, V>
 where
     K1: 'static + Send + Sync,
     K2: 'static + Send + Sync,
@@ -522,7 +535,15 @@ where
     fn id(&self) -> NodeId {
         self.state.id()
     }
+}
 
+impl<K1, K2, K3, V> Notifier for OnMemorySrc3Args<K1, K2, K3, V>
+where
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    K3: 'static + Send + Sync,
+    V: 'static + Send + Sync,
+{
     #[inline]
     fn state(&self) -> StateId {
         self.state.state()

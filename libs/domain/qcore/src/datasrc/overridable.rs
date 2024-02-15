@@ -7,11 +7,11 @@ use std::{
 };
 
 use maplit::btreeset;
-use qcore_derive::Listener;
+use qcore_derive::{Listener, Node};
 
 use super::{
     DataSrc, Listener, Notifier, TakeSnapshot, Tree, _private::_UnaryPassThroughNode,
-    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc3Args, TakeSnapshot2Args,
+    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc3Args, Node, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
@@ -20,7 +20,7 @@ use super::{
 mod _node {
     use std::sync::{Arc, Mutex};
 
-    use crate::datasrc::{Listener, NodeId, Notifier, PublisherState, StateId};
+    use crate::datasrc::{Listener, Node, NodeId, Notifier, PublisherState, StateId};
 
     #[derive(Debug)]
     pub(super) struct _Node<L> {
@@ -159,12 +159,14 @@ mod _node {
         }
     }
 
-    impl<L: 'static + Send + Sync> Listener for _Node<L> {
+    impl<L: 'static + Send + Sync> Node for _Node<L> {
         #[inline]
         fn id(&self) -> NodeId {
             self.info.id()
         }
+    }
 
+    impl<L: 'static + Send + Sync> Listener for _Node<L> {
         #[inline]
         fn listen(&mut self, publisher: &NodeId, state: &StateId) {
             if publisher != &self.src_id {
@@ -179,7 +181,8 @@ mod _node {
 // -----------------------------------------------------------------------------
 // Overriden
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Overriden<S, K, V> {
     src: S,
@@ -245,11 +248,6 @@ where
     K: 'static + Send + Sync,
     V: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> super::NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> super::StateId {
         self.node.lock().unwrap().state()
@@ -333,7 +331,8 @@ where
 // -----------------------------------------------------------------------------
 // Overridable
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Overridable<S, K, V> {
     src: S,
@@ -390,11 +389,6 @@ where
     K: 'static + Send + Sync,
     V: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> super::NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> super::StateId {
         self.node.lock().unwrap().state()
@@ -508,7 +502,8 @@ where
 // -----------------------------------------------------------------------------
 // Overriden2Args
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Overriden2Args<S, K1, K2, V> {
     src: S,
@@ -577,11 +572,6 @@ where
     K2: 'static + Send + Sync,
     V: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> super::NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> super::StateId {
         self.node.lock().unwrap().state()
@@ -681,7 +671,8 @@ where
 // -----------------------------------------------------------------------------
 // Overridable2Args
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Overridable2Args<S, K1, K2, V> {
     src: S,
@@ -740,11 +731,6 @@ where
     K2: 'static + Send + Sync,
     V: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> super::NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> super::StateId {
         self.node.lock().unwrap().state()
@@ -878,7 +864,8 @@ where
 // -----------------------------------------------------------------------------
 // Overriden3Args
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Overriden3Args<S, K1, K2, K3, V> {
     src: S,
@@ -954,11 +941,6 @@ where
     K3: 'static + Send + Sync,
     V: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> super::NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> super::StateId {
         self.node.lock().unwrap().state()
@@ -1073,7 +1055,8 @@ where
 // Overridable3Args
 //
 
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct Overridable3Args<S, K1, K2, K3, V> {
     src: S,
@@ -1134,11 +1117,6 @@ where
     K3: 'static + Send + Sync,
     V: 'static + Send + Sync,
 {
-    #[inline]
-    fn id(&self) -> super::NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> super::StateId {
         self.node.lock().unwrap().state()

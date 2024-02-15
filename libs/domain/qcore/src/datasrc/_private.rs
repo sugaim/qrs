@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, Weak};
 
-use super::{Listener, NodeId, Notifier, PublisherState, StateId};
+use super::{Listener, Node, NodeId, Notifier, PublisherState, StateId};
 
 // -----------------------------------------------------------------------------
 // _Node
@@ -58,11 +58,14 @@ impl _UnaryPassThroughNode {
     }
 }
 
-impl Listener for _UnaryPassThroughNode {
+impl Node for _UnaryPassThroughNode {
     #[inline]
     fn id(&self) -> NodeId {
         self.info.id()
     }
+}
+
+impl Listener for _UnaryPassThroughNode {
     #[inline]
     fn listen(&mut self, id: &NodeId, state: &StateId) {
         if id != &self.src_id {

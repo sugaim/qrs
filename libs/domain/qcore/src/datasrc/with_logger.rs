@@ -1,17 +1,18 @@
 use std::sync::{Arc, Mutex, Weak};
 
 use maplit::btreeset;
-use qcore_derive::Listener;
+use qcore_derive::{Listener, Node};
 
 use super::{
     _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Listener, NodeId, Notifier, StateId, TakeSnapshot, TakeSnapshot2Args, Tree,
+    DataSrc3Args, Listener, Node, NodeId, Notifier, StateId, TakeSnapshot, TakeSnapshot2Args, Tree,
 };
 
 // -----------------------------------------------------------------------------
 // WithLogger
 //
-#[derive(Debug, Listener)]
+#[derive(Debug, Node, Listener)]
+#[node(transparent = "node")]
 #[listener(transparent = "node")]
 pub struct WithLogger<S, F> {
     node: Arc<Mutex<_UnaryPassThroughNode>>,
@@ -63,11 +64,6 @@ impl<S, F> WithLogger<S, F> {
 }
 
 impl<S: Notifier, F: 'static + Send + Sync> Notifier for WithLogger<S, F> {
-    #[inline]
-    fn id(&self) -> NodeId {
-        self.node.lock().unwrap().id()
-    }
-
     #[inline]
     fn state(&self) -> StateId {
         self.node.lock().unwrap().state()
