@@ -494,8 +494,13 @@ where
     }
 
     #[inline]
-    pub fn persistent_override(self, layer: HashMap<K, V>) -> Overriden<S, K, V> {
-        Overriden::new(self.node.lock().unwrap().desc(), self.src, layer)
+    pub fn persistent_override(mut self, layer: HashMap<K, V>) -> Overriden<S, K, V> {
+        let (id, desc) = {
+            let node = self.node.lock().unwrap();
+            (node.id(), node.desc().to_owned())
+        };
+        self.src.remove_listener(&id);
+        Overriden::new(desc, self.src, layer)
     }
 }
 
@@ -854,10 +859,15 @@ where
 
     #[inline]
     pub fn persistent_override(
-        self,
+        mut self,
         layer: HashMap<K1, HashMap<K2, V>>,
     ) -> Overriden2Args<S, K1, K2, V> {
-        Overriden2Args::new(self.node.lock().unwrap().desc(), self.src, layer)
+        let (id, desc) = {
+            let node = self.node.lock().unwrap();
+            (node.id(), node.desc().to_owned())
+        };
+        self.src.remove_listener(&id);
+        Overriden2Args::new(desc, self.src, layer)
     }
 }
 
@@ -1268,9 +1278,482 @@ where
 
     #[inline]
     pub fn persistent_override(
-        self,
+        mut self,
         layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
     ) -> Overriden3Args<S, K1, K2, K3, V> {
-        Overriden3Args::new(self.node.lock().unwrap().desc(), self.src, layer)
+        let (id, desc) = {
+            let node = self.node.lock().unwrap();
+            (node.id(), node.desc().to_owned())
+        };
+        self.src.remove_listener(&id);
+        Overriden3Args::new(desc, self.src, layer)
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use maplit::hashmap;
+    use rstest::{fixture, rstest};
+
+    use crate::datasrc::{
+        node::DataSrc2Args, DataSrc, DataSrc3Args, Node, Notifier, OnMemorySrc, OnMemorySrc2Args,
+        OnMemorySrc3Args, Tree,
+    };
+
+    #[fixture]
+    fn src_1arg() -> OnMemorySrc<u64, u64> {
+        OnMemorySrc::with_data("map", hashmap! {1 => 10, 2 => 20, 3 => 30})
+    }
+
+    #[fixture]
+    fn src_2args() -> OnMemorySrc2Args<u64, u64, u64> {
+        OnMemorySrc2Args::with_data(
+            "map",
+            hashmap! {
+                1 => hashmap!{10 => 100, 20 => 200, 30 => 300},
+                2 => hashmap!{10 => 1000, 20 => 2000, 30 => 3000},
+                3 => hashmap!{10 => 10000, 20 => 20000, 30 => 30000},
+            },
+        )
+    }
+
+    #[fixture]
+    fn src_3args() -> OnMemorySrc3Args<u64, u64, u64, u64> {
+        OnMemorySrc3Args::with_data(
+            "map",
+            hashmap! {
+                1 => hashmap!{10 => hashmap!{100 => 1000, 200 => 2000, 300 => 3000}, 20 => hashmap!{100 => 10000, 200 => 20000, 300 => 30000}, 30 => hashmap!{100 => 100000, 200 => 200000, 300 => 300000}},
+                2 => hashmap!{10 => hashmap!{100 => 1000000, 200 => 2000000, 300 => 3000000}, 20 => hashmap!{100 => 10000000, 200 => 20000000, 300 => 30000000}, 30 => hashmap!{100 => 100000000, 200 => 200000000, 300 => 300000000}},
+                3 => hashmap!{10 => hashmap!{100 => 1000000000, 200 => 2000000000, 300 => 3000000000}, 20 => hashmap!{100 => 10000000000, 200 => 20000000000, 300 => 30000000000}, 30 => hashmap!{100 => 100000000000, 200 => 200000000000, 300 => 300000000000}},
+            },
+        )
+    }
+
+    #[rstest]
+    fn test_overridable_1arg(src_1arg: OnMemorySrc<u64, u64>) {
+        let mut src = Arc::new(Mutex::new(src_1arg)).overridable::<u64, u64>("overridable");
+
+        let state = src.state();
+        assert_eq!(src.req(&1).unwrap(), 10);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&2).unwrap(), 20);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&3).unwrap(), 30);
+        assert_eq!(state, src.state());
+        assert!(src.req(&4).is_err());
+        assert_eq!(state, src.state());
+        assert!(src.req(&5).is_err());
+        assert_eq!(state, src.state());
+
+        let res = src.temp_override(hashmap! {1 => 11, 4 => 4}, |src| {
+            let new_state = src.state();
+            assert_ne!(state, new_state);
+            assert_eq!(src.req(&1).unwrap(), 11);
+            assert_eq!(new_state, src.state());
+            assert_eq!(src.req(&2).unwrap(), 20);
+            assert_eq!(new_state, src.state());
+            assert_eq!(src.req(&3).unwrap(), 30);
+            assert_eq!(new_state, src.state());
+            assert_eq!(src.req(&4).unwrap(), 4);
+            assert_eq!(new_state, src.state());
+            assert!(src.req(&5).is_err());
+            assert_eq!(new_state, src.state());
+
+            let res = src.temp_override(hashmap! {1 => 42}, |src| {
+                let new_state2 = src.state();
+                assert_ne!(new_state, new_state2);
+                assert_eq!(src.req(&1).unwrap(), 42);
+                assert_eq!(new_state2, src.state());
+                assert_eq!(src.req(&2).unwrap(), 20);
+                assert_eq!(new_state2, src.state());
+                assert_eq!(src.req(&3).unwrap(), 30);
+                assert_eq!(new_state2, src.state());
+                assert_eq!(src.req(&4).unwrap(), 4);
+                assert_eq!(new_state2, src.state());
+                assert!(src.req(&5).is_err());
+                assert_eq!(new_state2, src.state());
+
+                src.req(&1).unwrap()
+            });
+            assert_eq!(src.req(&1).unwrap(), 11);
+            assert_eq!(new_state, src.state());
+
+            res
+        });
+        assert_eq!(res, 42);
+
+        assert_eq!(src.req(&1).unwrap(), 10);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&2).unwrap(), 20);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&3).unwrap(), 30);
+        assert_eq!(state, src.state());
+        assert!(src.req(&4).is_err());
+        assert_eq!(state, src.state());
+        assert!(src.req(&5).is_err());
+        assert_eq!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_overridable_1arg_clone(src_1arg: OnMemorySrc<u64, u64>) {
+        let mut src = src_1arg.overridable::<u64, u64>("overridable");
+        let src2 = src.clone_without_override();
+
+        assert_ne!(src.id(), src2.id());
+
+        assert_eq!(src.req(&1).unwrap(), 10);
+        assert_eq!(src2.req(&1).unwrap(), 10);
+        assert_eq!(src.req(&2).unwrap(), 20);
+        assert_eq!(src2.req(&2).unwrap(), 20);
+
+        src.temp_override(hashmap! {1 => 1, 2 => 2}, |src| {
+            assert_eq!(src.req(&1).unwrap(), 1);
+            assert_eq!(src.req(&2).unwrap(), 2);
+            assert_eq!(src2.req(&1).unwrap(), 10);
+            assert_eq!(src2.req(&2).unwrap(), 20);
+        });
+    }
+
+    #[rstest]
+    fn test_overridable_1arg_state_change(src_1arg: OnMemorySrc<u64, u64>) {
+        let mut src = src_1arg.overridable::<u64, u64>("overridable");
+
+        let state = src.state();
+        assert_eq!(src.req(&1).unwrap(), 10);
+        assert_eq!(state, src.state());
+
+        src.inner_mut().insert(1, 11);
+        assert_eq!(src.req(&1).unwrap(), 11);
+        assert_ne!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_overridable_1arg_tree(src_1arg: OnMemorySrc<u64, u64>) {
+        let src = src_1arg.overridable::<u64, u64>("overridable");
+        let Tree::Branch {
+            desc,
+            id,
+            state,
+            children,
+        } = src.tree()
+        else {
+            panic!()
+        };
+        assert_eq!(desc, "overridable");
+        assert_eq!(id, src.id());
+        assert_eq!(state, src.state());
+        assert_eq!(children.len(), 1);
+        assert_eq!(children.iter().next().unwrap(), &src.inner().tree());
+    }
+
+    #[rstest]
+    fn test_overridable_1arg_persistent_override(src_1arg: OnMemorySrc<u64, u64>) {
+        let src = src_1arg.overridable::<u64, u64>("overridable");
+        let overriden = src.persistent_override(hashmap! {1 => 11, 4 => 4});
+
+        assert_eq!(overriden.req(&1).unwrap(), 11);
+        assert_eq!(overriden.req(&2).unwrap(), 20);
+        assert_eq!(overriden.req(&3).unwrap(), 30);
+        assert_eq!(overriden.req(&4).unwrap(), 4);
+        assert!(overriden.req(&5).is_err());
+    }
+
+    #[rstest]
+    fn test_overridable_2args(src_2args: OnMemorySrc2Args<u64, u64, u64>) {
+        let mut src = Arc::new(Mutex::new(src_2args)).overridable::<u64, u64, u64>("overridable");
+
+        let state = src.state();
+        assert_eq!(src.req(&1, &10).unwrap(), 100);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&2, &20).unwrap(), 2000);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&3, &30).unwrap(), 30000);
+        assert_eq!(state, src.state());
+        assert!(src.req(&4, &40).is_err());
+        assert_eq!(state, src.state());
+        assert!(src.req(&5, &50).is_err());
+        assert_eq!(state, src.state());
+
+        let res = src.temp_override(
+            hashmap! {1 => hashmap!{10 => 101, 40 => 4}, 4 => hashmap!{40 => 44}},
+            |src| {
+                let new_state = src.state();
+                assert_ne!(state, new_state);
+                assert_eq!(src.req(&1, &10).unwrap(), 101);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&2, &20).unwrap(), 2000);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&3, &30).unwrap(), 30000);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&4, &40).unwrap(), 44);
+                assert_eq!(new_state, src.state());
+                assert!(src.req(&5, &50).is_err());
+                assert_eq!(new_state, src.state());
+
+                let res = src.temp_override(
+                    hashmap! {1 => hashmap!{10 => 42}, 4 => hashmap!{40 => 44}},
+                    |src| {
+                        let new_state2 = src.state();
+                        assert_ne!(new_state, new_state2);
+                        assert_eq!(src.req(&1, &10).unwrap(), 42);
+                        assert_eq!(new_state2, src.state());
+                        assert_eq!(src.req(&2, &20).unwrap(), 2000);
+                        assert_eq!(new_state2, src.state());
+                        assert_eq!(src.req(&3, &30).unwrap(), 30000);
+                        assert_eq!(new_state2, src.state());
+                        assert_eq!(src.req(&4, &40).unwrap(), 44);
+                        assert_eq!(new_state2, src.state());
+                        assert!(src.req(&5, &50).is_err());
+                        assert_eq!(new_state2, src.state());
+
+                        src.req(&1, &10).unwrap()
+                    },
+                );
+                assert_eq!(src.req(&1, &10).unwrap(), 101);
+                assert_eq!(new_state, src.state());
+
+                res
+            },
+        );
+        assert_eq!(res, 42);
+
+        assert_eq!(src.req(&1, &10).unwrap(), 100);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&2, &20).unwrap(), 2000);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&3, &30).unwrap(), 30000);
+        assert_eq!(state, src.state());
+        assert!(src.req(&4, &40).is_err());
+        assert_eq!(state, src.state());
+        assert!(src.req(&5, &50).is_err());
+        assert_eq!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_overridable_2args_clone(src_2args: OnMemorySrc2Args<u64, u64, u64>) {
+        let mut src = src_2args.overridable::<u64, u64, u64>("overridable");
+        let src2 = src.clone_without_override();
+
+        assert_ne!(src.id(), src2.id());
+
+        assert_eq!(src.req(&1, &10).unwrap(), 100);
+        assert_eq!(src2.req(&1, &10).unwrap(), 100);
+        assert_eq!(src.req(&2, &20).unwrap(), 2000);
+        assert_eq!(src2.req(&2, &20).unwrap(), 2000);
+
+        src.temp_override(
+            hashmap! {1 => hashmap!{10 => 1, 20 => 2}, 2 => hashmap!{20 => 20}},
+            |src| {
+                assert_eq!(src.req(&1, &10).unwrap(), 1);
+                assert_eq!(src.req(&2, &20).unwrap(), 20);
+                assert_eq!(src2.req(&1, &10).unwrap(), 100);
+                assert_eq!(src2.req(&2, &20).unwrap(), 2000);
+            },
+        );
+    }
+
+    #[rstest]
+    fn test_overridable_2args_state_change(src_2args: OnMemorySrc2Args<u64, u64, u64>) {
+        let mut src = src_2args.overridable::<u64, u64, u64>("overridable");
+
+        let state = src.state();
+        assert_eq!(src.req(&1, &10).unwrap(), 100);
+        assert_eq!(state, src.state());
+
+        src.inner_mut().insert(1, 10, 101);
+        assert_eq!(src.req(&1, &10).unwrap(), 101);
+        assert_ne!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_overridable_2args_tree(src_2args: OnMemorySrc2Args<u64, u64, u64>) {
+        let src = src_2args.overridable::<u64, u64, u64>("overridable");
+        let Tree::Branch {
+            desc,
+            id,
+            state,
+            children,
+        } = src.tree()
+        else {
+            panic!()
+        };
+        assert_eq!(desc, "overridable");
+        assert_eq!(id, src.id());
+        assert_eq!(state, src.state());
+        assert_eq!(children.len(), 1);
+        assert_eq!(children.iter().next().unwrap(), &src.inner().tree());
+    }
+
+    #[rstest]
+    fn test_overridable_2args_persistent_override(src_2args: OnMemorySrc2Args<u64, u64, u64>) {
+        let src = src_2args.overridable::<u64, u64, u64>("overridable");
+        let overriden = src.persistent_override(
+            hashmap! {1 => hashmap!{10 => 101, 40 => 4}, 4 => hashmap!{40 => 44}},
+        );
+
+        assert_eq!(overriden.req(&1, &10).unwrap(), 101);
+        assert_eq!(overriden.req(&2, &20).unwrap(), 2000);
+        assert_eq!(overriden.req(&3, &30).unwrap(), 30000);
+        assert_eq!(overriden.req(&4, &40).unwrap(), 44);
+        assert!(overriden.req(&5, &50).is_err());
+    }
+
+    #[rstest]
+    fn test_overridable_3args(src_3args: OnMemorySrc3Args<u64, u64, u64, u64>) {
+        let mut src =
+            Arc::new(Mutex::new(src_3args)).overridable::<u64, u64, u64, u64>("overridable");
+
+        let state = src.state();
+        assert_eq!(src.req(&1, &10, &100).unwrap(), 1000);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&2, &20, &200).unwrap(), 20000000);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&3, &30, &300).unwrap(), 300000000000);
+        assert_eq!(state, src.state());
+        assert!(src.req(&4, &40, &400).is_err());
+        assert_eq!(state, src.state());
+        assert!(src.req(&5, &50, &500).is_err());
+        assert_eq!(state, src.state());
+
+        let res = src.temp_override(
+            hashmap! {
+                1 => hashmap!{10 => hashmap!{100 => 1001, 400 => 4}, 4 => hashmap!{400 => 44}},
+                4 => hashmap!{40 => hashmap!{400 => 444}},
+            },
+            |src| {
+                let new_state = src.state();
+                assert_ne!(state, new_state);
+                assert_eq!(src.req(&1, &10, &100).unwrap(), 1001);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&1, &10, &400).unwrap(), 4);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&1, &4, &400).unwrap(), 44);
+                assert_eq!(src.req(&2, &20, &200).unwrap(), 20000000);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&3, &30, &300).unwrap(), 300000000000);
+                assert_eq!(new_state, src.state());
+                assert_eq!(src.req(&4, &40, &400).unwrap(), 444);
+                assert_eq!(new_state, src.state());
+                assert!(src.req(&5, &50, &500).is_err());
+                assert_eq!(new_state, src.state());
+
+                let res = src.temp_override(
+                    hashmap! {
+                        1 => hashmap!{10 => hashmap!{100 => 42}, 4 => hashmap!{400 => 44}},
+                        4 => hashmap!{40 => hashmap!{400 => 444}},
+                    },
+                    |src| {
+                        let new_state2 = src.state();
+                        assert_ne!(new_state, new_state2);
+                        assert_eq!(src.req(&1, &10, &100).unwrap(), 42);
+                        assert_eq!(new_state2, src.state());
+                        assert_eq!(src.req(&1, &10, &400).unwrap(), 4);
+                        assert_eq!(src.req(&2, &20, &200).unwrap(), 20000000);
+                        assert_eq!(new_state2, src.state());
+                        assert_eq!(src.req(&3, &30, &300).unwrap(), 300000000000);
+                        assert_eq!(new_state2, src.state());
+                        assert_eq!(src.req(&4, &40, &400).unwrap(), 444);
+                        assert_eq!(new_state2, src.state());
+                        assert!(src.req(&5, &50, &500).is_err());
+                        assert_eq!(new_state2, src.state());
+
+                        src.req(&1, &10, &100).unwrap()
+                    },
+                );
+                assert_eq!(res, 42);
+                assert_eq!(src.req(&1, &10, &100).unwrap(), 1001);
+                assert_eq!(new_state, src.state());
+
+                res
+            },
+        );
+        assert_eq!(res, 42);
+
+        assert_eq!(src.req(&1, &10, &100).unwrap(), 1000);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&2, &20, &200).unwrap(), 20000000);
+        assert_eq!(state, src.state());
+        assert_eq!(src.req(&3, &30, &300).unwrap(), 300000000000);
+        assert_eq!(state, src.state());
+        assert!(src.req(&4, &40, &400).is_err());
+        assert_eq!(state, src.state());
+        assert!(src.req(&5, &50, &500).is_err());
+        assert_eq!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_overridable_3args_clone(src_3args: OnMemorySrc3Args<u64, u64, u64, u64>) {
+        let mut src = src_3args.overridable::<u64, u64, u64, u64>("overridable");
+        let src2 = src.clone_without_override();
+
+        assert_ne!(src.id(), src2.id());
+
+        assert_eq!(src.req(&1, &10, &100).unwrap(), 1000);
+        assert_eq!(src2.req(&1, &10, &100).unwrap(), 1000);
+        assert_eq!(src.req(&2, &20, &200).unwrap(), 20000000);
+        assert_eq!(src2.req(&2, &20, &200).unwrap(), 20000000);
+
+        src.temp_override(
+            hashmap! {
+                1 => hashmap!{10 => hashmap!{100 => 1, 400 => 4}, 4 => hashmap!{400 => 44}},
+                4 => hashmap!{40 => hashmap!{400 => 444}},
+            },
+            |src| {
+                assert_eq!(src.req(&1, &10, &100).unwrap(), 1);
+                assert_eq!(src.req(&2, &20, &200).unwrap(), 20000000);
+                assert_eq!(src2.req(&1, &10, &100).unwrap(), 1000);
+                assert_eq!(src2.req(&2, &20, &200).unwrap(), 20000000);
+            },
+        );
+    }
+
+    #[rstest]
+    fn test_overridable_3args_state_change(src_3args: OnMemorySrc3Args<u64, u64, u64, u64>) {
+        let mut src = src_3args.overridable::<u64, u64, u64, u64>("overridable");
+
+        let state = src.state();
+        assert_eq!(src.req(&1, &10, &100).unwrap(), 1000);
+        assert_eq!(state, src.state());
+
+        src.inner_mut().insert(1, 10, 100, 1001);
+        assert_eq!(src.req(&1, &10, &100).unwrap(), 1001);
+        assert_ne!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_overridable_3args_tree(src_3args: OnMemorySrc3Args<u64, u64, u64, u64>) {
+        let src = src_3args.overridable::<u64, u64, u64, u64>("overridable");
+        let Tree::Branch {
+            desc,
+            id,
+            state,
+            children,
+        } = src.tree()
+        else {
+            panic!()
+        };
+        assert_eq!(desc, "overridable");
+        assert_eq!(id, src.id());
+        assert_eq!(state, src.state());
+        assert_eq!(children.len(), 1);
+        assert_eq!(children.iter().next().unwrap(), &src.inner().tree());
+    }
+
+    #[rstest]
+    fn test_overridable_3args_persistent_override(src_3args: OnMemorySrc3Args<u64, u64, u64, u64>) {
+        let src = src_3args.overridable::<u64, u64, u64, u64>("overridable");
+        let overriden = src.persistent_override(hashmap! {
+            1 => hashmap!{10 => hashmap!{100 => 1001, 400 => 4}, 4 => hashmap!{400 => 44}},
+            4 => hashmap!{40 => hashmap!{400 => 444}},
+        });
+
+        assert_eq!(overriden.req(&1, &10, &100).unwrap(), 1001);
+        assert_eq!(overriden.req(&2, &20, &200).unwrap(), 20000000);
+        assert_eq!(overriden.req(&3, &30, &300).unwrap(), 300000000000);
+        assert_eq!(overriden.req(&4, &40, &400).unwrap(), 444);
+        assert!(overriden.req(&5, &50, &500).is_err());
     }
 }

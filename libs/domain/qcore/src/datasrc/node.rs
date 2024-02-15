@@ -1,6 +1,8 @@
 use std::{
-    collections::BTreeSet,
+    borrow::Borrow,
+    collections::{BTreeSet, HashMap},
     fmt::Display,
+    hash::Hash,
     ops::{BitXor, BitXorAssign},
     sync::{Arc, Mutex, Weak},
 };
@@ -9,7 +11,10 @@ use derivative::Derivative;
 use serde::Serialize;
 use uuid::Uuid;
 
-use super::{Convert, Map, MapErr, WithLogger};
+use super::{
+    Convert, Map, MapErr, Overridable, Overridable2Args, Overridable3Args, Overriden,
+    Overriden2Args, Overriden3Args, WithLogger,
+};
 
 // -----------------------------------------------------------------------------
 // NodeId
@@ -401,6 +406,33 @@ pub trait DataSrc: Notifier {
     {
         WithLogger::new(desc, self, logger)
     }
+
+    /// Make this data source overridable
+    fn overridable<K, V>(self, desc: impl Into<String>) -> Overridable<Self, K, V>
+    where
+        Self: Sized,
+        K: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key>,
+        V: 'static + Send + Sync + Clone + Into<Self::Output>,
+    {
+        Overridable::new(desc, self)
+    }
+
+    /// Add override layer to this data source.
+    ///
+    /// Note that this override layer is immutable.
+    /// If you want to override more flexibly, please use `overridable` method.
+    fn with_override<K, V>(
+        self,
+        desc: impl Into<String>,
+        data: HashMap<K, V>,
+    ) -> Overriden<Self, K, V>
+    where
+        Self: Sized,
+        K: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key>,
+        V: 'static + Send + Sync + Clone + Into<Self::Output>,
+    {
+        Overriden::new(desc, self, data)
+    }
 }
 
 impl<T: DataSrc> DataSrc for Mutex<T> {
@@ -478,6 +510,35 @@ pub trait DataSrc2Args: Notifier {
         L: Fn(&Self::Key1, &Self::Key2, &Result<Self::Output, Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
+    }
+
+    /// Make this data source overridable
+    fn overridable<K1, K2, V>(self, desc: impl Into<String>) -> Overridable2Args<Self, K1, K2, V>
+    where
+        Self: Sized,
+        K1: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key1>,
+        K2: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key2>,
+        V: 'static + Send + Sync + Clone + Into<Self::Output>,
+    {
+        Overridable2Args::new(desc, self)
+    }
+
+    /// Add override layer to this data source.
+    ///
+    /// Note that this override layer is immutable.
+    /// If you want to override more flexibly, please use `overridable` method.
+    fn with_override<K1, K2, V>(
+        self,
+        desc: impl Into<String>,
+        data: HashMap<K1, HashMap<K2, V>>,
+    ) -> Overriden2Args<Self, K1, K2, V>
+    where
+        Self: Sized,
+        K1: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key1>,
+        K2: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key2>,
+        V: 'static + Send + Sync + Clone + Into<Self::Output>,
+    {
+        Overriden2Args::new(desc, self, data)
     }
 }
 
@@ -569,6 +630,40 @@ pub trait DataSrc3Args: Notifier {
         L: Fn(&Self::Key1, &Self::Key2, &Self::Key3, &Result<Self::Output, Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
+    }
+
+    /// Make this data source overridable
+    fn overridable<K1, K2, K3, V>(
+        self,
+        desc: impl Into<String>,
+    ) -> Overridable3Args<Self, K1, K2, K3, V>
+    where
+        Self: Sized,
+        K1: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key1>,
+        K2: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key2>,
+        K3: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key3>,
+        V: 'static + Send + Sync + Clone + Into<Self::Output>,
+    {
+        Overridable3Args::new(desc, self)
+    }
+
+    /// Add override layer to this data source.
+    ///
+    /// Note that this override layer is immutable.
+    /// If you want to override more flexibly, please use `overridable` method.
+    fn with_override<K1, K2, K3, V>(
+        self,
+        desc: impl Into<String>,
+        data: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
+    ) -> Overriden3Args<Self, K1, K2, K3, V>
+    where
+        Self: Sized,
+        K1: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key1>,
+        K2: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key2>,
+        K3: 'static + Send + Sync + Eq + Hash + Borrow<Self::Key3>,
+        V: 'static + Send + Sync + Clone + Into<Self::Output>,
+    {
+        Overriden3Args::new(desc, self, data)
     }
 }
 
