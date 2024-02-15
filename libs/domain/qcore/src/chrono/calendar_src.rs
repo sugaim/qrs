@@ -3,62 +3,46 @@
 //
 
 use std::{
-    collections::HashSet,
-    sync::{Arc, Weak},
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex, Weak},
 };
 
 use maplit::btreeset;
-use moka::sync::{Cache, CacheBuilder};
-use qcore_derive::Node;
 
 use crate::{
     chrono::CalendarSymVariant,
-    datasrc::{DataSrc, Node, NodeId, NodeInfo, NodeStateId, TakeSnapshot},
+    datasrc::{DataSrc, Listener, NodeId, Notifier, PublisherState, StateId, TakeSnapshot, Tree},
 };
 
 use super::{Calendar, CalendarSymbol};
 
 // -----------------------------------------------------------------------------
-// _Core
+// _Node
 //
 #[derive(Debug)]
-struct _Core<S> {
-    src: S,
-    cache: Cache<String, Calendar>,
-    info: NodeInfo,
-    self_state: NodeStateId, // invariant because this node itself does not have state
+struct _Node {
+    info: PublisherState,
+    src_id: NodeId,
+    cache: HashMap<CalendarSymbol, Calendar>,
+    self_state: StateId, // invariant because this node itself does not have state
 }
 
 //
 // methods
 //
-impl<S: Node> Node for _Core<S> {
+impl Listener for _Node {
     #[inline]
     fn id(&self) -> NodeId {
         self.info.id()
     }
 
     #[inline]
-    fn tree(&self) -> crate::datasrc::Tree {
-        self.info.make_tree_as_branch(btreeset! {self.src.tree()})
-    }
-
-    #[inline]
-    fn accept_subscriber(&self, subscriber: Weak<dyn Node>) -> NodeStateId {
-        self.info.accept_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn remove_subscriber(&self, subscriber: &NodeId) {
-        self.info.remove_subscriber(&subscriber);
-    }
-
-    #[inline]
-    fn subscribe(&self, id: &NodeId, state: &NodeStateId) {
-        if id != &self.src.id() {
+    fn listen(&mut self, publisher: &NodeId, state: &StateId) {
+        if publisher != &self.src_id {
             return;
         }
-        self.info.set_state(self.self_state ^ state);
+        self.cache.clear();
+        self.info.set_state(state ^ self.self_state);
     }
 }
 
@@ -67,57 +51,87 @@ impl<S: Node> Node for _Core<S> {
 //
 
 /// Data source for calendars
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug)]
 pub struct CalendarSrc<S> {
-    core: Arc<_Core<S>>,
+    src: S,
+    node: Arc<Mutex<_Node>>,
 }
 
 //
 // construction
 //
-impl<S> Clone for CalendarSrc<S> {
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-        }
+
+impl<S: Notifier> CalendarSrc<S> {
+    pub fn new(mut src: S) -> Self {
+        let self_state = StateId::gen();
+        let node = Arc::new(Mutex::new(_Node {
+            info: PublisherState::new("calendar source"),
+            src_id: src.id(),
+            self_state,
+            cache: HashMap::new(),
+        }));
+        let subsc = Arc::downgrade(&node);
+        let state = src.accept_listener(subsc) ^ self_state;
+        node.lock().unwrap().info.set_state(state);
+        Self { src, node }
     }
 }
 
-impl<S: DataSrc<str, Output = Calendar>> CalendarSrc<S> {
-    pub fn new(
-        src: S,
-        cache_builder: CacheBuilder<String, Calendar, Cache<String, Calendar>>,
-    ) -> Self {
-        let core = Arc::new(_Core {
-            src,
-            cache: cache_builder.build(),
-            info: NodeInfo::new("calendar"),
-            self_state: NodeStateId::gen(),
-        });
-        let subsc = Arc::downgrade(&core);
-        let downstream_state = core.src.accept_subscriber(subsc);
-        core.info.set_state(downstream_state ^ core.self_state);
-        Self { core }
+impl<S: Clone + Notifier> Clone for CalendarSrc<S> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self::new(self.src.clone())
     }
 }
 
 //
 // methods
 //
-impl<S: DataSrc<str, Output = Calendar>> DataSrc<CalendarSymbol> for CalendarSrc<S> {
+impl<S: Notifier> Notifier for CalendarSrc<S> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.node.lock().unwrap().info.id()
+    }
+
+    #[inline]
+    fn tree(&self) -> crate::datasrc::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.info.desc().into(), node.info.id(), node.info.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.node.lock().unwrap().info.accept_listener(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.node.lock().unwrap().info.remove_listener(id);
+    }
+}
+
+impl<S: DataSrc<Key = str, Output = Calendar>> DataSrc for CalendarSrc<S> {
+    type Key = CalendarSymbol;
     type Output = Calendar;
     type Err = S::Err;
 
-    fn req(&self, key: &CalendarSymbol) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let state = self.core.info.state();
-        if let Some(calendar) = self.core.cache.get(&format!("{}:{}", state, key)) {
-            return Ok((state, calendar));
+    fn req(&self, key: &CalendarSymbol) -> Result<(StateId, Self::Output), Self::Err> {
+        let state = self.node.lock().unwrap().info.state();
+        if let Some(calendar) = self.node.lock().unwrap().cache.get(key) {
+            return Ok((state, calendar.clone()));
         }
 
         use CalendarSymVariant::*;
         let cal = match key.dispatch() {
-            Single(s) => self.core.src.req(s).map(|(_, c)| c)?,
+            Single(s) => self.src.req(s).map(|(_, c)| c)?,
             AllClosed(syms) | AnyClosed(syms) => {
                 let cals: Vec<Calendar> = syms
                     .iter()
@@ -130,14 +144,13 @@ impl<S: DataSrc<str, Output = Calendar>> DataSrc<CalendarSymbol> for CalendarSrc
                 }
             }
         };
-        self.core
-            .cache
-            .insert(format!("{}:{}", state, key), cal.clone());
+        let mut node = self.node.lock().unwrap();
+        node.cache.insert(key.clone(), cal.clone());
         Ok((state, cal))
     }
 }
 
-impl<S: TakeSnapshot<str, Output = Calendar>> TakeSnapshot<CalendarSymbol> for CalendarSrc<S> {
+impl<S: TakeSnapshot<Key = str, Output = Calendar>> TakeSnapshot for CalendarSrc<S> {
     type SnapShot = CalendarSrc<S::SnapShot>;
     type SnapShotErr = S::SnapShotErr;
 
@@ -150,29 +163,46 @@ impl<S: TakeSnapshot<str, Output = Calendar>> TakeSnapshot<CalendarSymbol> for C
         for key in keys {
             key.leaves(&mut names);
         }
-        let snapshot = self
-            .core
-            .src
-            .take_snapshot(names.iter().map(|s| s.as_str()))?;
-        Ok(CalendarSrc::new(snapshot, Cache::builder()))
+        let snapshot = self.src.take_snapshot(names.iter().map(|s| s.as_str()))?;
+        Ok(CalendarSrc::new(snapshot))
     }
 }
 
 // =============================================================================
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{
+        str::FromStr,
+        sync::{Arc, Mutex},
+    };
 
     use chrono::NaiveDate;
+    use qcore_derive::Notifier;
     use rstest::{fixture, rstest};
 
     use crate::{
         chrono::{Calendar, CalendarSymbol},
-        datasrc::{DataSrc, Node, OnMemorySrc},
+        datasrc::{DataSrc, Notifier, OnMemorySrc, StateId},
     };
 
+    #[derive(Debug, Clone, Notifier)]
+    #[notifier(transparent = "internal")]
+    struct MockSrc {
+        internal: OnMemorySrc<String, Calendar>,
+    }
+
+    impl DataSrc for MockSrc {
+        type Key = str;
+        type Output = Calendar;
+        type Err = anyhow::Error;
+
+        fn req(&self, key: &str) -> Result<(StateId, Calendar), anyhow::Error> {
+            self.internal.req(&key.to_owned())
+        }
+    }
+
     #[fixture]
-    fn single_src() -> OnMemorySrc<String, Calendar> {
+    fn single_src() -> MockSrc {
         let mut src = OnMemorySrc::new("single calendar");
         let from = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let to = NaiveDate::from_ymd_opt(2999, 12, 31).unwrap();
@@ -217,11 +247,11 @@ mod tests {
                 .build()
                 .unwrap(),
         );
-        src
+        MockSrc { internal: src }
     }
 
     #[rstest]
-    fn test_req(single_src: OnMemorySrc<String, Calendar>) {
+    fn test_req(single_src: MockSrc) {
         let nyk = single_src.req("NYK").unwrap().1;
         let tky = single_src.req("TKY").unwrap().1;
         let ldn = single_src.req("LDN").unwrap().1;
@@ -230,7 +260,7 @@ mod tests {
         let tky = &tky;
         let ldn = &ldn;
 
-        let src = super::CalendarSrc::new(single_src, moka::sync::Cache::builder());
+        let src = super::CalendarSrc::new(single_src);
 
         // single - ok
         let sym = CalendarSymbol::of_single("NYK").unwrap();
@@ -270,41 +300,24 @@ mod tests {
     }
 
     #[rstest]
-    fn test_copy(single_src: OnMemorySrc<String, Calendar>) {
-        let src = super::CalendarSrc::new(single_src.clone(), moka::sync::Cache::builder());
-        let copy = src.clone();
-
-        // node id is shared
-        assert_eq!(src.id(), copy.id());
-
-        // state id is shared
-        let (id, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
-        let (cid, _) = copy
-            .req(&CalendarSymbol::of_single("NYK").unwrap())
-            .unwrap();
-        assert_eq!(id, cid);
-    }
-
-    #[rstest]
-    fn test_state_change(mut single_src: OnMemorySrc<String, Calendar>) {
-        let src = super::CalendarSrc::new(single_src.clone(), moka::sync::Cache::builder());
-        let copy = src.clone();
+    fn test_state_change(single_src: MockSrc) {
+        let single_src = Arc::new(Mutex::new(single_src));
+        let src = super::CalendarSrc::new(single_src.clone());
         let id = src.id();
-
-        assert_eq!(id, copy.id());
 
         let (old, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
 
-        single_src.remove(&"TKY".to_owned());
+        single_src
+            .lock()
+            .unwrap()
+            .internal
+            .remove(&"TKY".to_owned());
         let (new, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
-        let (cnew, _) = copy
-            .req(&CalendarSymbol::of_single("NYK").unwrap())
-            .unwrap();
+        let (cnew, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
 
         // state is changed, but node id is not changed.
         assert_ne!(old, new);
         assert_eq!(new, cnew);
         assert_eq!(id, src.id());
-        assert_eq!(id, copy.id());
     }
 }

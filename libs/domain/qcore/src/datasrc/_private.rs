@@ -1,8 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 
-use maplit::btreeset;
-
-use super::{Node, NodeId, NodeInfo, NodeStateId, Tree};
+use super::{Listener, NodeId, Notifier, PublisherState, StateId};
 
 // -----------------------------------------------------------------------------
 // _Node
@@ -10,74 +8,64 @@ use super::{Node, NodeId, NodeInfo, NodeStateId, Tree};
 
 /// Typical node implementation which does not have any state changing event.
 #[derive(Debug)]
-pub(super) struct _UnaryPassThroughNode<S> {
-    pub(super) src: S,
-    info: NodeInfo,
-    self_state: NodeStateId, // invariant becuase this node itself does not have state changing event
+pub(super) struct _UnaryPassThroughNode {
+    info: PublisherState,
+    src_id: NodeId,
+    self_state: StateId, // invariant becuase this node itself does not have state changing event
 }
 
 //
 // construction
 //
-impl<S: Node> _UnaryPassThroughNode<S> {
-    #[inline]
-    pub(super) fn new(src: S, desc: impl Into<String>) -> Arc<Self> {
-        let res = Arc::new(Self {
-            src,
-            info: NodeInfo::new(desc),
-            self_state: NodeStateId::gen(),
-        });
+impl _UnaryPassThroughNode {
+    /// Create a new instance and register it to the source.
+    pub(super) fn new_and_reg<S: Notifier>(
+        desc: impl Into<String>,
+        src: &mut S,
+    ) -> Arc<Mutex<Self>> {
+        let self_state = StateId::gen();
+        let res = Arc::new(Mutex::new(Self {
+            info: PublisherState::new(desc),
+            src_id: src.id(),
+            self_state,
+        }));
         let subsc = Arc::downgrade(&res);
-        let downstream_state = res.src.accept_subscriber(subsc);
-        res.info.set_state(downstream_state ^ res.self_state);
+        let state = src.accept_listener(subsc) ^ self_state;
+        res.lock().unwrap().info.set_state(state);
         res
-    }
-
-    #[inline]
-    pub(super) fn desc(&self) -> &str {
-        self.info.desc()
     }
 }
 
 //
 // methods
 //
-impl<S> _UnaryPassThroughNode<S> {
+impl _UnaryPassThroughNode {
     #[inline]
-    pub(super) fn state(&self) -> NodeStateId {
+    pub(super) fn desc(&self) -> String {
+        self.info.desc().into()
+    }
+    #[inline]
+    pub(super) fn state(&self) -> StateId {
         self.info.state()
+    }
+    #[inline]
+    pub(super) fn accept_subscriber(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.info.accept_listener(subsc)
+    }
+    #[inline]
+    pub(super) fn remove_subscriber(&mut self, id: &NodeId) {
+        self.info.remove_listener(id);
     }
 }
 
-impl<S: Node> Node for _UnaryPassThroughNode<S> {
+impl Listener for _UnaryPassThroughNode {
     #[inline]
     fn id(&self) -> NodeId {
         self.info.id()
     }
-
     #[inline]
-    fn tree(&self) -> super::Tree {
-        Tree::Branch {
-            desc: self.info.desc().to_owned(),
-            id: self.id(),
-            state: self.info.state(),
-            children: btreeset![self.src.tree()],
-        }
-    }
-
-    #[inline]
-    fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn Node>) -> super::NodeStateId {
-        self.info.accept_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn remove_subscriber(&self, subscriber: &NodeId) {
-        self.info.remove_subscriber(subscriber)
-    }
-
-    #[inline]
-    fn subscribe(&self, publisher: &super::NodeId, state: &super::NodeStateId) {
-        if publisher != &self.src.id() {
+    fn listen(&mut self, id: &NodeId, state: &StateId) {
+        if id != &self.src_id {
             return;
         }
         self.info.set_state(state ^ self.self_state);

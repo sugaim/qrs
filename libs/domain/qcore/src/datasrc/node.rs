@@ -2,11 +2,10 @@ use std::{
     collections::BTreeSet,
     fmt::Display,
     ops::{BitXor, BitXorAssign},
-    sync::{Mutex, Weak},
+    sync::{Arc, Mutex, Weak},
 };
 
 use derivative::Derivative;
-use dyn_clone::DynClone;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -50,15 +49,15 @@ impl NodeId {
 }
 
 // -----------------------------------------------------------------------------
-// NodeStateId
+// StateId
 //
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub struct NodeStateId(Uuid);
+pub struct StateId(Uuid);
 
 //
 // display, serde
 //
-impl Display for NodeStateId {
+impl Display for StateId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -67,17 +66,17 @@ impl Display for NodeStateId {
 //
 // construction
 //
-impl NodeStateId {
+impl StateId {
     /// Create a new `NodeStateId`
     ///
     /// This function intentionally nullary to ensure
     /// that the `NodeStateId` is almost surely unique.
     pub fn gen() -> Self {
-        NodeStateId(Uuid::new_v4())
+        StateId(Uuid::new_v4())
     }
 }
 
-impl BitXor for NodeStateId {
+impl BitXor for StateId {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
@@ -85,37 +84,37 @@ impl BitXor for NodeStateId {
     }
 }
 
-impl BitXor for &NodeStateId {
-    type Output = NodeStateId;
+impl BitXor for &StateId {
+    type Output = StateId;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        NodeStateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+        StateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
     }
 }
 
-impl BitXor<&NodeStateId> for NodeStateId {
-    type Output = NodeStateId;
+impl BitXor<&StateId> for StateId {
+    type Output = StateId;
 
-    fn bitxor(self, rhs: &NodeStateId) -> Self::Output {
-        NodeStateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+    fn bitxor(self, rhs: &StateId) -> Self::Output {
+        StateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
     }
 }
 
-impl BitXor<NodeStateId> for &NodeStateId {
-    type Output = NodeStateId;
+impl BitXor<StateId> for &StateId {
+    type Output = StateId;
 
-    fn bitxor(self, rhs: NodeStateId) -> Self::Output {
-        NodeStateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
+    fn bitxor(self, rhs: StateId) -> Self::Output {
+        StateId(Uuid::from_u128(self.0.as_u128() ^ rhs.0.as_u128()))
     }
 }
 
-impl BitXorAssign for NodeStateId {
+impl BitXorAssign for StateId {
     fn bitxor_assign(&mut self, rhs: Self) {
         *self = *self ^ rhs;
     }
 }
 
-impl BitXorAssign<&NodeStateId> for NodeStateId {
+impl BitXorAssign<&StateId> for StateId {
     fn bitxor_assign(&mut self, rhs: &Self) {
         *self = *self ^ rhs;
     }
@@ -124,37 +123,36 @@ impl BitXorAssign<&NodeStateId> for NodeStateId {
 //
 // methods
 //
-impl NodeStateId {
+impl StateId {
     pub fn uuid(&self) -> &Uuid {
         &self.0
     }
 }
 
 // -----------------------------------------------------------------------------
-// NodeInfo
+// PublisherState
 //
 
-/// A collection of data which may be necessary for typical implementation of `Node`
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct NodeInfo {
+pub struct PublisherState {
     id: NodeId,
     desc: String,
-    state: Mutex<NodeStateId>,
+    state: StateId,
     #[derivative(Debug = "ignore")]
-    children: Mutex<Vec<Weak<dyn Node>>>,
+    children: Vec<Weak<Mutex<dyn Listener>>>,
 }
 
 //
 // construction
 //
-impl NodeInfo {
+impl PublisherState {
     pub fn new(desc: impl Into<String>) -> Self {
         Self {
             id: NodeId::gen(),
             desc: desc.into(),
-            state: Mutex::new(NodeStateId::gen()),
-            children: Mutex::new(Vec::new()),
+            state: StateId::gen(),
+            children: Vec::new(),
         }
     }
 }
@@ -162,61 +160,61 @@ impl NodeInfo {
 //
 // methods
 //
-impl NodeInfo {
+impl PublisherState {
     #[inline]
     pub fn id(&self) -> NodeId {
         self.id
     }
     #[inline]
-    pub fn state(&self) -> NodeStateId {
-        self.state.lock().unwrap().clone()
+    pub fn desc(&self) -> &str {
+        &self.desc
     }
     #[inline]
-    pub fn set_state(&self, state: NodeStateId) {
-        *self.state.lock().unwrap() = state;
+    pub fn state(&self) -> StateId {
+        self.state
+    }
+    pub fn set_state(&mut self, state: StateId) {
+        self.state = state;
 
         // notify to all subscribers
-        let id = self.id();
-        let mut children = self.children.lock().unwrap();
-        children.retain(|child| match &child.upgrade() {
+        let id = self.id;
+        self.children.retain(|child| match child.upgrade() {
             Some(child) => {
-                child.subscribe(&id, &state);
+                child.lock().unwrap().listen(&id, &state);
                 true
             }
             None => false,
         });
     }
-    #[inline]
-    pub fn accept_subscriber(&self, subscriber: Weak<dyn Node>) -> NodeStateId {
-        self.children.lock().unwrap().push(subscriber);
+    pub fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        let Some(subsc_id) = subsc.upgrade().map(|s| s.lock().unwrap().id()) else {
+            // the subscriber is already dropped. so do nothing
+            return self.state();
+        };
+        self.remove_listener(&subsc_id);
+        self.children.push(subsc);
         self.state()
     }
     #[inline]
-    pub fn desc(&self) -> &str {
-        &self.desc
-    }
-    pub fn remove_subscriber(&self, subscriber: &NodeId) {
-        self.children
-            .lock()
-            .unwrap()
-            .retain(|child| match &child.upgrade().map(|c| c.id()) {
-                Some(id) => id != subscriber,
-                None => false,
-            });
+    pub fn remove_listener(&mut self, subscriber: &NodeId) {
+        self.children.retain(|child| match child.upgrade() {
+            Some(child) => &child.lock().unwrap().id() != subscriber,
+            None => false,
+        });
     }
     #[inline]
     pub fn make_tree_as_leaf(&self) -> Tree {
         Tree::Leaf {
-            desc: self.desc().to_string(),
-            id: self.id(),
+            desc: self.desc.to_owned(),
+            id: self.id,
             state: self.state(),
         }
     }
     #[inline]
     pub fn make_tree_as_branch(&self, children: BTreeSet<Tree>) -> Tree {
         Tree::Branch {
-            desc: self.desc().to_string(),
-            id: self.id(),
+            desc: self.desc.to_owned(),
+            id: self.id,
             state: self.state(),
             children,
         }
@@ -231,12 +229,12 @@ pub enum Tree {
     Leaf {
         desc: String,
         id: NodeId,
-        state: NodeStateId,
+        state: StateId,
     },
     Branch {
         desc: String,
         id: NodeId,
-        state: NodeStateId,
+        state: StateId,
         children: BTreeSet<Tree>,
     },
 }
@@ -250,29 +248,108 @@ pub enum Tree {
 /// Each node should have a immutable `NodeId`and a mutable `NodeStateId`.
 /// When the state changing event occurs, the node should notify it
 /// to all subscribers.
-pub trait Node: 'static {
-    /// Get the `NodeId` of the node
+pub trait Notifier: 'static + Send + Sync {
+    /// Get the `NodeId` of this node.
+    /// Implementations must ensure that the `NodeId` is immutable.
     fn id(&self) -> NodeId;
 
     /// Get the tree structure of the node
     /// Mainly used for debugging
     fn tree(&self) -> Tree;
 
-    /// Behavior as publisher. Accept subscriber which subscribes the change of this node.
+    /// Accept subscriber which subscribes the change of this node.
     /// Return the state id of this node when the subscriber is accepted.
-    fn accept_subscriber(&self, subscriber: Weak<dyn Node>) -> NodeStateId;
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId;
 
-    /// Behavior as publisher. Remove subscriber which subscribes the change of this node
-    fn remove_subscriber(&self, subscriber: &NodeId);
+    /// Remove subscriber which subscribes the change of this node
+    fn remove_listener(&mut self, id: &NodeId);
+}
 
-    /// Behavior as subscriber. Accept the state changing event from the publisher
-    fn subscribe(&self, publisher: &NodeId, state: &NodeStateId);
+impl<P: Notifier> Notifier for Mutex<P> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> Tree {
+        self.lock().unwrap().tree()
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.lock().unwrap().accept_listener(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.lock().unwrap().remove_listener(id)
+    }
+}
+
+impl<P: Notifier> Notifier for Arc<Mutex<P>> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> Tree {
+        self.lock().unwrap().tree()
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.lock().unwrap().accept_listener(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.lock().unwrap().remove_listener(id)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Listener
+//
+
+pub trait Listener: 'static + Send + Sync {
+    /// Get the `NodeId` of the node
+    fn id(&self) -> NodeId;
+
+    /// Accept the state changing event from the publisher
+    fn listen(&mut self, publisher: &NodeId, state: &StateId);
+}
+
+impl<S: Listener> Listener for Mutex<S> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn listen(&mut self, publisher: &NodeId, state: &StateId) {
+        self.lock().unwrap().listen(publisher, state)
+    }
+}
+
+impl<S: Listener> Listener for Arc<Mutex<S>> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn listen(&mut self, publisher: &NodeId, state: &StateId) {
+        self.lock().unwrap().listen(publisher, state)
+    }
 }
 
 // -----------------------------------------------------------------------------
 // DataSrc
 //
-pub trait DataSrc<K: ?Sized>: DynClone + Node {
+pub trait DataSrc: Notifier {
+    type Key: ?Sized;
     type Output;
     type Err;
 
@@ -281,13 +358,13 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     ///
     /// - `Ok`: when the data is successfully retrieved
     /// - `Err`: when the data is not found or some error occurred
-    fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err>;
+    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err>;
 
     /// Map the output of this data source
     fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
     where
         Self: Sized,
-        F: Fn(Self::Output) -> Self::Output + 'static,
+        F: 'static + Send + Sync + Fn(Self::Output) -> Self::Output,
     {
         Map::new(desc, self, f)
     }
@@ -296,7 +373,7 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
     where
         Self: Sized,
-        F: Fn(Self::Err) -> E + 'static,
+        F: 'static + Send + Sync + Fn(Self::Err) -> E,
     {
         MapErr::new(desc, self, f)
     }
@@ -305,7 +382,7 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
     where
         Self: Sized,
-        F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
+        F: 'static + Send + Sync + Fn(&Self::Key, Result<Self::Output, Self::Err>) -> Result<O, E>,
     {
         Convert::new(desc, self, f)
     }
@@ -314,67 +391,40 @@ pub trait DataSrc<K: ?Sized>: DynClone + Node {
     fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
-        L: Fn(&K, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
+        L: Fn(&Self::Key, &Result<(StateId, Self::Output), Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
+    }
+}
+
+impl<T: DataSrc> DataSrc for Mutex<T> {
+    type Key = T::Key;
+    type Output = T::Output;
+    type Err = T::Err;
+
+    #[inline]
+    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+        self.lock().unwrap().req(key)
+    }
+}
+
+impl<T: DataSrc> DataSrc for Arc<Mutex<T>> {
+    type Key = T::Key;
+    type Output = T::Output;
+    type Err = T::Err;
+
+    #[inline]
+    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+        self.lock().unwrap().req(key)
     }
 }
 
 // -----------------------------------------------------------------------------
 // DataSrc2Args
 //
-pub trait DataSrc2Args<K1: ?Sized, K2: ?Sized>: DynClone + Node {
-    type Output;
-    type Err;
-
-    /// Request data with the given keys
-    /// In addition to the data, the state id of the node is also returned.
-    ///
-    /// - `Ok`: when the data is successfully retrieved
-    /// - `Err`: when the data is not found or some error occurred
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err>;
-
-    /// Map the output of this data source
-    fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
-    where
-        Self: Sized,
-        F: Fn(Self::Output) -> Self::Output + 'static,
-    {
-        Map::new(desc, self, f)
-    }
-
-    /// Map the error of this data source
-    fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
-    where
-        Self: Sized,
-        F: Fn(Self::Err) -> E + 'static,
-    {
-        MapErr::new(desc, self, f)
-    }
-
-    /// Convert the output and error of this data source
-    fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
-    where
-        Self: Sized,
-        F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
-    {
-        Convert::new(desc, self, f)
-    }
-
-    /// Add a logger to data source
-    fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
-    where
-        Self: Sized,
-        L: Fn(&K1, &K2, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
-    {
-        WithLogger::new(desc, self, logger)
-    }
-}
-
-// -----------------------------------------------------------------------------
-// DataSrc3Args
-//
-pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
+pub trait DataSrc2Args: Notifier {
+    type Key1: ?Sized;
+    type Key2: ?Sized;
     type Output;
     type Err;
 
@@ -385,16 +435,15 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     /// - `Err`: when the data is not found or some error occurred
     fn req(
         &self,
-        key1: &K1,
-        key2: &K2,
-        key3: &K3,
-    ) -> Result<(NodeStateId, Self::Output), Self::Err>;
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+    ) -> Result<(StateId, Self::Output), Self::Err>;
 
     /// Map the output of this data source
     fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
     where
         Self: Sized,
-        F: Fn(Self::Output) -> Self::Output + 'static,
+        F: 'static + Send + Sync + Fn(Self::Output) -> Self::Output,
     {
         Map::new(desc, self, f)
     }
@@ -403,7 +452,7 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
     where
         Self: Sized,
-        F: Fn(Self::Err) -> E + 'static,
+        F: 'static + Send + Sync + Fn(Self::Err) -> E,
     {
         MapErr::new(desc, self, f)
     }
@@ -412,7 +461,10 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
     where
         Self: Sized,
-        F: Fn(Result<Self::Output, Self::Err>) -> Result<O, E> + 'static,
+        F: 'static
+            + Send
+            + Sync
+            + Fn(&Self::Key1, &Self::Key2, Result<Self::Output, Self::Err>) -> Result<O, E>,
     {
         Convert::new(desc, self, f)
     }
@@ -421,8 +473,144 @@ pub trait DataSrc3Args<K1: ?Sized, K2: ?Sized, K3: ?Sized>: DynClone + Node {
     fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
-        L: Fn(&K1, &K2, &K3, &Result<(NodeStateId, Self::Output), Self::Err>) + 'static,
+        L: Fn(&Self::Key1, &Self::Key2, &Result<(StateId, Self::Output), Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
+    }
+}
+
+impl<T: DataSrc2Args> DataSrc2Args for Mutex<T> {
+    type Key1 = T::Key1;
+    type Key2 = T::Key2;
+    type Output = T::Output;
+    type Err = T::Err;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        self.lock().unwrap().req(key1, key2)
+    }
+}
+
+impl<T: DataSrc2Args> DataSrc2Args for Arc<Mutex<T>> {
+    type Key1 = T::Key1;
+    type Key2 = T::Key2;
+    type Output = T::Output;
+    type Err = T::Err;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        self.lock().unwrap().req(key1, key2)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// DataSrc3Args
+//
+pub trait DataSrc3Args: Notifier {
+    type Key1: ?Sized;
+    type Key2: ?Sized;
+    type Key3: ?Sized;
+    type Output;
+    type Err;
+
+    /// Request data with the given keys
+    /// In addition to the data, the state id of the node is also returned.
+    ///
+    /// - `Ok`: when the data is successfully retrieved
+    /// - `Err`: when the data is not found or some error occurred
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+        key3: &Self::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err>;
+
+    /// Map the output of this data source
+    fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: 'static + Send + Sync + Fn(Self::Output) -> Self::Output,
+    {
+        Map::new(desc, self, f)
+    }
+
+    /// Map the error of this data source
+    fn map_err<F, E>(self, desc: impl Into<String>, f: F) -> MapErr<Self, F>
+    where
+        Self: Sized,
+        F: 'static + Send + Sync + Fn(Self::Err) -> E,
+    {
+        MapErr::new(desc, self, f)
+    }
+
+    /// Convert the output and error of this data source
+    fn convert<F, O, E>(self, desc: impl Into<String>, f: F) -> Convert<Self, F>
+    where
+        Self: Sized,
+        F: 'static
+            + Send
+            + Sync
+            + Fn(
+                &Self::Key1,
+                &Self::Key2,
+                &Self::Key3,
+                Result<Self::Output, Self::Err>,
+            ) -> Result<O, E>,
+    {
+        Convert::new(desc, self, f)
+    }
+
+    /// Add a logger to data source
+    fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
+    where
+        Self: Sized,
+        L: Fn(&Self::Key1, &Self::Key2, &Self::Key3, &Result<(StateId, Self::Output), Self::Err>)
+            + 'static,
+    {
+        WithLogger::new(desc, self, logger)
+    }
+}
+
+impl<T: DataSrc3Args> DataSrc3Args for Mutex<T> {
+    type Key1 = T::Key1;
+    type Key2 = T::Key2;
+    type Key3 = T::Key3;
+    type Output = T::Output;
+    type Err = T::Err;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+        key3: &Self::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        self.lock().unwrap().req(key1, key2, key3)
+    }
+}
+
+impl<T: DataSrc3Args> DataSrc3Args for Arc<Mutex<T>> {
+    type Key1 = T::Key1;
+    type Key2 = T::Key2;
+    type Key3 = T::Key3;
+    type Output = T::Output;
+    type Err = T::Err;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+        key3: &Self::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        self.lock().unwrap().req(key1, key2, key3)
     }
 }

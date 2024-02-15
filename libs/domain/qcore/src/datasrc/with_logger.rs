@@ -1,44 +1,44 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 
-use qcore_derive::Node;
+use maplit::btreeset;
+use qcore_derive::Listener;
 
 use super::{
     _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Node, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
+    DataSrc3Args, Listener, NodeId, Notifier, StateId, TakeSnapshot, TakeSnapshot2Args, Tree,
 };
 
 // -----------------------------------------------------------------------------
 // WithLogger
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct WithLogger<S, F> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    logger: Arc<F>,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    src: S,
+    logger: F,
 }
 
 //
 // construction
 //
-impl<S, F> Clone for WithLogger<S, F> {
+
+impl<S: Notifier, F> WithLogger<S, F> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            logger: self.logger.clone(),
-        }
+    pub fn new(desc: impl Into<String>, mut src: S, logger: F) -> Self {
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { node, src, logger }
     }
 }
 
-impl<S: Node, F: 'static> WithLogger<S, F> {
+impl<S: Clone + Notifier, F: Clone> Clone for WithLogger<S, F> {
     #[inline]
-    fn _new(desc: impl Into<String>, src: S, logger: Arc<F>) -> Self {
-        let core = _UnaryPassThroughNode::new(src, desc);
-        Self { core, logger }
-    }
-    #[inline]
-    pub fn new(desc: impl Into<String>, src: S, logger: F) -> Self {
-        Self::_new(desc, src, Arc::new(logger))
+    fn clone(&self) -> Self {
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.logger.clone(),
+        )
     }
 }
 
@@ -46,142 +46,177 @@ impl<S: Node, F: 'static> WithLogger<S, F> {
 // methods
 //
 impl<S, F> WithLogger<S, F> {
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    #[inline]
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<K, S, F> DataSrc<K> for WithLogger<S, F>
+impl<S: Notifier, F: 'static + Send + Sync> Notifier for WithLogger<S, F> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.node.lock().unwrap().id()
+    }
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, F> DataSrc for WithLogger<S, F>
 where
-    K: ?Sized,
-    S: DataSrc<K>,
-    F: Fn(&K, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
+    S: DataSrc,
+    F: 'static + Send + Sync + Fn(&S::Key, &Result<(StateId, S::Output), S::Err>),
 {
+    type Key = S::Key;
     type Output = S::Output;
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let result = self.core.src.req(key);
+    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+        let result = self.src.req(key);
         (self.logger)(key, &result);
         result
     }
 }
 
-impl<K1, K2, S, F> DataSrc2Args<K1, K2> for WithLogger<S, F>
+impl<S, F> DataSrc2Args for WithLogger<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: DataSrc2Args<K1, K2>,
-    F: Fn(&K1, &K2, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
+    S: DataSrc2Args,
+    F: 'static + Send + Sync + Fn(&S::Key1, &S::Key2, &Result<(StateId, S::Output), S::Err>),
 {
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
     type Output = S::Output;
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let result = self.core.src.req(key1, key2);
+    fn req(&self, key1: &S::Key1, key2: &S::Key2) -> Result<(StateId, Self::Output), Self::Err> {
+        let result = self.src.req(key1, key2);
         (self.logger)(key1, key2, &result);
         result
     }
 }
 
-impl<K1, K2, K3, S, F> DataSrc3Args<K1, K2, K3> for WithLogger<S, F>
+impl<S, F> DataSrc3Args for WithLogger<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: DataSrc3Args<K1, K2, K3>,
-    F: Fn(&K1, &K2, &K3, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
+    S: DataSrc3Args,
+    F: 'static
+        + Send
+        + Sync
+        + Fn(&S::Key1, &S::Key2, &S::Key3, &Result<(StateId, S::Output), S::Err>),
 {
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
+    type Key3 = S::Key3;
     type Output = S::Output;
     type Err = S::Err;
 
     #[inline]
     fn req(
         &self,
-        key1: &K1,
-        key2: &K2,
-        key3: &K3,
-    ) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let result = self.core.src.req(key1, key2, key3);
+        key1: &S::Key1,
+        key2: &S::Key2,
+        key3: &S::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        let result = self.src.req(key1, key2, key3);
         (self.logger)(key1, key2, key3, &result);
         result
     }
 }
 
-impl<K, S, F> TakeSnapshot<K> for WithLogger<S, F>
+impl<S, F> TakeSnapshot for WithLogger<S, F>
 where
-    K: ?Sized,
-    S: TakeSnapshot<K>,
-    F: Fn(&K, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
+    S: TakeSnapshot,
+    F: 'static + Send + Sync + Clone + Fn(&S::Key, &Result<(StateId, S::Output), S::Err>),
 {
     type SnapShot = WithLogger<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = &'a K>,
-        K: 'a,
+        It: IntoIterator<Item = &'a S::Key>,
+        S::Key: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger::_new(
-            self.core.desc(),
-            snap,
-            self.logger.clone(),
-        ))
+        self.src.take_snapshot(keys).map(|snap| {
+            WithLogger::new(self.node.lock().unwrap().desc(), snap, self.logger.clone())
+        })
     }
 }
 
-impl<K1, K2, S, F> TakeSnapshot2Args<K1, K2> for WithLogger<S, F>
+impl<S, F> TakeSnapshot2Args for WithLogger<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: TakeSnapshot2Args<K1, K2>,
-    F: Fn(&K1, &K2, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
+    S: TakeSnapshot2Args,
+    F: 'static
+        + Send
+        + Sync
+        + Clone
+        + Fn(&S::Key1, &S::Key2, &Result<(StateId, S::Output), S::Err>),
 {
     type SnapShot = WithLogger<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2)>,
-        K1: 'a,
-        K2: 'a,
+        It: IntoIterator<Item = (&'a S::Key1, &'a S::Key2)>,
+        S::Key1: 'a,
+        S::Key2: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger::_new(
-            self.core.desc(),
-            snap,
-            self.logger.clone(),
-        ))
+        self.src.take_snapshot(keys).map(|snap| {
+            WithLogger::new(self.node.lock().unwrap().desc(), snap, self.logger.clone())
+        })
     }
 }
 
-impl<K1, K2, K3, S, F> TakeSnapshot3Args<K1, K2, K3> for WithLogger<S, F>
+impl<S, F> TakeSnapshot3Args for WithLogger<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: TakeSnapshot3Args<K1, K2, K3>,
-    F: Fn(&K1, &K2, &K3, &Result<(NodeStateId, S::Output), S::Err>) + 'static,
+    S: TakeSnapshot3Args,
+    F: 'static
+        + Send
+        + Sync
+        + Clone
+        + Fn(&S::Key1, &S::Key2, &S::Key3, &Result<(StateId, S::Output), S::Err>),
 {
     type SnapShot = WithLogger<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
-        K1: 'a,
-        K2: 'a,
-        K3: 'a,
+        It: IntoIterator<Item = (&'a S::Key1, &'a S::Key2, &'a S::Key3)>,
+        S::Key1: 'a,
+        S::Key2: 'a,
+        S::Key3: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(WithLogger::_new(
-            self.core.desc(),
-            snap,
-            self.logger.clone(),
-        ))
+        self.src.take_snapshot(keys).map(|snap| {
+            WithLogger::new(self.node.lock().unwrap().desc(), snap, self.logger.clone())
+        })
     }
 }
 
@@ -193,152 +228,204 @@ mod tests {
     use maplit::hashmap;
     use rstest::{fixture, rstest};
 
-    use crate::datasrc::{
-        ImmutableOnMemorySrc, ImmutableOnMemorySrc2Args, ImmutableOnMemorySrc3Args,
-    };
+    use crate::datasrc::{OnMemorySrc, OnMemorySrc2Args, OnMemorySrc3Args};
 
     use super::*;
 
     #[fixture]
-    fn src_1arg() -> ImmutableOnMemorySrc<String, i32> {
-        let src = ImmutableOnMemorySrc::with_data(
+    fn src_1arg() -> OnMemorySrc<&'static str, i32> {
+        let src = OnMemorySrc::with_data(
             "src",
             hashmap! {
-                "a".to_owned() => 1,
-                "b".to_owned() => 2,
-                "c".to_owned() => 3,
+                "a" => 1,
+                "b" => 2,
+                "c" => 3,
             },
         );
         src
     }
 
     #[fixture]
-    fn src_2args() -> ImmutableOnMemorySrc2Args<String, String, i32> {
-        let src = ImmutableOnMemorySrc2Args::with_data(
+    fn src_2args() -> OnMemorySrc2Args<&'static str, &'static str, i32> {
+        let src = OnMemorySrc2Args::with_data(
             "src",
             hashmap! {
-                ("a".to_owned(), "x".to_owned()) => 1,
-                ("a".to_owned(), "y".to_owned()) => 2,
-                ("b".to_owned(), "x".to_owned()) => 3,
-                ("b".to_owned(), "y".to_owned()) => 4,
-                ("c".to_owned(), "x".to_owned()) => 5,
-                ("c".to_owned(), "y".to_owned()) => 6,
+                "a" => hashmap! {
+                    "x" => 1,
+                    "y" => 2,
+                },
+                "b" => hashmap! {
+                    "x" => 3,
+                    "y" => 4,
+                },
+                "c" => hashmap! {
+                    "x" => 5,
+                    "y" => 6,
+                },
             },
         );
         src
     }
 
     #[fixture]
-    fn src_3args() -> ImmutableOnMemorySrc3Args<String, String, String, i32> {
-        let src = ImmutableOnMemorySrc3Args::with_data(
+    fn src_3args() -> OnMemorySrc3Args<&'static str, &'static str, &'static str, i32> {
+        let src = OnMemorySrc3Args::with_data(
             "src",
             hashmap! {
-                ("a".to_owned(), "x".to_owned(), "i".to_owned()) => 1,
-                ("a".to_owned(), "x".to_owned(), "j".to_owned()) => 2,
-                ("a".to_owned(), "y".to_owned(), "i".to_owned()) => 3,
-                ("a".to_owned(), "y".to_owned(), "j".to_owned()) => 4,
-                ("b".to_owned(), "x".to_owned(), "i".to_owned()) => 5,
-                ("b".to_owned(), "x".to_owned(), "j".to_owned()) => 6,
-                ("b".to_owned(), "y".to_owned(), "i".to_owned()) => 7,
-                ("b".to_owned(), "y".to_owned(), "j".to_owned()) => 8,
-                ("c".to_owned(), "x".to_owned(), "i".to_owned()) => 9,
-                ("c".to_owned(), "x".to_owned(), "j".to_owned()) => 10,
-                ("c".to_owned(), "y".to_owned(), "i".to_owned()) => 11,
-                ("c".to_owned(), "y".to_owned(), "j".to_owned()) => 12,
+                "a" => hashmap! {
+                    "x" => hashmap! {
+                        "i" => 1,
+                        "j" => 2,
+                    },
+                    "y" => hashmap! {
+                        "i" => 3,
+                        "j" => 4,
+                    },
+                },
+                "b" => hashmap! {
+                    "x" => hashmap! {
+                        "i" => 5,
+                        "j" => 6,
+                    },
+                    "y" => hashmap! {
+                        "i" => 7,
+                        "j" => 8,
+                    },
+                },
+                "c" => hashmap! {
+                    "x" => hashmap! {
+                        "i" => 9,
+                        "j" => 10,
+                    },
+                    "y" => hashmap! {
+                        "i" => 11,
+                        "j" => 12,
+                    },
+                },
             },
         );
         src
     }
 
     #[rstest]
-    fn test_with_logger_1arg(src_1arg: ImmutableOnMemorySrc<String, i32>) {
-        let (reader, logger) = {
+    fn test_with_logger_1arg(src_1arg: OnMemorySrc<&'static str, i32>) {
+        let src_1arg = Arc::new(Mutex::new(src_1arg));
+        let (reader, src) = {
             let msg = Arc::new(Mutex::new(String::new()));
             let reader = msg.clone();
-            let logger = move |k: &str, r: &Result<(NodeStateId, i32), anyhow::Error>| {
+            let src = src_1arg.clone().with_logger("with_logger", move |k, r| {
                 let mut msg = msg.lock().unwrap();
                 match r {
                     Ok((_, v)) => *msg = format!("[ok] {}: {}", k, v),
                     Err(_) => *msg = format!("[ng] {}", k),
                 }
-            };
-            (reader, logger)
+            });
+            (reader, src)
         };
-        let src = WithLogger::new("with_logger", src_1arg, logger);
 
         // ok
-        assert_eq!(src.req("a").unwrap().1, 1);
+        assert_eq!(src.req(&"a").unwrap().1, 1);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] a: 1");
-        assert_eq!(src.req("b").unwrap().1, 2);
+        assert_eq!(src.req(&"b").unwrap().1, 2);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] b: 2");
-        assert_eq!(src.req("c").unwrap().1, 3);
+        assert_eq!(src.req(&"c").unwrap().1, 3);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] c: 3");
 
         // err
-        assert!(src.req("d").is_err());
+        assert!(src.req(&"d").is_err());
         assert_eq!(reader.lock().unwrap().as_str(), "[ng] d");
+
+        // state change
+        let (current_state, current_val) = src.req(&"a").unwrap();
+
+        src_1arg.lock().unwrap().insert("a", 100);
+        let (new_state, new_val) = src.req(&"a").unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] a: 100");
     }
 
     #[rstest]
-    fn test_with_logger_2args(src_2args: ImmutableOnMemorySrc2Args<String, String, i32>) {
-        let (reader, logger) = {
+    fn test_with_logger_2args(src_2args: OnMemorySrc2Args<&'static str, &'static str, i32>) {
+        let src_2args = Arc::new(Mutex::new(src_2args));
+        let (reader, src) = {
             let msg = Arc::new(Mutex::new(String::new()));
             let reader = msg.clone();
-            let logger =
-                move |k1: &str, k2: &str, r: &Result<(NodeStateId, i32), anyhow::Error>| {
-                    let mut msg = msg.lock().unwrap();
-                    match r {
-                        Ok((_, v)) => *msg = format!("[ok] ({}, {}): {}", k1, k2, v),
-                        Err(_) => *msg = format!("[ng] ({}, {})", k1, k2),
-                    }
-                };
-            (reader, logger)
+            let src = src_2args.clone().with_logger("logger", move |k1, k2, r| {
+                let mut msg = msg.lock().unwrap();
+                match r {
+                    Ok((_, v)) => *msg = format!("[ok] ({}, {}): {}", k1, k2, v),
+                    Err(_) => *msg = format!("[ng] ({}, {})", k1, k2),
+                }
+            });
+            (reader, src)
         };
-        let src = WithLogger::new("with_logger", src_2args, logger);
 
         // ok
-        assert_eq!(src.req("a", "x").unwrap().1, 1);
+        assert_eq!(src.req(&"a", &"x").unwrap().1, 1);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x): 1");
-        assert_eq!(src.req("b", "x").unwrap().1, 3);
+        assert_eq!(src.req(&"b", &"x").unwrap().1, 3);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x): 3");
-        assert_eq!(src.req("c", "x").unwrap().1, 5);
+        assert_eq!(src.req(&"c", &"x").unwrap().1, 5);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x): 5");
 
         // err
-        assert!(src.req("d", "x").is_err());
+        assert!(src.req(&"d", &"x").is_err());
         assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x)");
+
+        // state change
+        let (current_state, current_val) = src.req(&"a", &"x").unwrap();
+
+        src_2args.lock().unwrap().insert("a", "x", 100);
+        let (new_state, new_val) = src.req(&"a", &"x").unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x): 100");
     }
 
     #[rstest]
-    fn test_with_logger_3args(src_3args: ImmutableOnMemorySrc3Args<String, String, String, i32>) {
-        let (reader, logger) = {
+    fn test_with_logger_3args(
+        src_3args: OnMemorySrc3Args<&'static str, &'static str, &'static str, i32>,
+    ) {
+        let src_3args = Arc::new(Mutex::new(src_3args));
+        let (reader, src) = {
             let msg = Arc::new(Mutex::new(String::new()));
             let reader = msg.clone();
-            let logger =
-                move |k1: &str,
-                      k2: &str,
-                      k3: &str,
-                      r: &Result<(NodeStateId, i32), anyhow::Error>| {
-                    let mut msg = msg.lock().unwrap();
-                    match r {
-                        Ok((_, v)) => *msg = format!("[ok] ({}, {}, {}): {}", k1, k2, k3, v),
-                        Err(_) => *msg = format!("[ng] ({}, {}, {})", k1, k2, k3),
-                    }
-                };
-            (reader, logger)
+            let src = src_3args.clone().with_logger("log", move |k1, k2, k3, r| {
+                let mut msg = msg.lock().unwrap();
+                match r {
+                    Ok((_, v)) => *msg = format!("[ok] ({}, {}, {}): {}", k1, k2, k3, v),
+                    Err(_) => *msg = format!("[ng] ({}, {}, {})", k1, k2, k3),
+                }
+            });
+            (reader, src)
         };
-        let src = WithLogger::new("with_logger", src_3args, logger);
 
         // ok
-        assert_eq!(src.req("a", "x", "i").unwrap().1, 1);
+        assert_eq!(src.req(&"a", &"x", &"i").unwrap().1, 1);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x, i): 1");
-        assert_eq!(src.req("b", "x", "i").unwrap().1, 5);
+        assert_eq!(src.req(&"b", &"x", &"i").unwrap().1, 5);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x, i): 5");
-        assert_eq!(src.req("c", "x", "i").unwrap().1, 9);
+        assert_eq!(src.req(&"c", &"x", &"i").unwrap().1, 9);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x, i): 9");
 
         // err
-        assert!(src.req("d", "x", "i").is_err());
+        assert!(src.req(&"d", &"x", &"i").is_err());
         assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x, i)");
+
+        // state change
+        let (current_state, current_val) = src.req(&"a", &"x", &"i").unwrap();
+
+        src_3args.lock().unwrap().insert("a", "x", "i", 100);
+        let (new_state, new_val) = src.req(&"a", &"x", &"i").unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
+        assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x, i): 100");
     }
 }

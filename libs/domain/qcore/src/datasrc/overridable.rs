@@ -1,10 +1,17 @@
-use std::{borrow::Borrow, collections::HashMap, hash::Hash, sync::Arc, vec};
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    hash::Hash,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
-use qcore_derive::Node;
+use maplit::btreeset;
+use qcore_derive::Listener;
 
 use super::{
-    _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Node, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
+    DataSrc, Listener, Notifier, TakeSnapshot, Tree, _private::_UnaryPassThroughNode,
+    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc3Args, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
@@ -13,17 +20,15 @@ use super::{
 mod _node {
     use std::sync::{Arc, Mutex};
 
-    use maplit::btreeset;
-
-    use crate::datasrc::{Node, NodeId, NodeInfo, NodeStateId, Tree};
+    use crate::datasrc::{Listener, NodeId, Notifier, PublisherState, StateId};
 
     #[derive(Debug)]
-    pub(super) struct _Node<S, L> {
-        pub src: S,
+    pub(super) struct _Node<L> {
+        src_id: NodeId,
 
         // as node state id, we use the combined value of the current override layer state
         // and the downstream state id.
-        info: NodeInfo,
+        info: PublisherState,
 
         // state ids for override layers. To represent the layer structure,
         // we use stack(vec) to store the state ids.
@@ -32,29 +37,35 @@ mod _node {
         // hence, the last element is for the id when all override layers are applied
         // and the current state of the node.
         // if the top of override layer is popped, the state id is also popped.
-        override_state: Mutex<Vec<NodeStateId>>,
+        override_state: Vec<StateId>,
 
         // override layers
-        layers: Mutex<Vec<L>>,
+        layers: Vec<L>,
     }
 
     //
     // construction
     //
-    impl<S: Node, L: 'static> _Node<S, L> {
-        pub fn new(desc: impl Into<String>, src: S) -> Arc<Self> {
-            let res = Arc::new(Self {
-                src,
-                info: NodeInfo::new(desc),
-                override_state: Mutex::new(vec![NodeStateId::gen()]),
-                layers: Mutex::new(Vec::new()),
-            });
+    impl<L: 'static + Send + Sync> _Node<L> {
+        pub fn new_and_reg<S: Notifier>(
+            desc: impl Into<String>,
+            src: &mut S,
+            layers: Vec<L>,
+        ) -> Arc<Mutex<Self>> {
+            let override_state = (0..(layers.len() + 1))
+                .map(|_| StateId::gen())
+                .collect::<Vec<_>>();
+            let self_state = override_state.last().unwrap().clone();
+            let res = Arc::new(Mutex::new(Self {
+                src_id: src.id(),
+                info: PublisherState::new(desc),
+                override_state,
+                layers,
+            }));
 
-            // state id of this node = state id of downstream node ^ state id of override layer
-            let subsc = Arc::downgrade(&res);
-            let downstream_state = res.src.accept_subscriber(subsc);
-            let state = downstream_state ^ *res.override_state.lock().unwrap().last().unwrap();
-            res.info.set_state(state);
+            let lis = Arc::downgrade(&res);
+            let state = src.accept_listener(lis) ^ self_state;
+            res.lock().unwrap().info.set_state(state);
             res
         }
     }
@@ -62,9 +73,9 @@ mod _node {
     //
     // methods
     //
-    impl<S, L> _Node<S, L> {
+    impl<L> _Node<L> {
         /// Get the state id of the node.
-        pub fn state(&self) -> NodeStateId {
+        pub fn state(&self) -> StateId {
             self.info.state()
         }
 
@@ -73,16 +84,28 @@ mod _node {
             self.info.desc()
         }
 
+        /// Get a value from the override layers.
+        /// The value is found from the top layer to the bottom layer.
+        pub fn get_from_top<O>(&self, f: impl Fn(&L) -> Option<O>) -> (StateId, Option<O>) {
+            (self.state(), self.layers.iter().rev().find_map(f))
+        }
+
+        /// Get a value from the override layers.
+        /// The value is found from the bottom layer to the top layer.
+        pub fn get_from_bottom<O>(&self, f: impl Fn(&L) -> Option<O>) -> (StateId, Option<O>) {
+            (self.state(), self.layers.iter().find_map(f))
+        }
+
         /// Pop the top override layer.
         ///
         /// The state id of the node after the layer is popped is also returned.
-        pub fn pop(&self) -> Option<(NodeStateId, L)> {
-            let popped = self.layers.lock().unwrap().pop();
+        pub fn pop(&mut self) -> Option<(StateId, L)> {
+            let popped = self.layers.pop();
             if popped.is_none() {
                 return None;
             }
-            let prev_state = self.override_state.lock().unwrap().pop().unwrap();
-            let new_state = self.override_state.lock().unwrap().last().unwrap().clone();
+            let prev_state = self.override_state.pop().unwrap();
+            let new_state = self.override_state.last().unwrap().clone();
             let mut node_state = self.info.state();
 
             // remove prev state(see bitxor property) and reflect new state
@@ -95,97 +118,60 @@ mod _node {
         /// Push a new override layer.
         ///
         /// The state id of the node after the layer is pushed is returned.
-        pub fn push(&self, layer: L) -> NodeStateId {
-            let prev_state = self.override_state.lock().unwrap().last().unwrap().clone();
-            let new_state = NodeStateId::gen();
+        pub fn push(&mut self, layer: L) -> StateId {
+            let prev_state = self.override_state.last().unwrap().clone();
+            let new_state = StateId::gen();
             let mut node_state = self.info.state();
 
             // remove prev state(see bitxor property) and reflect new state
             node_state ^= prev_state;
             node_state ^= new_state;
             self.info.set_state(node_state);
-            self.override_state.lock().unwrap().push(new_state);
-            self.layers.lock().unwrap().push(layer);
+            self.override_state.push(new_state);
+            self.layers.push(layer);
             node_state
         }
 
-        pub fn clear(&self) -> NodeStateId {
-            let mut layers = self.layers.lock().unwrap();
-            if layers.is_empty() {
-                return self.info.state();
-            }
-            let mut states = self.override_state.lock().unwrap();
-            layers.clear();
-
-            let prev_state = states.pop().unwrap();
-            let new_state = states.first().unwrap().clone();
-            states.truncate(1);
-
-            let mut node_state = self.info.state();
-            node_state ^= prev_state;
-            node_state ^= new_state;
-            self.info.set_state(node_state);
-            node_state
+        pub fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> StateId {
+            self.info.accept_listener(subsc)
         }
 
-        /// Get a value from the override layers.
-        /// The value is found from the top layer to the bottom layer.
-        pub fn get_from_top<O>(&self, f: impl Fn(&L) -> Option<O>) -> Option<O> {
-            self.layers.lock().unwrap().iter().rev().find_map(f)
-        }
-
-        /// Get a value from the override layers.
-        /// The value is found from the bottom layer to the top layer.
-        pub fn get_from_bottom<O>(&self, f: impl Fn(&L) -> Option<O>) -> Option<O> {
-            self.layers.lock().unwrap().iter().find_map(f)
-        }
-
-        #[inline]
-        pub fn num_layers(&self) -> usize {
-            self.layers.lock().unwrap().len()
-        }
-
-        #[inline]
-        pub fn extend(&self, layers: Vec<L>) {
-            layers.into_iter().for_each(|layer| {
-                self.push(layer);
-            });
+        pub fn remove_listener(&mut self, id: &NodeId) {
+            self.info.remove_listener(id);
         }
     }
 
-    impl<S: Node, L: 'static> Node for _Node<S, L> {
+    impl<L> Extend<L> for _Node<L> {
+        fn extend<T: IntoIterator<Item = L>>(&mut self, iter: T) {
+            let orig_len = self.layers.len();
+            self.layers.extend(iter);
+            let num_incr = self.layers.len() - orig_len;
+
+            let cur_state = self.override_state.last().unwrap().clone();
+            self.override_state
+                .extend((0..num_incr).map(|_| StateId::gen()));
+            let new_state = self.override_state.last().unwrap().clone();
+
+            let mut node_state = self.info.state();
+            node_state ^= cur_state;
+            node_state ^= new_state;
+            self.info.set_state(node_state);
+        }
+    }
+
+    impl<L: 'static + Send + Sync> Listener for _Node<L> {
         #[inline]
         fn id(&self) -> NodeId {
             self.info.id()
         }
 
         #[inline]
-        fn tree(&self) -> Tree {
-            Tree::Branch {
-                desc: self.info.desc().to_owned(),
-                id: self.id(),
-                state: self.info.state(),
-                children: btreeset![self.src.tree()],
-            }
-        }
-
-        #[inline]
-        fn accept_subscriber(&self, subscriber: std::sync::Weak<dyn Node>) -> NodeStateId {
-            self.info.accept_subscriber(subscriber)
-        }
-
-        #[inline]
-        fn remove_subscriber(&self, subscriber: &NodeId) {
-            self.info.remove_subscriber(subscriber)
-        }
-
-        #[inline]
-        fn subscribe(&self, publisher: &NodeId, state: &NodeStateId) {
-            if publisher != &self.src.id() {
+        fn listen(&mut self, publisher: &NodeId, state: &StateId) {
+            if publisher != &self.src_id {
                 return;
             }
-            let new_state = state ^ *self.override_state.lock().unwrap().last().unwrap();
-            self.info.set_state(new_state);
+            let layer_state = self.override_state.last().unwrap();
+            self.info.set_state(state ^ layer_state);
         }
     }
 }
@@ -193,33 +179,43 @@ mod _node {
 // -----------------------------------------------------------------------------
 // Overriden
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Overriden<S, K, V> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    layer: Arc<HashMap<K, V>>,
+    src: S,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    layer: HashMap<K, V>,
 }
 
 //
 // construction
 //
-impl<S: Node, K, V> Overriden<S, K, V> {
+impl<S, K, V> Overriden<S, K, V>
+where
+    S: Notifier,
+    K: 'static + Send + Sync,
+    V: 'static + Send + Sync,
+{
     #[inline]
-    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K, V>) -> Self {
-        Self {
-            core: _UnaryPassThroughNode::new(src, desc),
-            layer: Arc::new(layer),
-        }
+    pub fn new(desc: impl Into<String>, mut src: S, layer: HashMap<K, V>) -> Self {
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { src, node, layer }
     }
 }
 
-impl<S, K, V> Clone for Overriden<S, K, V> {
+impl<S, K, V> Clone for Overriden<S, K, V>
+where
+    S: Clone + Notifier,
+    K: 'static + Send + Sync + Clone,
+    V: 'static + Send + Sync + Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            layer: self.layer.clone(),
-        }
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.layer.clone(),
+        )
     }
 }
 
@@ -228,89 +224,139 @@ impl<S, K, V> Clone for Overriden<S, K, V> {
 //
 impl<S, K, V> Overriden<S, K, V> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<Q, S, K, V> DataSrc<Q> for Overriden<S, K, V>
+impl<S, K, V> Notifier for Overriden<S, K, V>
 where
-    Q: ?Sized + Eq + Hash,
-    S: DataSrc<Q>,
-    K: 'static + Eq + Hash + Borrow<Q>,
-    V: 'static + Clone + Into<S::Output>,
+    S: Notifier,
+    K: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> super::NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc().into(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &super::NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, K, V> DataSrc for Overriden<S, K, V>
+where
+    S: DataSrc,
+    S::Key: Eq + Hash,
+    K: 'static + Send + Sync + Eq + Hash + Borrow<S::Key>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    type Key = S::Key;
     type Output = S::Output;
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &Q) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
+    fn req(&self, key: &Self::Key) -> Result<(super::StateId, Self::Output), Self::Err> {
+        let state = self.node.lock().unwrap().state();
         if let Some(val) = self.layer.get(key) {
-            return Ok((self.core.state(), val.clone().into()));
+            return Ok((state, val.clone().into()));
         }
-        self.core.src.req(key)
+        self.src.req(key).map(|(_, v)| (state, v))
     }
 }
 
-impl<Q, S, K, V> TakeSnapshot<Q> for Overriden<S, K, V>
+impl<S, K, V> TakeSnapshot for Overriden<S, K, V>
 where
-    Q: ?Sized + Eq + Hash,
-    S: TakeSnapshot<Q>,
-    K: 'static + Eq + Hash + Borrow<Q> + Clone,
-    V: 'static + Clone + Into<S::Output>,
+    S: TakeSnapshot,
+    S::Key: Eq + Hash,
+    K: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
     type SnapShot = Overriden<S::SnapShot, K, V>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = &'a Q>,
-        Q: 'a,
+        It: IntoIterator<Item = &'a Self::Key>,
+        Self::Key: 'a,
     {
         let items = keys.into_iter().collect::<Vec<_>>();
-        let snapshot = self.core.src.take_snapshot(items.iter().map(|q| *q))?;
-
-        let contained = items.iter().filter_map(|k| self.layer.get_key_value(k));
-        let layer = contained.map(|(k, v)| (k.clone(), v.clone())).collect();
-        Ok(Overriden::with_layer(self.core.desc(), snapshot, layer))
+        let snapshot = self.src.take_snapshot(items.iter().map(Deref::deref))?;
+        let layer = items.iter().filter_map(|k| {
+            self.layer
+                .get_key_value(k)
+                .map(|(k, v)| (k.clone(), v.clone()))
+        });
+        Ok(Overriden::new(
+            self.node.lock().unwrap().desc(),
+            snapshot,
+            layer.collect(),
+        ))
     }
 }
 
 // -----------------------------------------------------------------------------
 // Overridable
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Overridable<S, K, V> {
-    core: Arc<_node::_Node<S, HashMap<K, V>>>,
+    src: S,
+    node: Arc<Mutex<_node::_Node<HashMap<K, V>>>>,
 }
 
 //
 // construction
 //
-impl<S: Node, K: 'static, V: 'static> Overridable<S, K, V> {
+impl<S, K, V> Overridable<S, K, V>
+where
+    S: Notifier,
+    K: 'static + Send + Sync,
+    V: 'static + Send + Sync,
+{
     #[inline]
-    pub fn _new(desc: impl Into<String>, src: S, layers: Vec<HashMap<K, V>>) -> Self {
-        let core = _node::_Node::new(desc, src);
-        core.extend(layers);
-        Self { core }
+    pub fn new(desc: impl Into<String>, mut src: S) -> Self {
+        let node = _node::_Node::new_and_reg(desc, &mut src, Vec::new());
+        Self { src, node }
     }
-    #[inline]
-    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K, V>) -> Self {
-        Self::_new(desc, src, vec![layer])
-    }
-    #[inline]
-    pub fn new(desc: impl Into<String>, src: S) -> Self {
-        Self::_new(desc, src, Vec::new())
-    }
-}
 
-impl<S, K, V> Clone for Overridable<S, K, V> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-        }
+    pub fn clone_without_override(&self) -> Self
+    where
+        S: Clone,
+    {
+        Self::new(self.node.lock().unwrap().desc(), self.src.clone())
     }
 }
 
@@ -319,124 +365,183 @@ impl<S, K, V> Clone for Overridable<S, K, V> {
 //
 impl<S, K, V> Overridable<S, K, V> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<Q, S, K, V> DataSrc<Q> for Overridable<S, K, V>
+impl<S, K, V> Notifier for Overridable<S, K, V>
 where
-    Q: ?Sized + Eq + Hash,
-    S: DataSrc<Q>,
-    K: 'static + Eq + Hash + Borrow<Q>,
-    V: 'static + Clone + Into<S::Output>,
+    S: Notifier,
+    K: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> super::NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc().into(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
+        self.node.lock().unwrap().accept_listener(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &super::NodeId) {
+        self.node.lock().unwrap().remove_listener(id);
+    }
+}
+
+impl<S, K, V> DataSrc for Overridable<S, K, V>
+where
+    S: DataSrc,
+    S::Key: Eq + Hash,
+    K: 'static + Send + Sync + Eq + Hash + Borrow<S::Key>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    type Key = S::Key;
     type Output = S::Output;
     type Err = S::Err;
 
-    fn req(&self, key: &Q) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        if let Some(val) = self.core.get_from_top(|layer| layer.get(key).cloned()) {
-            return Ok((self.core.state(), val.into()));
+    #[inline]
+    fn req(&self, key: &Self::Key) -> Result<(super::StateId, Self::Output), Self::Err> {
+        let (state, val) = self
+            .node
+            .lock()
+            .unwrap()
+            .get_from_top(|layer| layer.get(key).cloned());
+        if let Some(val) = val {
+            return Ok((state, val.into()));
         }
-        self.core.src.req(key)
+        self.src.req(key).map(|(_, v)| (state, v))
     }
 }
 
-impl<Q, S, K, V> TakeSnapshot<Q> for Overridable<S, K, V>
+impl<S, K, V> TakeSnapshot for Overridable<S, K, V>
 where
-    Q: ?Sized + Eq + Hash,
-    S: TakeSnapshot<Q>,
-    K: 'static + Clone + Eq + Hash + Borrow<Q>,
-    V: 'static + Clone + Into<S::Output>,
+    S: TakeSnapshot,
+    S::Key: Eq + Hash,
+    K: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
     type SnapShot = Overriden<S::SnapShot, K, V>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = &'a Q>,
-        Q: 'a,
+        It: IntoIterator<Item = &'a Self::Key>,
+        Self::Key: 'a,
     {
         let items = keys.into_iter().collect::<Vec<_>>();
-        let snapshot = self.core.src.take_snapshot(items.iter().map(|q| *q))?;
-
+        let snapshot = self.src.take_snapshot(items.iter().map(Deref::deref))?;
+        let node = self.node.lock().unwrap();
         let layer = items.iter().filter_map(|k| {
-            self.core.get_from_bottom(|layer| {
+            node.get_from_bottom(|layer| {
                 layer.get_key_value(k).map(|(k, v)| (k.clone(), v.clone()))
             })
+            .1
         });
-
-        Ok(Overriden::with_layer(
-            self.core.desc(),
+        Ok(Overriden::new(
+            self.node.lock().unwrap().desc(),
             snapshot,
             layer.collect(),
         ))
     }
 }
 
-impl<S, K, V> Overridable<S, K, V> {
-    /// Push a new override layer.
-    /// The state id of the node after the layer is pushed is returned.
+impl<S, K, V> Overridable<S, K, V>
+where
+    S: DataSrc,
+    S::Key: Eq + Hash,
+    K: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    /// Temporarily override the layers.
+    ///
+    /// After the function is executed, the override layers are popped and the state of the node is restored.
     #[inline]
-    pub fn push_layer(&mut self, layer: HashMap<K, V>) -> NodeStateId {
-        self.core.push(layer)
+    pub fn temp_override<F, R>(&mut self, layer: HashMap<K, V>, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        self.node.lock().unwrap().push(layer);
+        let res = f(self);
+        self.node.lock().unwrap().pop();
+        res
     }
 
-    /// Pop the top override layer.
-    /// The state id of the node after the layer is popped is also returned.
     #[inline]
-    pub fn pop_layer(&mut self) -> Option<(NodeStateId, HashMap<K, V>)> {
-        self.core.pop()
-    }
-
-    /// Clear all override layers.
-    /// The state id of the node after the layers are cleared is returned.
-    #[inline]
-    pub fn clear_layers(&mut self) -> NodeStateId {
-        self.core.clear()
-    }
-
-    /// Num of override layers
-    #[inline]
-    pub fn num_layers(&self) -> usize {
-        self.core.num_layers()
+    pub fn persistent_override(self, layer: HashMap<K, V>) -> Overriden<S, K, V> {
+        Overriden::new(self.node.lock().unwrap().desc(), self.src, layer)
     }
 }
 
 // -----------------------------------------------------------------------------
 // Overriden2Args
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Overriden2Args<S, K1, K2, V> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    layer: Arc<HashMap<K1, HashMap<K2, V>>>,
+    src: S,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    layer: HashMap<K1, HashMap<K2, V>>,
 }
 
 //
 // construction
 //
-impl<S: Node, K1, K2, V> Overriden2Args<S, K1, K2, V>
+impl<S, K1, K2, V> Overriden2Args<S, K1, K2, V>
 where
-    K1: Eq + Hash,
-    K2: Eq + Hash,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
     #[inline]
-    fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
-        Self {
-            core: _UnaryPassThroughNode::new(src, desc),
-            layer: Arc::new(layer),
-        }
+    pub fn new(desc: impl Into<String>, mut src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { src, node, layer }
     }
 }
 
-impl<S, K1, K2, V> Clone for Overriden2Args<S, K1, K2, V> {
+impl<S, K1, K2, V> Clone for Overriden2Args<S, K1, K2, V>
+where
+    S: Clone + Notifier,
+    K1: 'static + Send + Sync + Clone,
+    K2: 'static + Send + Sync + Clone,
+    V: 'static + Send + Sync + Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            layer: self.layer.clone(),
-        }
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.layer.clone(),
+        )
     }
 }
 
@@ -445,69 +550,122 @@ impl<S, K1, K2, V> Clone for Overriden2Args<S, K1, K2, V> {
 //
 impl<S, K1, K2, V> Overriden2Args<S, K1, K2, V> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<Q1, Q2, S, K1, K2, V> DataSrc2Args<Q1, Q2> for Overriden2Args<S, K1, K2, V>
+impl<S, K1, K2, V> Notifier for Overriden2Args<S, K1, K2, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    S: DataSrc2Args<Q1, Q2>,
-    K1: 'static + Eq + Hash + Borrow<Q1>,
-    K2: 'static + Eq + Hash + Borrow<Q2>,
-    V: 'static + Clone + Into<S::Output>,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> super::NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc().into(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &super::NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, K1, K2, V> DataSrc2Args for Overriden2Args<S, K1, K2, V>
+where
+    S: DataSrc2Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Borrow<S::Key2>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
     type Output = S::Output;
     type Err = S::Err;
 
-    fn req(&self, key1: &Q1, key2: &Q2) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        if let Some(v) = self.layer.get(key1).and_then(|m| m.get(key2)) {
-            return Ok((self.core.state(), v.clone().into()));
+    #[inline]
+    fn req(
+        &self,
+        key1: &S::Key1,
+        key2: &S::Key2,
+    ) -> Result<(super::StateId, Self::Output), Self::Err> {
+        let state = self.node.lock().unwrap().state();
+        if let Some(val) = self.layer.get(key1).and_then(|m| m.get(key2)) {
+            return Ok((state, val.clone().into()));
         }
-        self.core.src.req(key1, key2)
+        self.src.req(key1, key2).map(|(_, v)| (state, v))
     }
 }
 
-impl<Q1, Q2, S, K1, K2, V> TakeSnapshot2Args<Q1, Q2> for Overriden2Args<S, K1, K2, V>
+impl<S, K1, K2, V> TakeSnapshot2Args for Overriden2Args<S, K1, K2, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    S: TakeSnapshot2Args<Q1, Q2>,
-    K1: 'static + Eq + Hash + Borrow<Q1> + Clone,
-    K2: 'static + Eq + Hash + Borrow<Q2> + Clone,
-    V: 'static + Clone + Into<S::Output>,
+    S: TakeSnapshot2Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key2>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
     type SnapShot = Overriden2Args<S::SnapShot, K1, K2, V>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a Q1, &'a Q2)>,
-        Q1: 'a,
-        Q2: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
     {
         let items = keys.into_iter().collect::<Vec<_>>();
         let snapshot = self
-            .core
             .src
-            .take_snapshot(items.iter().map(|(q1, q2)| (*q1, *q2)))?;
-
+            .take_snapshot(items.iter().map(|(k1, k2)| (*k1, *k2)))?;
         let contained = items.iter().filter_map(|(k1, k2)| {
-            let fst = self.layer.get_key_value(k1);
-            fst.and_then(|(k1, m)| m.get_key_value(k2).map(|(k2, v)| (k1, k2, v)))
+            self.layer
+                .get_key_value(k1)
+                .and_then(|(k1, m)| m.get_key_value(k2).map(|(k2, v)| (k1, k2, v)))
         });
         let mut layer = HashMap::new();
-
         for (k1, k2, v) in contained {
             layer
                 .entry(k1.clone())
                 .or_insert_with(HashMap::new)
                 .insert(k2.clone(), v.clone());
         }
-        Ok(Overriden2Args::with_layer(
-            self.core.desc(),
+        Ok(Overriden2Args::new(
+            self.node.lock().unwrap().desc(),
             snapshot,
             layer,
         ))
@@ -517,43 +675,35 @@ where
 // -----------------------------------------------------------------------------
 // Overridable2Args
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Overridable2Args<S, K1, K2, V> {
-    core: Arc<_node::_Node<S, HashMap<K1, HashMap<K2, V>>>>,
+    src: S,
+    node: Arc<Mutex<_node::_Node<HashMap<K1, HashMap<K2, V>>>>>,
 }
 
 //
 // construction
 //
-impl<S: Node, K1, K2, V> Overridable2Args<S, K1, K2, V>
+impl<S, K1, K2, V> Overridable2Args<S, K1, K2, V>
 where
-    K1: 'static + Eq + Hash,
-    K2: 'static + Eq + Hash,
-    V: 'static,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
     #[inline]
-    fn _new(desc: impl Into<String>, src: S, layers: Vec<HashMap<K1, HashMap<K2, V>>>) -> Self {
-        let core = _node::_Node::new(desc, src);
-        core.extend(layers);
-        Self { core }
+    pub fn new(desc: impl Into<String>, mut src: S) -> Self {
+        let node = _node::_Node::new_and_reg(desc, &mut src, Vec::new());
+        Self { src, node }
     }
-    #[inline]
-    pub fn with_layer(desc: impl Into<String>, src: S, layer: HashMap<K1, HashMap<K2, V>>) -> Self {
-        Self::_new(desc, src, vec![layer])
-    }
-    #[inline]
-    pub fn new(desc: impl Into<String>, src: S) -> Self {
-        Self::_new(desc, src, Vec::new())
-    }
-}
 
-impl<S, K1, K2, V> Clone for Overridable2Args<S, K1, K2, V> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-        }
+    pub fn clone_without_override(&self) -> Self
+    where
+        S: Clone,
+    {
+        Self::new(self.node.lock().unwrap().desc(), self.src.clone())
     }
 }
 
@@ -562,74 +712,128 @@ impl<S, K1, K2, V> Clone for Overridable2Args<S, K1, K2, V> {
 //
 impl<S, K1, K2, V> Overridable2Args<S, K1, K2, V> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<Q1, Q2, S, K1, K2, V> DataSrc2Args<Q1, Q2> for Overridable2Args<S, K1, K2, V>
+impl<S, K1, K2, V> Notifier for Overridable2Args<S, K1, K2, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    S: DataSrc2Args<Q1, Q2>,
-    K1: 'static + Eq + Hash + Borrow<Q1>,
-    K2: 'static + Eq + Hash + Borrow<Q2>,
-    V: 'static + Clone + Into<S::Output>,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> super::NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc().into(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
+        self.node.lock().unwrap().accept_listener(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &super::NodeId) {
+        self.node.lock().unwrap().remove_listener(id);
+    }
+}
+
+impl<S, K1, K2, V> DataSrc2Args for Overridable2Args<S, K1, K2, V>
+where
+    S: DataSrc2Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Borrow<S::Key2>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
     type Output = S::Output;
     type Err = S::Err;
 
-    fn req(&self, key1: &Q1, key2: &Q2) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        if let Some(v) = self
-            .core
-            .get_from_top(|layer| layer.get(key1).and_then(|m| m.get(key2).cloned()))
-        {
-            return Ok((self.core.state(), v.into()));
+    #[inline]
+    fn req(
+        &self,
+        key1: &S::Key1,
+        key2: &S::Key2,
+    ) -> Result<(super::StateId, Self::Output), Self::Err> {
+        let (state, val) = self
+            .node
+            .lock()
+            .unwrap()
+            .get_from_top(|layer| layer.get(key1).and_then(|m| m.get(key2).cloned()));
+        if let Some(val) = val {
+            return Ok((state, val.into()));
         }
-        self.core.src.req(key1, key2)
+        self.src.req(key1, key2).map(|(_, v)| (state, v))
     }
 }
 
-impl<Q1, Q2, S, K1, K2, V> TakeSnapshot2Args<Q1, Q2> for Overridable2Args<S, K1, K2, V>
+impl<S, K1, K2, V> TakeSnapshot2Args for Overridable2Args<S, K1, K2, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    S: TakeSnapshot2Args<Q1, Q2>,
-    K1: 'static + Eq + Hash + Borrow<Q1> + Clone,
-    K2: 'static + Eq + Hash + Borrow<Q2> + Clone,
-    V: 'static + Clone + Into<S::Output>,
+    S: TakeSnapshot2Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key2>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
     type SnapShot = Overriden2Args<S::SnapShot, K1, K2, V>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a Q1, &'a Q2)>,
-        Q1: 'a,
-        Q2: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
     {
         let items = keys.into_iter().collect::<Vec<_>>();
         let snapshot = self
-            .core
             .src
-            .take_snapshot(items.iter().map(|(q1, q2)| (*q1, *q2)))?;
-
-        let mut layer = HashMap::new();
-
+            .take_snapshot(items.iter().map(|(k1, k2)| (*k1, *k2)))?;
+        let node = self.node.lock().unwrap();
         let contained = items.iter().filter_map(|(k1, k2)| {
-            self.core.get_from_bottom(|layer| {
-                let fst = layer.get_key_value(k1);
-                fst.and_then(|(k1, m)| {
-                    let snd = m.get_key_value(k2);
-                    snd.map(|(k2, v)| (k1.clone(), k2.clone(), v.clone()))
+            node.get_from_bottom(|layer| {
+                layer.get_key_value(k1).and_then(|(k1, m)| {
+                    m.get_key_value(k2)
+                        .map(|(k2, v)| (k1.clone(), k2.clone(), v.clone()))
                 })
             })
+            .1
         });
+        let mut layer = HashMap::new();
         for (k1, k2, v) in contained {
             layer.entry(k1).or_insert_with(HashMap::new).insert(k2, v);
         }
-        Ok(Overriden2Args::with_layer(
-            self.core.desc(),
+        Ok(Overriden2Args::new(
+            self.node.lock().unwrap().desc(),
             snapshot,
             layer,
         ))
@@ -638,74 +842,84 @@ where
 
 impl<S, K1, K2, V> Overridable2Args<S, K1, K2, V>
 where
-    K1: Eq + Hash + Clone,
-    K2: Eq + Hash + Clone,
+    S: DataSrc2Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key2>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
-    /// Push a new override layer.
-    /// The state id of the node after the layer is pushed is returned.
+    /// Temporarily override the layers.
+    ///
+    /// After the function is executed, the override layers are popped and the state of the node is restored.
     #[inline]
-    pub fn push_layer(&mut self, layer: HashMap<K1, HashMap<K2, V>>) -> NodeStateId {
-        self.core.push(layer)
-    }
-
-    /// Pop the top override layer.
-    /// The state id of the node after the layer is popped is also returned.
-    #[inline]
-    pub fn pop_layer(&mut self) -> Option<(NodeStateId, HashMap<K1, HashMap<K2, V>>)> {
-        self.core.pop()
-    }
-
-    /// Clear all override layers.
-    #[inline]
-    pub fn clear_layers(&mut self) -> NodeStateId {
-        self.core.clear()
+    pub fn temp_override<F, R>(&mut self, layer: HashMap<K1, HashMap<K2, V>>, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        self.node.lock().unwrap().push(layer);
+        let res = f(self);
+        self.node.lock().unwrap().pop();
+        res
     }
 
     #[inline]
-    pub fn num_layers(&self) -> usize {
-        self.core.num_layers()
+    pub fn persistent_override(
+        self,
+        layer: HashMap<K1, HashMap<K2, V>>,
+    ) -> Overriden2Args<S, K1, K2, V> {
+        Overriden2Args::new(self.node.lock().unwrap().desc(), self.src, layer)
     }
 }
 
 // -----------------------------------------------------------------------------
 // Overriden3Args
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Overriden3Args<S, K1, K2, K3, V> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    layer: Arc<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>,
+    src: S,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
 }
 
 //
 // construction
 //
-impl<S: Node, K1, K2, K3, V> Overriden3Args<S, K1, K2, K3, V>
+impl<S, K1, K2, K3, V> Overriden3Args<S, K1, K2, K3, V>
 where
-    K1: Eq + Hash,
-    K2: Eq + Hash,
-    K3: Eq + Hash,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    K3: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
     #[inline]
-    fn with_layer(
+    pub fn new(
         desc: impl Into<String>,
-        src: S,
+        mut src: S,
         layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
     ) -> Self {
-        Self {
-            core: _UnaryPassThroughNode::new(src, desc),
-            layer: Arc::new(layer),
-        }
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { src, node, layer }
     }
 }
 
-impl<S, K1, K2, K3, V> Clone for Overriden3Args<S, K1, K2, K3, V> {
+impl<S, K1, K2, K3, V> Clone for Overriden3Args<S, K1, K2, K3, V>
+where
+    S: Clone + Notifier,
+    K1: 'static + Send + Sync + Clone,
+    K2: 'static + Send + Sync + Clone,
+    K3: 'static + Send + Sync + Clone,
+    V: 'static + Send + Sync + Clone,
+{
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            layer: self.layer.clone(),
-        }
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.layer.clone(),
+        )
     }
 }
 
@@ -714,92 +928,137 @@ impl<S, K1, K2, K3, V> Clone for Overriden3Args<S, K1, K2, K3, V> {
 //
 impl<S, K1, K2, K3, V> Overriden3Args<S, K1, K2, K3, V> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<Q1, Q2, Q3, S, K1, K2, K3, V> DataSrc3Args<Q1, Q2, Q3> for Overriden3Args<S, K1, K2, K3, V>
+impl<S, K1, K2, K3, V> Notifier for Overriden3Args<S, K1, K2, K3, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    Q3: ?Sized + Eq + Hash,
-    S: DataSrc3Args<Q1, Q2, Q3>,
-    K1: 'static + Eq + Hash + Borrow<Q1>,
-    K2: 'static + Eq + Hash + Borrow<Q2>,
-    K3: 'static + Eq + Hash + Borrow<Q3>,
-    V: 'static + Clone + Into<S::Output>,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    K3: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> super::NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc().into(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &super::NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, K1, K2, K3, V> DataSrc3Args for Overriden3Args<S, K1, K2, K3, V>
+where
+    S: DataSrc3Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    S::Key3: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Borrow<S::Key2>,
+    K3: 'static + Send + Sync + Eq + Hash + Borrow<S::Key3>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
+    type Key3 = S::Key3;
     type Output = S::Output;
     type Err = S::Err;
 
+    #[inline]
     fn req(
         &self,
-        key1: &Q1,
-        key2: &Q2,
-        key3: &Q3,
-    ) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        if let Some(v) = self
+        key1: &S::Key1,
+        key2: &S::Key2,
+        key3: &S::Key3,
+    ) -> Result<(super::StateId, Self::Output), Self::Err> {
+        let state = self.node.lock().unwrap().state();
+        if let Some(val) = self
             .layer
             .get(key1)
-            .and_then(|m1| m1.get(key2))
-            .and_then(|m2| m2.get(key3))
+            .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3).cloned()))
         {
-            return Ok((self.core.state(), v.clone().into()));
+            return Ok((state, val.clone().into()));
         }
-        self.core.src.req(key1, key2, key3)
+        self.src.req(key1, key2, key3).map(|(_, v)| (state, v))
     }
 }
 
-impl<Q1, Q2, Q3, S, K1, K2, K3, V> TakeSnapshot3Args<Q1, Q2, Q3>
-    for Overriden3Args<S, K1, K2, K3, V>
+impl<S, K1, K2, K3, V> TakeSnapshot3Args for Overriden3Args<S, K1, K2, K3, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    Q3: ?Sized + Eq + Hash,
-    S: TakeSnapshot3Args<Q1, Q2, Q3>,
-    K1: 'static + Eq + Hash + Borrow<Q1> + Clone,
-    K2: 'static + Eq + Hash + Borrow<Q2> + Clone,
-    K3: 'static + Eq + Hash + Borrow<Q3> + Clone,
-    V: 'static + Clone + Into<S::Output>,
+    S: TakeSnapshot3Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    S::Key3: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key2>,
+    K3: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key3>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
     type SnapShot = Overriden3Args<S::SnapShot, K1, K2, K3, V>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a Q1, &'a Q2, &'a Q3)>,
-        Q1: 'a,
-        Q2: 'a,
-        Q3: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2, &'a Self::Key3)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
+        Self::Key3: 'a,
     {
         let items = keys.into_iter().collect::<Vec<_>>();
         let snapshot = self
-            .core
             .src
-            .take_snapshot(items.iter().map(|(q1, q2, q3)| (*q1, *q2, *q3)))?;
-        let mut layer = HashMap::new();
-
+            .take_snapshot(items.iter().map(|(k1, k2, k3)| (*k1, *k2, *k3)))?;
         let contained = items.iter().filter_map(|(k1, k2, k3)| {
-            let fst = self.layer.get_key_value(k1);
-            fst.and_then(|(k1, m1)| {
-                let snd = m1.get_key_value(k2);
-                snd.and_then(|(k2, m2)| {
-                    let thd = m2.get_key_value(k3);
-                    thd.map(|(k3, v)| (k1.clone(), k2.clone(), k3.clone(), v.clone()))
-                })
+            self.layer.get_key_value(k1).and_then(|(k1, m1)| {
+                m1.get_key_value(k2)
+                    .and_then(|(k2, m2)| m2.get_key_value(k3).map(|(k3, v)| (k1, k2, k3, v)))
             })
         });
+        let mut layer = HashMap::new();
         for (k1, k2, k3, v) in contained {
             layer
-                .entry(k1)
+                .entry(k1.clone())
                 .or_insert_with(HashMap::new)
-                .entry(k2)
+                .entry(k2.clone())
                 .or_insert_with(HashMap::new)
-                .insert(k3, v);
+                .insert(k3.clone(), v.clone());
         }
-        Ok(Overriden3Args::with_layer(
-            self.core.desc(),
+        Ok(Overriden3Args::new(
+            self.node.lock().unwrap().desc(),
             snapshot,
             layer,
         ))
@@ -809,44 +1068,37 @@ where
 // -----------------------------------------------------------------------------
 // Overridable3Args
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Overridable3Args<S, K1, K2, K3, V> {
-    core: Arc<_node::_Node<S, HashMap<K1, HashMap<K2, HashMap<K3, V>>>>>,
+    src: S,
+    node: Arc<Mutex<_node::_Node<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>>>,
 }
 
 //
 // construction
 //
-impl<S: Node, K1, K2, K3, V> Overridable3Args<S, K1, K2, K3, V>
+impl<S, K1, K2, K3, V> Overridable3Args<S, K1, K2, K3, V>
 where
-    K1: 'static + Eq + Hash,
-    K2: 'static + Eq + Hash,
-    K3: 'static + Eq + Hash,
-    V: 'static,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    K3: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
     #[inline]
-    fn with_layer(
-        desc: impl Into<String>,
-        src: S,
-        layers: Vec<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>,
-    ) -> Self {
-        let core = _node::_Node::new(desc, src);
-        core.extend(layers);
-        Self { core }
+    pub fn new(desc: impl Into<String>, mut src: S) -> Self {
+        let node = _node::_Node::new_and_reg(desc, &mut src, Vec::new());
+        Self { src, node }
     }
-    #[inline]
-    pub fn new(desc: impl Into<String>, src: S) -> Self {
-        Self::with_layer(desc, src, Vec::new())
-    }
-}
 
-impl<S, K1, K2, K3, V> Clone for Overridable3Args<S, K1, K2, K3, V> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-        }
+    pub fn clone_without_override(&self) -> Self
+    where
+        S: Clone,
+    {
+        Self::new(self.node.lock().unwrap().desc(), self.src.clone())
     }
 }
 
@@ -855,83 +1107,133 @@ impl<S, K1, K2, K3, V> Clone for Overridable3Args<S, K1, K2, K3, V> {
 //
 impl<S, K1, K2, K3, V> Overridable3Args<S, K1, K2, K3, V> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<Q1, Q2, Q3, S, K1, K2, K3, V> DataSrc3Args<Q1, Q2, Q3> for Overridable3Args<S, K1, K2, K3, V>
+impl<S, K1, K2, K3, V> Notifier for Overridable3Args<S, K1, K2, K3, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    Q3: ?Sized + Eq + Hash,
-    S: DataSrc3Args<Q1, Q2, Q3>,
-    K1: 'static + Eq + Hash + Borrow<Q1>,
-    K2: 'static + Eq + Hash + Borrow<Q2>,
-    K3: 'static + Eq + Hash + Borrow<Q3>,
-    V: 'static + Clone + Into<S::Output>,
+    S: Notifier,
+    K1: 'static + Send + Sync,
+    K2: 'static + Send + Sync,
+    K3: 'static + Send + Sync,
+    V: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> super::NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc().into(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
+        self.node.lock().unwrap().accept_listener(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &super::NodeId) {
+        self.node.lock().unwrap().remove_listener(id);
+    }
+}
+
+impl<S, K1, K2, K3, V> DataSrc3Args for Overridable3Args<S, K1, K2, K3, V>
+where
+    S: DataSrc3Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    S::Key3: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Borrow<S::Key2>,
+    K3: 'static + Send + Sync + Eq + Hash + Borrow<S::Key3>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
+    type Key3 = S::Key3;
     type Output = S::Output;
     type Err = S::Err;
 
+    #[inline]
     fn req(
         &self,
-        key1: &Q1,
-        key2: &Q2,
-        key3: &Q3,
-    ) -> Result<(super::NodeStateId, Self::Output), Self::Err> {
-        if let Some(v) = self.core.get_from_top(|layer| {
-            let fst = layer.get(key1);
-            let snd = fst.and_then(|m1| m1.get(key2));
-            snd.and_then(|m2| m2.get(key3).cloned())
-        }) {
-            return Ok((self.core.state(), v.clone().into()));
+        key1: &S::Key1,
+        key2: &S::Key2,
+        key3: &S::Key3,
+    ) -> Result<(super::StateId, Self::Output), Self::Err> {
+        let (state, val) = self.node.lock().unwrap().get_from_top(|layer| {
+            layer
+                .get(key1)
+                .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3).cloned()))
+        });
+        if let Some(val) = val {
+            return Ok((state, val.clone().into()));
         }
-        self.core.src.req(key1, key2, key3)
+        self.src.req(key1, key2, key3).map(|(_, v)| (state, v))
     }
 }
 
-impl<Q1, Q2, Q3, S, K1, K2, K3, V> TakeSnapshot3Args<Q1, Q2, Q3>
-    for Overridable3Args<S, K1, K2, K3, V>
+impl<S, K1, K2, K3, V> TakeSnapshot3Args for Overridable3Args<S, K1, K2, K3, V>
 where
-    Q1: ?Sized + Eq + Hash,
-    Q2: ?Sized + Eq + Hash,
-    Q3: ?Sized + Eq + Hash,
-    S: TakeSnapshot3Args<Q1, Q2, Q3>,
-    K1: 'static + Eq + Hash + Borrow<Q1> + Clone,
-    K2: 'static + Eq + Hash + Borrow<Q2> + Clone,
-    K3: 'static + Eq + Hash + Borrow<Q3> + Clone,
-    V: 'static + Clone + Into<S::Output>,
+    S: TakeSnapshot3Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    S::Key3: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key2>,
+    K3: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key3>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
     type SnapShot = Overriden3Args<S::SnapShot, K1, K2, K3, V>;
     type SnapShotErr = S::SnapShotErr;
 
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a Q1, &'a Q2, &'a Q3)>,
-        Q1: 'a,
-        Q2: 'a,
-        Q3: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2, &'a Self::Key3)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
+        Self::Key3: 'a,
     {
         let items = keys.into_iter().collect::<Vec<_>>();
         let snapshot = self
-            .core
             .src
-            .take_snapshot(items.iter().map(|(q1, q2, q3)| (*q1, *q2, *q3)))?;
-        let mut layer = HashMap::new();
-
+            .take_snapshot(items.iter().map(|(k1, k2, k3)| (*k1, *k2, *k3)))?;
+        let node = self.node.lock().unwrap();
         let contained = items.iter().filter_map(|(k1, k2, k3)| {
-            self.core.get_from_bottom(|layer| {
-                let fst = layer.get_key_value(k1);
-                fst.and_then(|(k1, m1)| {
-                    let snd = m1.get_key_value(k2);
-                    snd.and_then(|(k2, m2)| {
-                        let trd = m2.get_key_value(k3);
-                        trd.map(|(k3, v)| (k1.clone(), k2.clone(), k3.clone(), v.clone()))
+            node.get_from_bottom(|layer| {
+                layer.get_key_value(k1).and_then(|(k1, m1)| {
+                    m1.get_key_value(k2).and_then(|(k2, m2)| {
+                        m2.get_key_value(k3)
+                            .map(|(k3, v)| (k1.clone(), k2.clone(), k3.clone(), v.clone()))
                     })
                 })
             })
+            .1
         });
+        let mut layer = HashMap::new();
         for (k1, k2, k3, v) in contained {
             layer
                 .entry(k1)
@@ -940,8 +1242,8 @@ where
                 .or_insert_with(HashMap::new)
                 .insert(k3, v);
         }
-        Ok(Overriden3Args::with_layer(
-            self.core.desc(),
+        Ok(Overriden3Args::new(
+            self.node.lock().unwrap().desc(),
             snapshot,
             layer,
         ))
@@ -950,30 +1252,38 @@ where
 
 impl<S, K1, K2, K3, V> Overridable3Args<S, K1, K2, K3, V>
 where
-    K1: Eq + Hash + Clone,
-    K2: Eq + Hash + Clone,
-    K3: Eq + Hash + Clone,
+    S: DataSrc3Args,
+    S::Key1: Eq + Hash,
+    S::Key2: Eq + Hash,
+    S::Key3: Eq + Hash,
+    K1: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key1>,
+    K2: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key2>,
+    K3: 'static + Send + Sync + Eq + Hash + Clone + Borrow<S::Key3>,
+    V: 'static + Send + Sync + Clone + Into<S::Output>,
 {
-    /// Push a new override layer.
+    /// Temporarily override the layers.
+    ///
+    /// After the function is executed, the override layers are popped and the state of the node is restored.
     #[inline]
-    pub fn push_layer(&mut self, layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>) -> NodeStateId {
-        self.core.push(layer)
+    pub fn temp_override<F, R>(
+        &mut self,
+        layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
+        f: F,
+    ) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        self.node.lock().unwrap().push(layer);
+        let res = f(self);
+        self.node.lock().unwrap().pop();
+        res
     }
 
-    /// Pop the top override layer.
     #[inline]
-    pub fn pop_layer(&mut self) -> Option<(NodeStateId, HashMap<K1, HashMap<K2, HashMap<K3, V>>>)> {
-        self.core.pop()
-    }
-
-    /// Pop the top override layer.
-    #[inline]
-    pub fn clear_layers(&mut self) -> NodeStateId {
-        self.core.clear()
-    }
-
-    #[inline]
-    pub fn num_layers(&self) -> usize {
-        self.core.num_layers()
+    pub fn persistent_override(
+        self,
+        layer: HashMap<K1, HashMap<K2, HashMap<K3, V>>>,
+    ) -> Overriden3Args<S, K1, K2, K3, V> {
+        Overriden3Args::new(self.node.lock().unwrap().desc(), self.src, layer)
     }
 }

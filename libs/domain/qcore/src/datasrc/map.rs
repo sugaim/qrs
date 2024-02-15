@@ -1,47 +1,44 @@
-use std::sync::Arc;
+// use std::sync::Arc;
 
-use qcore_derive::Node;
+use std::sync::{Arc, Mutex, Weak};
+
+use maplit::btreeset;
+use qcore_derive::Listener;
 
 use super::{
-    _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,
-    DataSrc3Args, Node, NodeStateId, TakeSnapshot, TakeSnapshot2Args,
+    DataSrc, Listener, NodeId, Notifier, StateId, Tree, _private::_UnaryPassThroughNode,
+    node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc3Args, TakeSnapshot, TakeSnapshot2Args,
 };
 
 // -----------------------------------------------------------------------------
 // Map
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Map<S, F> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    f: Arc<F>,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    src: S,
+    f: F,
 }
 
 //
 // construction
 //
-impl<S, F> Clone for Map<S, F> {
+impl<S: Notifier, F> Map<S, F> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            f: self.f.clone(),
-        }
+    pub fn new(desc: impl Into<String>, mut src: S, f: F) -> Self {
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { node, f, src }
     }
 }
-
-impl<S: Node, F: 'static> Map<S, F> {
+impl<S: Notifier + Clone, F: Clone> Clone for Map<S, F> {
     #[inline]
-    fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
-        Self {
-            core: _UnaryPassThroughNode::new(src, desc),
-            f,
-        }
-    }
-
-    #[inline]
-    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
-        Self::_new(desc, src, Arc::new(f))
+    fn clone(&self) -> Self {
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.f.clone(),
+        )
     }
 }
 
@@ -50,72 +47,116 @@ impl<S: Node, F: 'static> Map<S, F> {
 //
 impl<S, F> Map<S, F> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<K, S, F, O> DataSrc<K> for Map<S, F>
+impl<S, F> Notifier for Map<S, F>
 where
-    K: ?Sized,
-    S: DataSrc<K>,
-    F: Fn(S::Output) -> O + 'static,
+    S: Notifier,
+    F: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, F, O> DataSrc for Map<S, F>
+where
+    S: DataSrc,
+    F: 'static + Send + Sync + Fn(S::Output) -> O,
+{
+    type Key = S::Key;
     type Output = O;
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let (_, output) = self.core.src.req(key)?;
-        Ok((self.core.state(), (self.f)(output)))
+    fn req(&self, key: &S::Key) -> Result<(StateId, Self::Output), Self::Err> {
+        self.src
+            .req(key)
+            .map(|(_, o)| (self.node.lock().unwrap().state(), (self.f)(o)))
     }
 }
 
-impl<K1, K2, S, F, O> DataSrc2Args<K1, K2> for Map<S, F>
+impl<S, F, O> DataSrc2Args for Map<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: DataSrc2Args<K1, K2>,
-    F: Fn(S::Output) -> O + 'static,
+    S: DataSrc2Args,
+    F: 'static + Send + Sync + Fn(S::Output) -> O,
 {
-    type Output = O;
-    type Err = S::Err;
-
-    #[inline]
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let (_, output) = self.core.src.req(key1, key2)?;
-        Ok((self.core.state(), (self.f)(output)))
-    }
-}
-
-impl<K1, K2, K3, S, F, O> DataSrc3Args<K1, K2, K3> for Map<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: DataSrc3Args<K1, K2, K3>,
-    F: Fn(S::Output) -> O + 'static,
-{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
     type Output = O;
     type Err = S::Err;
 
     #[inline]
     fn req(
         &self,
-        key1: &K1,
-        key2: &K2,
-        key3: &K3,
-    ) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        let (_, output) = self.core.src.req(key1, key2, key3)?;
-        Ok((self.core.state(), (self.f)(output)))
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        let (_, output) = self.src.req(key1, key2)?;
+        Ok((self.node.lock().unwrap().state(), (self.f)(output)))
     }
 }
 
-impl<K, S, F, O> TakeSnapshot<K> for Map<S, F>
+impl<S, F, O> DataSrc3Args for Map<S, F>
 where
-    K: ?Sized,
-    S: TakeSnapshot<K>,
-    F: Fn(S::Output) -> O + 'static,
+    S: DataSrc3Args,
+    F: 'static + Send + Sync + Fn(S::Output) -> O,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
+    type Key3 = S::Key3;
+    type Output = O;
+    type Err = S::Err;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+        key3: &Self::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        let (_, output) = self.src.req(key1, key2, key3)?;
+        Ok((self.node.lock().unwrap().state(), (self.f)(output)))
+    }
+}
+
+impl<S, F, O> TakeSnapshot for Map<S, F>
+where
+    S: TakeSnapshot,
+    F: 'static + Send + Sync + Clone + Fn(S::Output) -> O,
 {
     type SnapShot = Map<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -123,20 +164,19 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = &'a K>,
-        K: 'a,
+        It: IntoIterator<Item = &'a Self::Key>,
+        Self::Key: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| Map::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
-impl<K1, K2, S, F, O> TakeSnapshot2Args<K1, K2> for Map<S, F>
+impl<S, F, O> TakeSnapshot2Args for Map<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: TakeSnapshot2Args<K1, K2>,
-    F: Fn(S::Output) -> O + 'static,
+    S: TakeSnapshot2Args,
+    F: 'static + Send + Sync + Clone + Fn(S::Output) -> O,
 {
     type SnapShot = Map<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -144,22 +184,20 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2)>,
-        K1: 'a,
-        K2: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| Map::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
-impl<K1, K2, K3, S, F, O> TakeSnapshot3Args<K1, K2, K3> for Map<S, F>
+impl<S, F, O> TakeSnapshot3Args for Map<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: TakeSnapshot3Args<K1, K2, K3>,
-    F: Fn(S::Output) -> O + 'static,
+    S: TakeSnapshot3Args,
+    F: 'static + Send + Sync + Clone + Fn(S::Output) -> O,
 {
     type SnapShot = Map<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -167,51 +205,47 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
-        K1: 'a,
-        K2: 'a,
-        K3: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2, &'a Self::Key3)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
+        Self::Key3: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Map::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| Map::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
 // -----------------------------------------------------------------------------
 // MapErr
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct MapErr<S, F> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    f: Arc<F>,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    src: S,
+    f: F,
 }
 
 //
 // construction
 //
-impl<S, F> Clone for MapErr<S, F> {
+impl<S: Notifier, F> MapErr<S, F> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            f: self.f.clone(),
-        }
+    pub fn new(desc: impl Into<String>, mut src: S, f: F) -> Self {
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { node, f, src }
     }
 }
 
-impl<S: Node, F: 'static> MapErr<S, F> {
+impl<S: Clone + Notifier, F: Clone> Clone for MapErr<S, F> {
     #[inline]
-    fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
-        Self {
-            core: _UnaryPassThroughNode::new(src, desc),
-            f,
-        }
-    }
-
-    #[inline]
-    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
-        Self::_new(desc, src, Arc::new(f))
+    fn clone(&self) -> Self {
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.f.clone(),
+        )
     }
 }
 
@@ -219,78 +253,127 @@ impl<S: Node, F: 'static> MapErr<S, F> {
 // methods
 //
 impl<S, F> MapErr<S, F> {
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    #[inline]
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<K, S, F, E> DataSrc<K> for MapErr<S, F>
+impl<S, F> Notifier for MapErr<S, F>
 where
-    K: ?Sized,
-    S: DataSrc<K>,
-    F: Fn(S::Err) -> E + 'static,
+    S: Notifier,
+    F: 'static + Send + Sync,
 {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, F, E> DataSrc for MapErr<S, F>
+where
+    S: DataSrc,
+    F: 'static + Send + Sync + Fn(S::Err) -> E,
+{
+    type Key = S::Key;
     type Output = S::Output;
     type Err = E;
 
     #[inline]
-    fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        match self.core.src.req(key) {
-            Ok((state, output)) => Ok((state, output)),
-            Err(err) => Err((self.f)(err)),
-        }
+    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+        self.src
+            .req(key)
+            .map_err(|err| (self.f)(err))
+            .map(|(_, o)| (self.node.lock().unwrap().state(), o))
     }
 }
 
-impl<K1, K2, S, F, E> DataSrc2Args<K1, K2> for MapErr<S, F>
+impl<S, F, E> DataSrc2Args for MapErr<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: DataSrc2Args<K1, K2>,
-    F: Fn(S::Err) -> E + 'static,
+    S: DataSrc2Args,
+    F: 'static + Send + Sync + Fn(S::Err) -> E,
 {
-    type Output = S::Output;
-    type Err = E;
-
-    #[inline]
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        match self.core.src.req(key1, key2) {
-            Ok((state, output)) => Ok((state, output)),
-            Err(err) => Err((self.f)(err)),
-        }
-    }
-}
-
-impl<K1, K2, K3, S, F, E> DataSrc3Args<K1, K2, K3> for MapErr<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: DataSrc3Args<K1, K2, K3>,
-    F: Fn(S::Err) -> E + 'static,
-{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
     type Output = S::Output;
     type Err = E;
 
     #[inline]
     fn req(
         &self,
-        key1: &K1,
-        key2: &K2,
-        key3: &K3,
-    ) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        match self.core.src.req(key1, key2, key3) {
-            Ok((state, output)) => Ok((state, output)),
-            Err(err) => Err((self.f)(err)),
-        }
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        self.src
+            .req(key1, key2)
+            .map_err(|err| (self.f)(err))
+            .map(|(_, o)| (self.node.lock().unwrap().state(), o))
     }
 }
 
-impl<K, S, F, E> TakeSnapshot<K> for MapErr<S, F>
+impl<S, F, E> DataSrc3Args for MapErr<S, F>
 where
-    K: ?Sized,
-    S: TakeSnapshot<K>,
-    F: Fn(S::Err) -> E + 'static,
+    S: DataSrc3Args,
+    F: 'static + Send + Sync + Fn(S::Err) -> E,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
+    type Key3 = S::Key3;
+    type Output = S::Output;
+    type Err = E;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+        key3: &Self::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        self.src
+            .req(key1, key2, key3)
+            .map_err(|err| (self.f)(err))
+            .map(|(_, o)| (self.node.lock().unwrap().state(), o))
+    }
+}
+
+impl<S, F, E> TakeSnapshot for MapErr<S, F>
+where
+    S: TakeSnapshot,
+    F: 'static + Send + Sync + Clone + Fn(S::Err) -> E,
 {
     type SnapShot = MapErr<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -298,20 +381,19 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = &'a K>,
-        K: 'a,
+        It: IntoIterator<Item = &'a Self::Key>,
+        Self::Key: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| MapErr::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
-impl<K1, K2, S, F, E> TakeSnapshot2Args<K1, K2> for MapErr<S, F>
+impl<S, F, E> TakeSnapshot2Args for MapErr<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: TakeSnapshot2Args<K1, K2>,
-    F: Fn(S::Err) -> E + 'static,
+    S: TakeSnapshot2Args,
+    F: 'static + Send + Sync + Clone + Fn(S::Err) -> E,
 {
     type SnapShot = MapErr<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -319,22 +401,20 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2)>,
-        K1: 'a,
-        K2: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| MapErr::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
-impl<K1, K2, K3, S, F, E> TakeSnapshot3Args<K1, K2, K3> for MapErr<S, F>
+impl<S, F, E> TakeSnapshot3Args for MapErr<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: TakeSnapshot3Args<K1, K2, K3>,
-    F: Fn(S::Err) -> E + 'static,
+    S: TakeSnapshot3Args,
+    F: 'static + Send + Sync + Clone + Fn(S::Err) -> E,
 {
     type SnapShot = MapErr<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -342,50 +422,47 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
-        K1: 'a,
-        K2: 'a,
-        K3: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2, &'a Self::Key3)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
+        Self::Key3: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(MapErr::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| MapErr::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
 // -----------------------------------------------------------------------------
 // Convert
 //
-#[derive(Debug, Node)]
-#[node(transparent = "core")]
+#[derive(Debug, Listener)]
+#[listener(transparent = "node")]
 pub struct Convert<S, F> {
-    core: Arc<_UnaryPassThroughNode<S>>,
-    f: Arc<F>,
+    node: Arc<Mutex<_UnaryPassThroughNode>>,
+    src: S,
+    f: F,
 }
 
 //
 // construction
 //
-impl<S, F> Clone for Convert<S, F> {
+impl<S: Notifier, F> Convert<S, F> {
     #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            f: self.f.clone(),
-        }
+    pub fn new(desc: impl Into<String>, mut src: S, f: F) -> Self {
+        let node = _UnaryPassThroughNode::new_and_reg(desc, &mut src);
+        Self { node, f, src }
     }
 }
 
-impl<S: Node, F: 'static> Convert<S, F> {
-    fn _new(desc: impl Into<String>, src: S, f: Arc<F>) -> Self {
-        Self {
-            core: _UnaryPassThroughNode::new(src, desc),
-            f,
-        }
-    }
-
+impl<S: Clone + Notifier, F: Clone> Clone for Convert<S, F> {
     #[inline]
-    pub fn new(desc: impl Into<String>, src: S, f: F) -> Self {
-        Self::_new(desc, src, Arc::new(f))
+    fn clone(&self) -> Self {
+        Self::new(
+            self.node.lock().unwrap().desc(),
+            self.src.clone(),
+            self.f.clone(),
+        )
     }
 }
 
@@ -394,78 +471,119 @@ impl<S: Node, F: 'static> Convert<S, F> {
 //
 impl<S, F> Convert<S, F> {
     #[inline]
-    pub fn downstream(&self) -> &S {
-        &self.core.src
+    pub fn inner(&self) -> &S {
+        &self.src
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.src
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.src
     }
 }
 
-impl<K, S, F, O, E> DataSrc<K> for Convert<S, F>
+impl<S: Notifier, F: 'static + Send + Sync> Notifier for Convert<S, F> {
+    #[inline]
+    fn id(&self) -> NodeId {
+        self.node.lock().unwrap().id()
+    }
+
+    #[inline]
+    fn tree(&self) -> super::Tree {
+        let (desc, id, state) = {
+            let node = self.node.lock().unwrap();
+            (node.desc(), node.id(), node.state())
+        };
+        Tree::Branch {
+            desc,
+            id,
+            state,
+            children: btreeset! {self.src.tree()},
+        }
+    }
+
+    #[inline]
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
+        self.node.lock().unwrap().accept_subscriber(subsc)
+    }
+
+    #[inline]
+    fn remove_listener(&mut self, id: &NodeId) {
+        self.node.lock().unwrap().remove_subscriber(id);
+    }
+}
+
+impl<S, F, O, E> DataSrc for Convert<S, F>
 where
-    K: ?Sized,
-    S: DataSrc<K>,
-    F: Fn(Result<S::Output, S::Err>) -> Result<O, E> + 'static,
+    S: DataSrc,
+    F: 'static + Send + Sync + Fn(&S::Key, Result<S::Output, S::Err>) -> Result<O, E>,
 {
+    type Key = S::Key;
     type Output = O;
     type Err = E;
 
     #[inline]
-    fn req(&self, key: &K) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        match self.core.src.req(key) {
-            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.state(), output)),
-            Err(err) => (self.f)(Err(err)).map(|o| (self.core.state(), o)),
-        }
+    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+        let base = self.src.req(key).map(|(_, o)| o);
+        (self.f)(key, base).map(|o| (self.node.lock().unwrap().state(), o))
     }
 }
 
-impl<K1, K2, S, F, O, E> DataSrc2Args<K1, K2> for Convert<S, F>
+impl<S, F, O, E> DataSrc2Args for Convert<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: DataSrc2Args<K1, K2>,
-    F: Fn(Result<S::Output, S::Err>) -> Result<O, E> + 'static,
+    S: DataSrc2Args,
+    F: 'static + Send + Sync + Fn(&S::Key1, &S::Key2, Result<S::Output, S::Err>) -> Result<O, E>,
 {
-    type Output = O;
-    type Err = E;
-
-    #[inline]
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        match self.core.src.req(key1, key2) {
-            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.state(), output)),
-            Err(err) => (self.f)(Err(err)).map(|o| (self.core.state(), o)),
-        }
-    }
-}
-
-impl<K1, K2, K3, S, F, O, E> DataSrc3Args<K1, K2, K3> for Convert<S, F>
-where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: DataSrc3Args<K1, K2, K3>,
-    F: Fn(Result<S::Output, S::Err>) -> Result<O, E> + 'static,
-{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
     type Output = O;
     type Err = E;
 
     #[inline]
     fn req(
         &self,
-        key1: &K1,
-        key2: &K2,
-        key3: &K3,
-    ) -> Result<(NodeStateId, Self::Output), Self::Err> {
-        match self.core.src.req(key1, key2, key3) {
-            Ok((_, output)) => (self.f)(Ok(output)).map(|output| (self.core.state(), output)),
-            Err(err) => (self.f)(Err(err)).map(|o| (self.core.state(), o)),
-        }
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        let base = self.src.req(key1, key2).map(|(_, o)| o);
+        (self.f)(key1, key2, base).map(|o| (self.node.lock().unwrap().state(), o))
     }
 }
 
-impl<K, S, F, O, E> TakeSnapshot<K> for Convert<S, F>
+impl<S, F, O, E> DataSrc3Args for Convert<S, F>
 where
-    K: ?Sized,
-    S: TakeSnapshot<K>,
-    F: Fn(Result<S::Output, S::Err>) -> Result<O, E> + 'static,
+    S: DataSrc3Args,
+    F: 'static
+        + Send
+        + Sync
+        + Fn(&S::Key1, &S::Key2, &S::Key3, Result<S::Output, S::Err>) -> Result<O, E>,
+{
+    type Key1 = S::Key1;
+    type Key2 = S::Key2;
+    type Key3 = S::Key3;
+    type Output = O;
+    type Err = E;
+
+    #[inline]
+    fn req(
+        &self,
+        key1: &Self::Key1,
+        key2: &Self::Key2,
+        key3: &Self::Key3,
+    ) -> Result<(StateId, Self::Output), Self::Err> {
+        let base = self.src.req(key1, key2, key3).map(|(_, o)| o);
+        (self.f)(key1, key2, key3, base).map(|o| (self.node.lock().unwrap().state(), o))
+    }
+}
+
+impl<S, F, O, E> TakeSnapshot for Convert<S, F>
+where
+    S: TakeSnapshot,
+    F: 'static + Send + Sync + Clone + Fn(&S::Key, Result<S::Output, S::Err>) -> Result<O, E>,
 {
     type SnapShot = Convert<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -473,20 +591,23 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = &'a K>,
-        K: 'a,
+        It: IntoIterator<Item = &'a Self::Key>,
+        Self::Key: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| Convert::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
-impl<K1, K2, S, F, O, E> TakeSnapshot2Args<K1, K2> for Convert<S, F>
+impl<S, F, O, E> TakeSnapshot2Args for Convert<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    S: TakeSnapshot2Args<K1, K2>,
-    F: Fn(Result<S::Output, S::Err>) -> Result<O, E> + 'static,
+    S: TakeSnapshot2Args,
+    F: 'static
+        + Send
+        + Sync
+        + Clone
+        + Fn(&S::Key1, &S::Key2, Result<S::Output, S::Err>) -> Result<O, E>,
 {
     type SnapShot = Convert<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -494,22 +615,24 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2)>,
-        K1: 'a,
-        K2: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| Convert::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
-impl<K1, K2, K3, S, F, O, E> TakeSnapshot3Args<K1, K2, K3> for Convert<S, F>
+impl<S, F, O, E> TakeSnapshot3Args for Convert<S, F>
 where
-    K1: ?Sized,
-    K2: ?Sized,
-    K3: ?Sized,
-    S: TakeSnapshot3Args<K1, K2, K3>,
-    F: Fn(Result<S::Output, S::Err>) -> Result<O, E> + 'static,
+    S: TakeSnapshot3Args,
+    F: 'static
+        + Send
+        + Sync
+        + Clone
+        + Fn(&S::Key1, &S::Key2, &S::Key3, Result<S::Output, S::Err>) -> Result<O, E>,
 {
     type SnapShot = Convert<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -517,31 +640,32 @@ where
     #[inline]
     fn take_snapshot<'a, It>(&self, keys: It) -> Result<Self::SnapShot, Self::SnapShotErr>
     where
-        It: IntoIterator<Item = (&'a K1, &'a K2, &'a K3)>,
-        K1: 'a,
-        K2: 'a,
-        K3: 'a,
+        It: IntoIterator<Item = (&'a Self::Key1, &'a Self::Key2, &'a Self::Key3)>,
+        Self::Key1: 'a,
+        Self::Key2: 'a,
+        Self::Key3: 'a,
     {
-        let snap = self.core.src.take_snapshot(keys)?;
-        Ok(Convert::_new(self.core.desc(), snap, self.f.clone()))
+        self.src
+            .take_snapshot(keys)
+            .map(|snap| Convert::new(self.node.lock().unwrap().desc(), snap, self.f.clone()))
     }
 }
 
 // =============================================================================
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use maplit::hashmap;
     use rstest::{fixture, rstest};
 
-    use crate::datasrc::{
-        ImmutableOnMemorySrc, ImmutableOnMemorySrc2Args, ImmutableOnMemorySrc3Args,
-    };
+    use crate::datasrc::{OnMemorySrc, OnMemorySrc2Args, OnMemorySrc3Args};
 
     use super::*;
 
     #[fixture]
-    fn src_1arg() -> ImmutableOnMemorySrc<String, i32> {
-        let src = ImmutableOnMemorySrc::with_data(
+    fn src_1arg() -> OnMemorySrc<String, i32> {
+        let src = OnMemorySrc::with_data(
             "src",
             hashmap! {
                 "a".to_owned() => 1,
@@ -553,162 +677,420 @@ mod tests {
     }
 
     #[fixture]
-    fn src_2args() -> ImmutableOnMemorySrc2Args<String, String, i32> {
-        let src = ImmutableOnMemorySrc2Args::with_data(
+    fn src_2args() -> OnMemorySrc2Args<String, String, i32> {
+        let src = OnMemorySrc2Args::with_data(
             "src",
             hashmap! {
-                ("a".to_owned(), "x".to_owned()) => 1,
-                ("a".to_owned(), "y".to_owned()) => 2,
-                ("b".to_owned(), "x".to_owned()) => 3,
-                ("b".to_owned(), "y".to_owned()) => 4,
-                ("c".to_owned(), "x".to_owned()) => 5,
-                ("c".to_owned(), "y".to_owned()) => 6,
+                "a".to_owned() => hashmap! {
+                    "x".to_owned() => 1,
+                    "y".to_owned() => 2,
+                },
+                "b".to_owned() => hashmap! {
+                    "x".to_owned() => 3,
+                    "y".to_owned() => 4,
+                },
+                "c".to_owned() => hashmap! {
+                    "x".to_owned() => 5,
+                    "y".to_owned() => 6,
+                },
             },
         );
         src
     }
 
     #[fixture]
-    fn src_3args() -> ImmutableOnMemorySrc3Args<String, String, String, i32> {
-        let src = ImmutableOnMemorySrc3Args::with_data(
+    fn src_3args() -> OnMemorySrc3Args<String, String, String, i32> {
+        let src = OnMemorySrc3Args::with_data(
             "src",
             hashmap! {
-                ("a".to_owned(), "x".to_owned(), "i".to_owned()) => 1,
-                ("a".to_owned(), "x".to_owned(), "j".to_owned()) => 2,
-                ("a".to_owned(), "y".to_owned(), "i".to_owned()) => 3,
-                ("a".to_owned(), "y".to_owned(), "j".to_owned()) => 4,
-                ("b".to_owned(), "x".to_owned(), "i".to_owned()) => 5,
-                ("b".to_owned(), "x".to_owned(), "j".to_owned()) => 6,
-                ("b".to_owned(), "y".to_owned(), "i".to_owned()) => 7,
-                ("b".to_owned(), "y".to_owned(), "j".to_owned()) => 8,
-                ("c".to_owned(), "x".to_owned(), "i".to_owned()) => 9,
-                ("c".to_owned(), "x".to_owned(), "j".to_owned()) => 10,
-                ("c".to_owned(), "y".to_owned(), "i".to_owned()) => 11,
-                ("c".to_owned(), "y".to_owned(), "j".to_owned()) => 12,
+                "a".to_owned() => hashmap! {
+                    "x".to_owned() => hashmap! {
+                        "i".to_owned() => 1,
+                        "j".to_owned() => 2,
+                    },
+                    "y".to_owned() => hashmap! {
+                        "i".to_owned() => 3,
+                        "j".to_owned() => 4,
+                    },
+                },
+                "b".to_owned() => hashmap! {
+                    "x".to_owned() => hashmap! {
+                        "i".to_owned() => 5,
+                        "j".to_owned() => 6,
+                    },
+                    "y".to_owned() => hashmap! {
+                        "i".to_owned() => 7,
+                        "j".to_owned() => 8,
+                    },
+                },
+                "c".to_owned() => hashmap! {
+                    "x".to_owned() => hashmap! {
+                        "i".to_owned() => 9,
+                        "j".to_owned() => 10,
+                    },
+                    "y".to_owned() => hashmap! {
+                        "i".to_owned() => 11,
+                        "j".to_owned() => 12,
+                    },
+                },
             },
         );
         src
     }
 
     #[rstest]
-    fn test_map_1arg(src_1arg: ImmutableOnMemorySrc<String, i32>) {
-        let src = Map::new("map", src_1arg, |x| x * 2);
+    fn test_map_1arg(src_1arg: OnMemorySrc<String, i32>) {
+        let src_1arg = Arc::new(Mutex::new(src_1arg));
+        let src = src_1arg.clone().map("map", |x| x * 2);
 
         // ok
-        assert_eq!(src.req("a").unwrap().1, 2);
-        assert_eq!(src.req("b").unwrap().1, 4);
-        assert_eq!(src.req("c").unwrap().1, 6);
+        assert_eq!(src.req(&"a".to_owned()).unwrap().1, 2);
+        assert_eq!(src.req(&"b".to_owned()).unwrap().1, 4);
+        assert_eq!(src.req(&"c".to_owned()).unwrap().1, 6);
 
         // err
-        assert!(src.req("d").is_err());
+        assert!(src.req(&"d".to_owned()).is_err());
+
+        // state change
+        let (current_state, current_val) = src.req(&"a".to_owned()).unwrap();
+
+        src_1arg.lock().unwrap().insert("a".to_owned(), 100);
+        let (new_state, new_val) = src.req(&"a".to_owned()).unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 2);
+        assert_eq!(new_val, 200);
     }
 
     #[rstest]
-    fn test_map_2args(src_2args: ImmutableOnMemorySrc2Args<String, String, i32>) {
-        let src = Map::new("map", src_2args, |x| x * 2);
+    fn test_map_2args(src_2args: OnMemorySrc2Args<String, String, i32>) {
+        let src_2args = Arc::new(Mutex::new(src_2args));
+        let src = src_2args.clone().map("map", |x| x * 2);
 
         // ok
-        assert_eq!(src.req("a", "x").unwrap().1, 2);
-        assert_eq!(src.req("a", "y").unwrap().1, 4);
-        assert_eq!(src.req("b", "x").unwrap().1, 6);
-        assert_eq!(src.req("b", "y").unwrap().1, 8);
-        assert_eq!(src.req("c", "x").unwrap().1, 10);
-        assert_eq!(src.req("c", "y").unwrap().1, 12);
+        assert_eq!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap().1, 2);
+        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap().1, 4);
+        assert_eq!(src.req(&"b".to_owned(), &"x".to_owned()).unwrap().1, 6);
+        assert_eq!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap().1, 8);
+        assert_eq!(src.req(&"c".to_owned(), &"x".to_owned()).unwrap().1, 10);
+        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap().1, 12);
 
         // err
-        assert!(src.req("d", "x").is_err());
-        assert!(src.req("a", "z").is_err());
+        assert!(src.req(&"d".to_owned(), &"x".to_owned()).is_err());
+        assert!(src.req(&"a".to_owned(), &"z".to_owned()).is_err());
+
+        // state change
+        let (current_state, current_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+
+        src_2args
+            .lock()
+            .unwrap()
+            .insert("a".to_owned(), "x".to_owned(), 100);
+
+        let (new_state, new_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 2);
+        assert_eq!(new_val, 200);
     }
 
     #[rstest]
-    fn test_map_3args(src_3args: ImmutableOnMemorySrc3Args<String, String, String, i32>) {
-        let src = Map::new("map", src_3args, |x| x * 2);
+    fn test_map_3args(src_3args: OnMemorySrc3Args<String, String, String, i32>) {
+        let src_3args = Arc::new(Mutex::new(src_3args));
+        let src = src_3args.clone().map("map", |x| x * 2);
 
         // ok
-        assert_eq!(src.req("a", "x", "i").unwrap().1, 2);
-        assert_eq!(src.req("a", "x", "j").unwrap().1, 4);
-        assert_eq!(src.req("a", "y", "i").unwrap().1, 6);
-        assert_eq!(src.req("a", "y", "j").unwrap().1, 8);
-        assert_eq!(src.req("b", "x", "i").unwrap().1, 10);
-        assert_eq!(src.req("b", "x", "j").unwrap().1, 12);
-        assert_eq!(src.req("b", "y", "i").unwrap().1, 14);
-        assert_eq!(src.req("b", "y", "j").unwrap().1, 16);
-        assert_eq!(src.req("c", "x", "i").unwrap().1, 18);
-        assert_eq!(src.req("c", "x", "j").unwrap().1, 20);
-        assert_eq!(src.req("c", "y", "i").unwrap().1, 22);
-        assert_eq!(src.req("c", "y", "j").unwrap().1, 24);
+        assert_eq!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            2
+        );
+        assert_eq!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            4
+        );
+        assert_eq!(
+            src.req(&"a".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            6
+        );
+        assert_eq!(
+            src.req(&"a".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            8
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            10
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            12
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            14
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            16
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            18
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            20
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            22
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            24
+        );
 
         // err
-        assert!(src.req("d", "x", "i").is_err());
-        assert!(src.req("a", "z", "i").is_err());
-        assert!(src.req("a", "x", "k").is_err());
+        assert!(src
+            .req(&"d".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(src
+            .req(&"a".to_owned(), &"z".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(src
+            .req(&"a".to_owned(), &"x".to_owned(), &"k".to_owned())
+            .is_err());
+
+        // state change
+        let (current_state, current_val) = src
+            .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .unwrap();
+
+        src_3args
+            .lock()
+            .unwrap()
+            .insert("a".to_owned(), "x".to_owned(), "i".to_owned(), 100);
+
+        let (new_state, new_val) = src
+            .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 2);
+        assert_eq!(new_val, 200);
     }
 
     #[rstest]
-    fn test_map_err_1arg(src_1arg: ImmutableOnMemorySrc<String, i32>) {
-        let src = MapErr::new("map", src_1arg, |_| "error".to_owned());
+    fn test_map_err_1arg(src_1arg: OnMemorySrc<String, i32>) {
+        let src_1arg = Arc::new(Mutex::new(src_1arg));
+        let src = src_1arg.clone().map_err("map", |_| "error".to_owned());
 
         // ok
-        assert_eq!(src.req("a").unwrap().1, 1);
-        assert_eq!(src.req("b").unwrap().1, 2);
-        assert_eq!(src.req("c").unwrap().1, 3);
+        assert_eq!(src.req(&"a".to_owned()).unwrap().1, 1);
+        assert_eq!(src.req(&"b".to_owned()).unwrap().1, 2);
+        assert_eq!(src.req(&"c".to_owned()).unwrap().1, 3);
 
         // err
-        assert!(src.req("d").is_err());
-        assert!(src.req("d").unwrap_err() == "error");
+        assert!(src.req(&"d".to_owned()).is_err());
+        assert!(src.req(&"d".to_owned()).unwrap_err() == "error");
+
+        // state change
+        let (current_state, current_val) = src.req(&"a".to_owned()).unwrap();
+
+        src_1arg.lock().unwrap().insert("a".to_owned(), 100);
+        let (new_state, new_val) = src.req(&"a".to_owned()).unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
     }
 
     #[rstest]
-    fn test_map_err_2args(src_2args: ImmutableOnMemorySrc2Args<String, String, i32>) {
-        let src = MapErr::new("map", src_2args, |_| "error".to_owned());
+    fn test_map_err_2args(src_2args: OnMemorySrc2Args<String, String, i32>) {
+        let src_2args = Arc::new(Mutex::new(src_2args));
+        let src = src_2args.clone().map_err("map", |_| "error".to_owned());
 
         // ok
-        assert_eq!(src.req("a", "x").unwrap().1, 1);
-        assert_eq!(src.req("a", "y").unwrap().1, 2);
-        assert_eq!(src.req("b", "x").unwrap().1, 3);
-        assert_eq!(src.req("b", "y").unwrap().1, 4);
-        assert_eq!(src.req("c", "x").unwrap().1, 5);
-        assert_eq!(src.req("c", "y").unwrap().1, 6);
+        assert_eq!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap().1, 1);
+        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap().1, 2);
+        assert_eq!(src.req(&"b".to_owned(), &"x".to_owned()).unwrap().1, 3);
+        assert_eq!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap().1, 4);
+        assert_eq!(src.req(&"c".to_owned(), &"x".to_owned()).unwrap().1, 5);
+        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap().1, 6);
 
         // err
-        assert!(src.req("d", "x").is_err());
-        assert!(src.req("d", "x").unwrap_err() == "error");
-        assert!(src.req("a", "z").is_err());
-        assert!(src.req("a", "z").unwrap_err() == "error");
+        assert!(src.req(&"d".to_owned(), &"x".to_owned()).is_err());
+        assert!(src.req(&"d".to_owned(), &"x".to_owned()).unwrap_err() == "error");
+        assert!(src.req(&"a".to_owned(), &"z".to_owned()).is_err());
+        assert!(src.req(&"a".to_owned(), &"z".to_owned()).unwrap_err() == "error");
+
+        // state change
+        let (current_state, current_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+
+        src_2args
+            .lock()
+            .unwrap()
+            .insert("a".to_owned(), "x".to_owned(), 100);
+        let (new_state, new_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
     }
 
     #[rstest]
-    fn test_map_err_3args(src_3args: ImmutableOnMemorySrc3Args<String, String, String, i32>) {
-        let src = MapErr::new("map", src_3args, |_| "error".to_owned());
+    fn test_map_err_3args(src_3args: OnMemorySrc3Args<String, String, String, i32>) {
+        let src_3args = Arc::new(Mutex::new(src_3args));
+        let src = src_3args.clone().map_err("map", |_| "error".to_owned());
 
         // ok
-        assert_eq!(src.req("a", "x", "i").unwrap().1, 1);
-        assert_eq!(src.req("a", "x", "j").unwrap().1, 2);
-        assert_eq!(src.req("a", "y", "i").unwrap().1, 3);
-        assert_eq!(src.req("a", "y", "j").unwrap().1, 4);
-        assert_eq!(src.req("b", "x", "i").unwrap().1, 5);
-        assert_eq!(src.req("b", "x", "j").unwrap().1, 6);
-        assert_eq!(src.req("b", "y", "i").unwrap().1, 7);
-        assert_eq!(src.req("b", "y", "j").unwrap().1, 8);
-        assert_eq!(src.req("c", "x", "i").unwrap().1, 9);
-        assert_eq!(src.req("c", "x", "j").unwrap().1, 10);
-        assert_eq!(src.req("c", "y", "i").unwrap().1, 11);
-        assert_eq!(src.req("c", "y", "j").unwrap().1, 12);
+        assert_eq!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            1
+        );
+        assert_eq!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            2
+        );
+        assert_eq!(
+            src.req(&"a".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            3
+        );
+        assert_eq!(
+            src.req(&"a".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            4
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            5
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            6
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            7
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            8
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            9
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            10
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap()
+                .1,
+            11
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"y".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            12
+        );
 
         // err
-        assert!(src.req("d", "x", "i").is_err());
-        assert!(src.req("d", "x", "i").unwrap_err() == "error");
-        assert!(src.req("a", "z", "i").is_err());
-        assert!(src.req("a", "z", "i").unwrap_err() == "error");
-        assert!(src.req("a", "x", "k").is_err());
-        assert!(src.req("a", "x", "k").unwrap_err() == "error");
+        assert!(src
+            .req(&"d".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            src.req(&"d".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "error"
+        );
+        assert!(src
+            .req(&"a".to_owned(), &"z".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            src.req(&"a".to_owned(), &"z".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "error"
+        );
+        assert!(src
+            .req(&"a".to_owned(), &"x".to_owned(), &"k".to_owned())
+            .is_err());
+        assert!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"k".to_owned())
+                .unwrap_err()
+                == "error"
+        );
+
+        // state change
+        let (current_state, current_val) = src
+            .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .unwrap();
+
+        src_3args
+            .lock()
+            .unwrap()
+            .insert("a".to_owned(), "x".to_owned(), "i".to_owned(), 100);
+
+        let (new_state, new_val) = src
+            .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
     }
 
     #[rstest]
-    fn test_convert_1arg(src_1arg: ImmutableOnMemorySrc<String, i32>) {
-        let src = Convert::new("convert", src_1arg, |r| match r {
+    fn test_convert_1arg(src_1arg: OnMemorySrc<String, i32>) {
+        let src_1arg = Arc::new(Mutex::new(src_1arg));
+        let src = src_1arg.clone().convert("convert", |s, r| match r {
             Ok(x) => {
-                if x % 2 == 0 {
+                if x % 2 == 0 || s == "a" {
                     Ok(x)
                 } else {
                     Err("error".to_owned())
@@ -718,25 +1100,38 @@ mod tests {
         });
 
         // ok
-        assert_eq!(src.req("b").unwrap().1, 2);
+        assert_eq!(src.req(&"a".to_owned()).unwrap().1, 1);
+        assert_eq!(src.req(&"b".to_owned()).unwrap().1, 2);
 
         // err
-        assert!(src.req("a").is_err());
-        assert!(src.req("a").unwrap_err() == "error");
+        assert!(src.req(&"c".to_owned()).is_err());
+        assert!(src.req(&"c".to_owned()).unwrap_err() == "error");
 
-        assert!(src.req("c").is_err());
-        assert!(src.req("c").unwrap_err() == "error");
+        assert!(src.req(&"d".to_owned()).is_err());
+        assert!(src.req(&"d".to_owned()).unwrap_err() == "downstream error");
 
-        assert!(src.req("d").is_err());
-        assert!(src.req("d").unwrap_err() == "downstream error");
+        // state change
+        let (current_state, current_val) = src.req(&"a".to_owned()).unwrap();
+
+        src_1arg.lock().unwrap().insert("a".to_owned(), 100);
+        let (new_state, new_val) = src.req(&"a".to_owned()).unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 1);
+        assert_eq!(new_val, 100);
     }
 
     #[rstest]
-    fn test_convert_2args(src_2args: ImmutableOnMemorySrc2Args<String, String, i32>) {
-        let src = Convert::new("convert", src_2args, |r| match r {
+    fn test_convert_2args(src_2args: OnMemorySrc2Args<String, String, i32>) {
+        let src_2args = Arc::new(Mutex::new(src_2args));
+        let src = src_2args.clone().convert("convert", |s1, _, r| match r {
             Ok(x) => {
                 if x % 2 == 0 {
-                    Ok(x)
+                    if s1 == "b" {
+                        Err("b!".to_owned())
+                    } else {
+                        Ok(x)
+                    }
                 } else {
                     Err("error".to_owned())
                 }
@@ -745,44 +1140,118 @@ mod tests {
         });
 
         // ok
-        assert_eq!(src.req("a", "y").unwrap().1, 2);
-        assert_eq!(src.req("b", "y").unwrap().1, 4);
-        assert_eq!(src.req("c", "y").unwrap().1, 6);
+        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap().1, 2);
+        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap().1, 6);
 
         // err
-        assert!(src.req("a", "x").is_err());
-        assert!(src.req("a", "x").unwrap_err() == "error");
+        assert!(src.req(&"a".to_owned(), &"x".to_owned()).is_err());
+        assert!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap_err() == "error");
 
-        assert!(src.req("d", "x").is_err());
-        assert!(src.req("d", "x").unwrap_err() == "downstream error");
+        assert!(src.req(&"b".to_owned(), &"y".to_owned()).is_err());
+        assert!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap_err() == "b!");
+
+        assert!(src.req(&"d".to_owned(), &"x".to_owned()).is_err());
+        assert!(src.req(&"d".to_owned(), &"x".to_owned()).unwrap_err() == "downstream error");
+
+        // state change
+        let (current_state, current_val) = src.req(&"a".to_owned(), &"y".to_owned()).unwrap();
+
+        src_2args
+            .lock()
+            .unwrap()
+            .insert("a".to_owned(), "y".to_owned(), 100);
+        let (new_state, new_val) = src.req(&"a".to_owned(), &"y".to_owned()).unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 2);
+        assert_eq!(new_val, 100);
     }
 
     #[rstest]
-    fn test_convert_3args(src_3args: ImmutableOnMemorySrc3Args<String, String, String, i32>) {
-        let src = Convert::new("convert", src_3args, |r| match r {
-            Ok(x) => {
-                if x % 2 == 0 {
-                    Ok(x)
-                } else {
-                    Err("error".to_owned())
+    fn test_convert_3args(src_3args: OnMemorySrc3Args<String, String, String, i32>) {
+        let src_3args = Arc::new(Mutex::new(src_3args));
+        let src = src_3args
+            .clone()
+            .convert("convert", |s1, _, s3, r| match r {
+                Ok(x) => {
+                    if s3 == "j" {
+                        let mult = match s1.as_str() {
+                            "a" => 3,
+                            "b" => 2,
+                            _ => -1,
+                        };
+                        Ok(x * mult)
+                    } else {
+                        Err("error".to_owned())
+                    }
                 }
-            }
-            Err(_) => Err("downstream error".to_owned()),
-        });
+                Err(_) => Err("downstream error".to_owned()),
+            });
 
         // ok
-        assert_eq!(src.req("a", "x", "j").unwrap().1, 2);
-        assert_eq!(src.req("b", "x", "j").unwrap().1, 6);
-        assert_eq!(src.req("c", "x", "j").unwrap().1, 10);
+        assert_eq!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            6
+        );
+        assert_eq!(
+            src.req(&"b".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            12
+        );
+        assert_eq!(
+            src.req(&"c".to_owned(), &"x".to_owned(), &"j".to_owned())
+                .unwrap()
+                .1,
+            -10
+        );
 
         // err
-        assert!(src.req("a", "x", "i").is_err());
-        assert!(src.req("a", "x", "i").unwrap_err() == "error");
+        assert!(src
+            .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            src.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "error"
+        );
 
-        assert!(src.req("a", "y", "i").is_err());
-        assert!(src.req("a", "y", "i").unwrap_err() == "error");
+        assert!(src
+            .req(&"a".to_owned(), &"y".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            src.req(&"a".to_owned(), &"y".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "error"
+        );
 
-        assert!(src.req("d", "x", "i").is_err());
-        assert!(src.req("d", "x", "i").unwrap_err() == "downstream error");
+        assert!(src
+            .req(&"d".to_owned(), &"x".to_owned(), &"i".to_owned())
+            .is_err());
+        assert!(
+            src.req(&"d".to_owned(), &"x".to_owned(), &"i".to_owned())
+                .unwrap_err()
+                == "downstream error"
+        );
+
+        // state change
+        let (current_state, current_val) = src
+            .req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
+            .unwrap();
+
+        src_3args
+            .lock()
+            .unwrap()
+            .insert("a".to_owned(), "x".to_owned(), "j".to_owned(), 100);
+
+        let (new_state, new_val) = src
+            .req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
+            .unwrap();
+
+        assert_ne!(current_state, new_state);
+        assert_eq!(current_val, 6);
+        assert_eq!(new_val, 300);
     }
 }
