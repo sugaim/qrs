@@ -142,15 +142,6 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
     }
 
     #[inline]
-    pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
-    where
-        K: Borrow<Q>,
-        Q: Eq + Hash + ?Sized,
-    {
-        self.data.get_mut(key)
-    }
-
-    #[inline]
     pub fn contains_key<Q>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
@@ -363,17 +354,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         Q2: Eq + Hash + ?Sized,
     {
         self.data.get(key1).and_then(|m| m.get(key2))
-    }
-
-    #[inline]
-    pub fn get_mut<Q1, Q2>(&mut self, key1: &Q1, key2: &Q2) -> Option<&mut V>
-    where
-        K1: Borrow<Q1>,
-        K2: Borrow<Q2>,
-        Q1: Eq + Hash + ?Sized,
-        Q2: Eq + Hash + ?Sized,
-    {
-        self.data.get_mut(key1).and_then(|m| m.get_mut(key2))
     }
 
     #[inline]
@@ -643,21 +623,6 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
     }
 
     #[inline]
-    pub fn get_mut<Q1, Q2, Q3>(&mut self, key1: &Q1, key2: &Q2, key3: &Q3) -> Option<&mut V>
-    where
-        K1: Borrow<Q1>,
-        K2: Borrow<Q2>,
-        K3: Borrow<Q3>,
-        Q1: Eq + Hash + ?Sized,
-        Q2: Eq + Hash + ?Sized,
-        Q3: Eq + Hash + ?Sized,
-    {
-        self.data
-            .get_mut(key1)
-            .and_then(|m1| m1.get_mut(key2).and_then(|m2| m2.get_mut(key3)))
-    }
-
-    #[inline]
     pub fn contains_key<Q1, Q2, Q3>(&self, key1: &Q1, key2: &Q2, key3: &Q3) -> bool
     where
         K1: Borrow<Q1>,
@@ -752,5 +717,420 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
         let new_state = StateId::gen();
         self.state.set_state(new_state);
         Some(new_state)
+    }
+}
+
+impl<K1, K2, K3, V, It> Extend<(K1, It)> for OnMemorySrc3Args<K1, K2, K3, V>
+where
+    K1: Eq + Hash,
+    K2: Eq + Hash,
+    K3: Eq + Hash,
+    It: IntoIterator<Item = (K2, HashMap<K3, V>)>,
+{
+    fn extend<T: IntoIterator<Item = (K1, It)>>(&mut self, iter: T) {
+        let mut has_modified = false;
+        for (k1, m) in iter {
+            let sub = self.data.entry(k1).or_insert_with(HashMap::new);
+            let orig_len = sub.len();
+            sub.extend(m);
+            has_modified |= orig_len != sub.len();
+        }
+        if has_modified {
+            let new_state = StateId::gen();
+            self.state.set_state(new_state);
+        }
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+
+    use std::collections::HashMap;
+
+    use maplit::hashmap;
+    use rstest::{fixture, rstest};
+
+    use crate::datasrc::Notifier;
+
+    use super::{OnMemorySrc, OnMemorySrc2Args, OnMemorySrc3Args};
+
+    #[fixture]
+    fn src_1arg() -> OnMemorySrc<String, u32> {
+        OnMemorySrc::with_data(
+            "src",
+            hashmap! {
+                "a".to_string() => 1,
+                "b".to_string() => 2,
+                "c".to_string() => 3,
+            },
+        )
+    }
+
+    #[fixture]
+    fn src_2args() -> OnMemorySrc2Args<String, String, u32> {
+        OnMemorySrc2Args::with_data(
+            "src",
+            hashmap! {
+                "a".to_string() => hashmap!{
+                    "x".to_string() => 1,
+                    "y".to_string() => 2,
+                    "z".to_string() => 3,
+                },
+                "b".to_string() => hashmap!{
+                    "x".to_string() => 4,
+                    "y".to_string() => 5,
+                    "z".to_string() => 6,
+                },
+                "c".to_string() => hashmap!{
+                    "x".to_string() => 7,
+                    "y".to_string() => 8,
+                    "z".to_string() => 9,
+                },
+            },
+        )
+    }
+
+    #[fixture]
+    fn src_3args() -> OnMemorySrc3Args<String, String, String, u32> {
+        OnMemorySrc3Args::with_data(
+            "src",
+            hashmap! {
+                "a".to_string() => hashmap!{
+                    "x".to_string() => hashmap!{
+                        "i".to_string() => 1,
+                        "j".to_string() => 2,
+                        "k".to_string() => 3,
+                    },
+                    "y".to_string() => hashmap!{
+                        "i".to_string() => 4,
+                        "j".to_string() => 5,
+                        "k".to_string() => 6,
+                    },
+                    "z".to_string() => hashmap!{
+                        "i".to_string() => 7,
+                        "j".to_string() => 8,
+                        "k".to_string() => 9,
+                    },
+                },
+                "b".to_string() => hashmap!{
+                    "x".to_string() => hashmap!{
+                        "i".to_string() => 10,
+                        "j".to_string() => 11,
+                        "k".to_string() => 12,
+                    },
+                    "y".to_string() => hashmap!{
+                        "i".to_string() => 13,
+                        "j".to_string() => 14,
+                        "k".to_string() => 15,
+                    },
+                    "z".to_string() => hashmap!{
+                        "i".to_string() => 16,
+                        "j".to_string() => 17,
+                        "k".to_string() => 18,
+                    },
+                },
+                "c".to_string() => hashmap!{
+                    "x".to_string() => hashmap!{
+                        "i".to_string() => 19,
+                        "j".to_string() => 20,
+                        "k".to_string() => 21,
+                    },
+                    "y".to_string() => hashmap!{
+                        "i".to_string() => 22,
+                        "j".to_string() => 23,
+                        "k".to_string() => 24,
+                    },
+                    "z".to_string() => hashmap!{
+                        "i".to_string() => 25,
+                        "j".to_string() => 26,
+                        "k".to_string() => 27,
+                    },
+                },
+            },
+        )
+    }
+
+    #[rstest]
+    fn test_1arg_get(src_1arg: OnMemorySrc<String, u32>) {
+        let state = src_1arg.state();
+        assert_eq!(src_1arg.get("a"), Some(&1));
+        assert_eq!(state, src_1arg.state());
+        assert_eq!(src_1arg.get("b"), Some(&2));
+        assert_eq!(state, src_1arg.state());
+        assert_eq!(src_1arg.get("c"), Some(&3));
+        assert_eq!(state, src_1arg.state());
+        assert_eq!(src_1arg.get("d"), None);
+        assert_eq!(src_1arg.state(), state);
+    }
+
+    #[rstest]
+    fn test_1arg_contains_key(src_1arg: OnMemorySrc<String, u32>) {
+        let state = src_1arg.state();
+        assert_eq!(src_1arg.contains_key("a"), true);
+        assert_eq!(state, src_1arg.state());
+        assert_eq!(src_1arg.contains_key("b"), true);
+        assert_eq!(state, src_1arg.state());
+        assert_eq!(src_1arg.contains_key("c"), true);
+        assert_eq!(state, src_1arg.state());
+        assert_eq!(src_1arg.contains_key("d"), false);
+        assert_eq!(state, src_1arg.state());
+    }
+
+    #[rstest]
+    fn test_1arg_is_empty(src_1arg: OnMemorySrc<String, u32>) {
+        let state = src_1arg.state();
+        assert_eq!(src_1arg.is_empty(), false);
+        assert_eq!(state, src_1arg.state());
+        let mut src = OnMemorySrc::new("src");
+        let state = src.state();
+        assert_eq!(src.is_empty(), true);
+        assert_eq!(state, src.state());
+        src.insert("a".to_string(), 1);
+        assert_eq!(src.is_empty(), false);
+        assert_ne!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_1arg_retain(src_1arg: OnMemorySrc<String, u32>) {
+        let mut src = src_1arg;
+        let state = src.state();
+        let new_state = src.retain(|k, v| k == "a" || *v == 3);
+        assert_eq!(new_state, Some(src.state()));
+        assert_ne!(new_state, Some(state));
+        assert_eq!(src.get("a"), Some(&1));
+        assert_eq!(src.get("b"), None);
+        assert_eq!(src.get("c"), Some(&3));
+
+        // no change
+        let state = src.state();
+        let new_state = src.retain(|_, _| true);
+        assert_eq!(new_state, None);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_1arg_clear(src_1arg: OnMemorySrc<String, u32>) {
+        let mut src = src_1arg;
+        let state = src.state();
+        let new_state = src.clear();
+        assert_eq!(new_state, Some(src.state()));
+        assert_ne!(new_state, Some(state));
+        assert_eq!(src.is_empty(), true);
+
+        // no change
+        let state = src.state();
+        let new_state = src.clear();
+        assert_eq!(new_state, None);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_1arg_extend(src_1arg: OnMemorySrc<String, u32>) {
+        let mut src = src_1arg;
+        let state = src.state();
+        src.extend(vec![("d".to_string(), 4), ("e".to_string(), 5)]);
+        assert_eq!(src.get("d"), Some(&4));
+        assert_eq!(src.get("e"), Some(&5));
+        assert_ne!(src.state(), state);
+
+        // no change
+        let state = src.state();
+        src.extend(vec![]);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_2args_get(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let state = src_2args.state();
+        assert_eq!(src_2args.get("a", "x"), Some(&1));
+        assert_eq!(state, src_2args.state());
+        assert_eq!(src_2args.get("b", "y"), Some(&5));
+        assert_eq!(state, src_2args.state());
+        assert_eq!(src_2args.get("c", "z"), Some(&9));
+        assert_eq!(state, src_2args.state());
+        assert_eq!(src_2args.get("d", "z"), None);
+        assert_eq!(src_2args.state(), state);
+    }
+
+    #[rstest]
+    fn test_2args_contains_key(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let state = src_2args.state();
+        assert_eq!(src_2args.contains_key("a", "x"), true);
+        assert_eq!(state, src_2args.state());
+        assert_eq!(src_2args.contains_key("b", "y"), true);
+        assert_eq!(state, src_2args.state());
+        assert_eq!(src_2args.contains_key("c", "z"), true);
+        assert_eq!(state, src_2args.state());
+        assert_eq!(src_2args.contains_key("d", "z"), false);
+        assert_eq!(src_2args.state(), state);
+    }
+
+    #[rstest]
+    fn test_2args_is_empty(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let state = src_2args.state();
+        assert_eq!(src_2args.is_empty(), false);
+        assert_eq!(state, src_2args.state());
+        let mut src = OnMemorySrc2Args::new("src");
+        let state = src.state();
+        assert_eq!(src.is_empty(), true);
+        assert_eq!(state, src.state());
+        src.insert("a".to_string(), "x".to_string(), 1);
+        assert_eq!(src.is_empty(), false);
+        assert_ne!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_2args_retain(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let mut src = src_2args;
+        let state = src.state();
+        let new_state = src.retain(|k1, k2, _| k1 == "a" || k2 == "z");
+        assert_eq!(new_state, Some(src.state()));
+        assert_ne!(new_state, Some(state));
+        assert_eq!(src.get("a", "x"), Some(&1));
+        assert_eq!(src.get("b", "y"), None);
+        assert_eq!(src.get("c", "z"), Some(&9));
+
+        // no change
+        let state = src.state();
+        let new_state = src.retain(|_, _, _| true);
+        assert_eq!(new_state, None);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_2args_clear(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let mut src = src_2args;
+        let state = src.state();
+        let new_state = src.clear();
+        assert_eq!(new_state, Some(src.state()));
+        assert_ne!(new_state, Some(state));
+        assert_eq!(src.is_empty(), true);
+
+        // no change
+        let state = src.state();
+        let new_state = src.clear();
+        assert_eq!(new_state, None);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_2args_extend(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let mut src = src_2args;
+        let state = src.state();
+        src.extend(vec![
+            ("d".to_string(), hashmap! {"x".to_string() => 10}),
+            ("e".to_string(), hashmap! {"y".to_string() => 11}),
+        ]);
+        assert_eq!(src.get("d", "x"), Some(&10));
+        assert_eq!(src.get("e", "y"), Some(&11));
+        assert_ne!(src.state(), state);
+
+        // no change
+        let state = src.state();
+        src.extend(HashMap::<String, HashMap<String, u32>>::default());
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_3args_get(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let state = src_3args.state();
+        assert_eq!(src_3args.get("a", "x", "i"), Some(&1));
+        assert_eq!(state, src_3args.state());
+        assert_eq!(src_3args.get("b", "y", "j"), Some(&14));
+        assert_eq!(state, src_3args.state());
+        assert_eq!(src_3args.get("c", "z", "k"), Some(&27));
+        assert_eq!(state, src_3args.state());
+        assert_eq!(src_3args.get("d", "z", "k"), None);
+        assert_eq!(src_3args.state(), state);
+    }
+
+    #[rstest]
+    fn test_3args_contains_key(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let state = src_3args.state();
+        assert_eq!(src_3args.contains_key("a", "x", "i"), true);
+        assert_eq!(state, src_3args.state());
+        assert_eq!(src_3args.contains_key("b", "y", "j"), true);
+        assert_eq!(state, src_3args.state());
+        assert_eq!(src_3args.contains_key("c", "z", "k"), true);
+        assert_eq!(state, src_3args.state());
+        assert_eq!(src_3args.contains_key("d", "z", "k"), false);
+        assert_eq!(src_3args.state(), state);
+    }
+
+    #[rstest]
+    fn test_3args_is_empty(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let state = src_3args.state();
+        assert_eq!(src_3args.is_empty(), false);
+        assert_eq!(state, src_3args.state());
+        let mut src = OnMemorySrc3Args::new("src");
+        let state = src.state();
+        assert_eq!(src.is_empty(), true);
+        assert_eq!(state, src.state());
+        src.insert("a".to_string(), "x".to_string(), "i".to_string(), 1);
+        assert_eq!(src.is_empty(), false);
+        assert_ne!(state, src.state());
+    }
+
+    #[rstest]
+    fn test_3args_retain(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let mut src = src_3args;
+        let state = src.state();
+        let new_state = src.retain(|k1, _, k3, _| k1 == "a" || k3 == "j");
+        assert_eq!(new_state, Some(src.state()));
+        assert_ne!(new_state, Some(state));
+        assert_eq!(src.get("a", "x", "i"), Some(&1));
+        assert_eq!(src.get("b", "y", "j"), Some(&14));
+        assert_eq!(src.get("c", "z", "k"), None);
+
+        // no change
+        let state = src.state();
+        let new_state = src.retain(|_, _, _, _| true);
+        assert_eq!(new_state, None);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_3args_clear(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let mut src = src_3args;
+        let state = src.state();
+        let new_state = src.clear();
+        assert_eq!(new_state, Some(src.state()));
+        assert_ne!(new_state, Some(state));
+        assert_eq!(src.is_empty(), true);
+
+        // no change
+        let state = src.state();
+        let new_state = src.clear();
+        assert_eq!(new_state, None);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_3args_extend(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let mut src = src_3args;
+        let state = src.state();
+        src.extend(vec![
+            (
+                "d".to_string(),
+                hashmap! {
+                    "x".to_string() => hashmap!{"i".to_string() => 10}
+                },
+            ),
+            (
+                "e".to_string(),
+                hashmap! {
+                    "y".to_string() => hashmap!{"j".to_string() => 11}
+                },
+            ),
+        ]);
+        assert_eq!(src.get("d", "x", "i"), Some(&10));
+        assert_eq!(src.get("e", "y", "j"), Some(&11));
+        assert_ne!(src.state(), state);
+
+        // no change
+        let state = src.state();
+        src.extend(HashMap::<String, HashMap<String, HashMap<String, u32>>>::default());
+        assert_eq!(src.state(), state);
     }
 }

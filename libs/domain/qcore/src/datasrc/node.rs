@@ -665,4 +665,30 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_stateid_bitxor_assign() {
+        let id1 = super::StateId(Uuid::from_u128(u128::MAX));
+        let id2 = super::StateId(Uuid::from_u128(u128::MIN));
+        let id3 = super::StateId(Uuid::from_u128(u128::MAX / 2));
+
+        for lhs in &[id1, id2, id3] {
+            {
+                // self is inverse of itself
+                let mut lhs = *lhs;
+                lhs ^= lhs;
+                assert_eq!(lhs, super::StateId(Uuid::from_u128(0)));
+            }
+
+            for rhs in &[id1, id2, id3] {
+                let mut lhs = *lhs;
+                let orig = lhs;
+                lhs ^= rhs;
+                assert_eq!(
+                    lhs.uuid().as_u128(),
+                    (orig.uuid().as_u128() ^ rhs.uuid().as_u128())
+                );
+            }
+        }
+    }
 }
