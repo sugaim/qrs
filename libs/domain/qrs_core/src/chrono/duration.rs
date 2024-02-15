@@ -313,12 +313,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_days(count as i64);
+    ///    let qrs_core_obj = Duration::with_days(count as i64);
     ///    let chrono_obj = chrono::Duration::days(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -330,12 +330,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_weeks(count as i64);
+    ///    let qrs_core_obj = Duration::with_weeks(count as i64);
     ///    let chrono_obj = chrono::Duration::weeks(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -347,12 +347,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_hours(count as i64);
+    ///    let qrs_core_obj = Duration::with_hours(count as i64);
     ///    let chrono_obj = chrono::Duration::hours(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -364,12 +364,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_mins(count as i64);
+    ///    let qrs_core_obj = Duration::with_mins(count as i64);
     ///    let chrono_obj = chrono::Duration::minutes(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -381,12 +381,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_secs(count as i64);
+    ///    let qrs_core_obj = Duration::with_secs(count as i64);
     ///    let chrono_obj = chrono::Duration::seconds(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -398,12 +398,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_millsecs(count as i64);
+    ///    let qrs_core_obj = Duration::with_millsecs(count as i64);
     ///    let chrono_obj = chrono::Duration::milliseconds(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -415,12 +415,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_microsecs(count as i64);
+    ///    let qrs_core_obj = Duration::with_microsecs(count as i64);
     ///    let chrono_obj = chrono::Duration::microseconds(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -432,12 +432,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qcore_obj = Duration::with_nanosecs(count as i64);
+    ///    let qrs_core_obj = Duration::with_nanosecs(count as i64);
     ///    let chrono_obj = chrono::Duration::nanoseconds(count as i64);
-    ///    assert_eq!(qcore_obj, Duration::from(chrono_obj));
+    ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
@@ -454,13 +454,13 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
     ///
-    ///     assert_eq!(qcore_obj.as_chrono(), &chrono_obj);
+    ///     assert_eq!(qrs_core_obj.as_chrono(), &chrono_obj);
     /// }
     /// ```
     #[inline]
@@ -472,13 +472,13 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
     ///
-    ///     assert_eq!(qcore_obj.days(), chrono_obj.num_days());
+    ///     assert_eq!(qrs_core_obj.days(), chrono_obj.num_days());
     /// }
     /// ```
     #[inline]
@@ -490,12 +490,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.hours(), chrono_obj.num_hours());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.hours(), chrono_obj.num_hours());
     /// }
     /// ```
     #[inline]
@@ -507,12 +507,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.mins(), chrono_obj.num_minutes());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.mins(), chrono_obj.num_minutes());
     /// }
     /// ```
     #[inline]
@@ -524,12 +524,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.secs(), chrono_obj.num_seconds());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.secs(), chrono_obj.num_seconds());
     /// }
     /// ```
     #[inline]
@@ -541,12 +541,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.millsecs(), chrono_obj.num_milliseconds());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.millsecs(), chrono_obj.num_milliseconds());
     /// }
     /// ```
     #[inline]
@@ -558,12 +558,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.microsecs(), chrono_obj.num_microseconds());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.microsecs(), chrono_obj.num_microseconds());
     /// }
     /// ```
     #[inline]
@@ -575,12 +575,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.nanosecs(), chrono_obj.num_nanoseconds());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.nanosecs(), chrono_obj.num_nanoseconds());
     /// }
     /// ```
     #[inline]
@@ -592,12 +592,12 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::Duration;
+    /// use qrs_core::chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
-    ///     let qcore_obj = Duration::from(chrono_obj);
-    ///     assert_eq!(qcore_obj.subsec_nanos(), chrono_obj.subsec_nanos());
+    ///     let qrs_core_obj = Duration::from(chrono_obj);
+    ///     assert_eq!(qrs_core_obj.subsec_nanos(), chrono_obj.subsec_nanos());
     /// }
     /// ```
     #[inline]
@@ -849,12 +849,12 @@ mod tests {
     fn test_conversion() {
         // chrono -> qrs
         let chrono_obj = chrono::Duration::days(1);
-        let qcore_obj = Duration::from(chrono_obj);
-        assert_eq!(qcore_obj, Duration::with_days(1));
+        let qrs_core_obj = Duration::from(chrono_obj);
+        assert_eq!(qrs_core_obj, Duration::with_days(1));
 
         // qrs -> chrono
-        let qcore_obj = Duration::with_days(1);
-        let chrono_obj: chrono::Duration = qcore_obj.into();
+        let qrs_core_obj = Duration::with_days(1);
+        let chrono_obj: chrono::Duration = qrs_core_obj.into();
         assert_eq!(chrono_obj, chrono::Duration::days(1));
     }
 

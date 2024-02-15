@@ -15,14 +15,14 @@ pub fn gen_schema() -> anyhow::Result<()> {
         dir
     };
 
-    // qcore
+    // qrs_core
     {
         let mut dir = root_dir.clone();
-        dir.push("qcore");
+        dir.push("qrs_core");
         std::fs::create_dir_all(&dir)?;
-        gen_schema_single::<qcore::chrono::Calendar>(&dir)?;
-        gen_schema_single::<qcore::chrono::CalendarSymbol>(&dir)?;
-        gen_schema_single::<qcore::chrono::DateTime<chrono::FixedOffset>>(&dir)?;
+        gen_schema_single::<qrs_core::chrono::Calendar>(&dir)?;
+        gen_schema_single::<qrs_core::chrono::CalendarSymbol>(&dir)?;
+        gen_schema_single::<qrs_core::chrono::DateTime<chrono::FixedOffset>>(&dir)?;
     }
     Ok(())
 }
@@ -80,13 +80,13 @@ mod tests {
             dir
         };
 
-        // qcore
+        // qrs_core
         {
             let mut dir = root_dir.clone();
-            dir.push("qcore");
-            check_same_schema::<qcore::chrono::Calendar>(&dir);
-            check_same_schema::<qcore::chrono::CalendarSymbol>(&dir);
-            check_same_schema::<qcore::chrono::DateTime<chrono::FixedOffset>>(&dir);
+            dir.push("qrs_core");
+            check_same_schema::<qrs_core::chrono::Calendar>(&dir);
+            check_same_schema::<qrs_core::chrono::CalendarSymbol>(&dir);
+            check_same_schema::<qrs_core::chrono::DateTime<chrono::FixedOffset>>(&dir);
         }
     }
 }

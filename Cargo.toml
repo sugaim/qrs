@@ -7,9 +7,9 @@ exclude = ["scripts/**"]
 [workspace]
 resolver = "2"
 members = [
-    "libs/domain/qcore",
-    "libs/domain/qcore/qcore_derive",
-    "scripts/qrs-scripts",
+    "libs/domain/qrs_core",
+    "libs/domain/qrs_core/qrs_core_derive",
+    "scripts/qrs_scripts",
 ]
 
 [workspace.dependencies]
@@ -46,4 +46,4 @@ uuid = { version = "1.7.0", features = ["v4", "serde"] }
 quote = { version = "1.0.35" }
 
 # internal
-qcore = { path = "libs/domain/qcore" }
+qrs_core = { path = "libs/domain/qrs_core" }

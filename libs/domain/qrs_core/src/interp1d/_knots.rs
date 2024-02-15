@@ -58,7 +58,7 @@ where
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         format!(
-            "qcore::interp1d::Knots<{}, {}>",
+            "qrs_core::interp1d::Knots<{}, {}>",
             G::schema_id(),
             V::schema_id()
         )
@@ -140,7 +140,7 @@ impl<G: PartialOrd, V> Knots<G, V> {
     ///
     /// # Examples
     /// ```ignore
-    /// use qcore::interp1d::lerp::Knots;
+    /// use qrs_core::interp1d::lerp::Knots;
     ///
     /// let knots = Knots::new(vec![0, 10, 20], vec![0, 1, 2]).unwrap();
     ///

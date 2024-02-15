@@ -19,12 +19,12 @@ use super::{DestructibleInterp1d, Interp1d, Interp1dBuilder, _knots::Knots};
 ///
 /// # Example
 /// ```
-/// use qcore::interp1d::Interp1d;
+/// use qrs_core::interp1d::Interp1d;
 ///
 /// let grids = vec![0.0, 1.0, 2.0];
 /// let values = vec![0.0, 1.0, 0.0];
 ///
-/// let interp = qcore::interp1d::Lerp1d::new(grids, values).unwrap();
+/// let interp = qrs_core::interp1d::Lerp1d::new(grids, values).unwrap();
 ///
 /// assert_eq!(interp.interp(&-0.5), -0.5);
 /// assert_eq!(interp.interp(&0.5), 0.5);

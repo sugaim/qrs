@@ -71,7 +71,7 @@ impl<Tz: TimeZone> JsonSchema for DateTime<Tz> {
         "DateTime".to_string()
     }
     fn schema_id() -> Cow<'static, str> {
-        Cow::Borrowed("qcore::chrono::DateTime")
+        Cow::Borrowed("qrs_core::chrono::DateTime")
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut res = <chrono::DateTime<Tz> as JsonSchema>::json_schema(gen).into_object();
@@ -98,7 +98,7 @@ where
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -291,7 +291,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -308,7 +308,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -323,7 +323,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -338,7 +338,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -353,7 +353,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -368,7 +368,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -385,7 +385,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -400,7 +400,7 @@ impl<Tz: TimeZone> DateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::DateTime;
+    /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();

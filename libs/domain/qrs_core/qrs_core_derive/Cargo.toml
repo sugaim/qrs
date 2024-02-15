@@ -1,5 +1,5 @@
 [package]
-name = "qcore_derive"
+name = "qrs_core_derive"
 version.workspace = true
 edition.workspace = true
 

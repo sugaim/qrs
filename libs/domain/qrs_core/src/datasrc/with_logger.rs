@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex, Weak};
 
 use maplit::btreeset;
-use qcore_derive::{Listener, Node};
+use qrs_core_derive::{Listener, Node};
 
 use super::{
     _private::_UnaryPassThroughNode, node::DataSrc2Args, snapshot::TakeSnapshot3Args, DataSrc,

@@ -64,8 +64,8 @@ impl From<CalendarSymbol> for CalendarSymVariant {
 ///
 /// # Examples
 /// ```
-/// use qcore::chrono::CalendarSymbol;
-/// use qcore::chrono::CalendarSymVariant;
+/// use qrs_core::chrono::CalendarSymbol;
+/// use qrs_core::chrono::CalendarSymVariant;
 ///
 /// let sym = CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap();
 /// match sym.dispatch() {
@@ -140,7 +140,7 @@ impl JsonSchema for CalendarSymbol {
         "CalendarSymbol".to_owned()
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        "qcore::chrono::CalendarSymbol".into()
+        "qrs_core::chrono::CalendarSymbol".into()
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut sch = <String as JsonSchema>::json_schema(gen).into_object();
@@ -220,8 +220,8 @@ impl CalendarSymbol {
     ///
     /// # Examples
     /// ```
-    /// use qcore::chrono::CalendarSymbol;
-    /// use qcore::chrono::CalendarSymVariant;
+    /// use qrs_core::chrono::CalendarSymbol;
+    /// use qrs_core::chrono::CalendarSymVariant;
     ///
     /// let sym = CalendarSymbol::of_single("TK");
     /// assert!(sym.is_ok());
@@ -323,7 +323,7 @@ impl CalendarSymbol {
     /// # Examples
     /// ```
     /// use std::collections::HashSet;
-    /// use qcore::chrono::CalendarSymbol;
+    /// use qrs_core::chrono::CalendarSymbol;
     ///
     /// let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
     /// let mut set = HashSet::new();

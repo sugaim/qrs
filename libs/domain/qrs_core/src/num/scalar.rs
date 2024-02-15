@@ -9,7 +9,7 @@ use super::{Exp, Log};
 ///
 /// # Example
 /// ```
-/// use qcore::num::Arithmetic;
+/// use qrs_core::num::Arithmetic;
 /// use static_assertions::assert_impl_all;
 ///
 /// // integer types
@@ -80,7 +80,7 @@ impl<T: num::Float + Arithmetic> FloatBased for num::Complex<T> {
 ///
 /// # Example
 /// ```
-/// use qcore::num::Scalar;
+/// use qrs_core::num::Scalar;
 /// use static_assertions::assert_impl_all;
 ///
 /// assert_impl_all!(f32: Scalar);

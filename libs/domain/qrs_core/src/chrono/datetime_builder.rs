@@ -4,11 +4,11 @@ use chrono::{NaiveDate, NaiveTime, TimeZone};
 // DateTimeBuilder
 //
 
-/// A builder for creating a `qcore::chrono::DateTime`.
+/// A builder for creating a `qrs_core::chrono::DateTime`.
 ///
 /// # Example
 /// ```
-/// use qcore::chrono::DateTimeBuilder;
+/// use qrs_core::chrono::DateTimeBuilder;
 ///
 /// let datetime = DateTimeBuilder::new()
 ///     .with_ymd(2021, 1, 1).unwrap()
@@ -57,7 +57,7 @@ impl<D, Tz> DateTimeBuilder<D, (), Tz> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -86,7 +86,7 @@ impl<D, Tz> DateTimeBuilder<D, (), Tz> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -122,7 +122,7 @@ impl<D, Tz> DateTimeBuilder<D, (), Tz> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -161,7 +161,7 @@ impl<T, Tz> DateTimeBuilder<(), T, Tz> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_date(&chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap())
@@ -190,7 +190,7 @@ impl<T, Tz> DateTimeBuilder<(), T, Tz> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -225,7 +225,7 @@ impl<D, T> DateTimeBuilder<D, T, ()> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -252,7 +252,7 @@ impl<D, T> DateTimeBuilder<D, T, ()> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -285,7 +285,7 @@ impl<D, T> DateTimeBuilder<D, T, ()> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()
@@ -310,7 +310,7 @@ impl<Tz: TimeZone> DateTimeBuilder<NaiveDate, NaiveTime, Tz> {
     ///
     /// # Example
     /// ```
-    /// use qcore::chrono::DateTimeBuilder;
+    /// use qrs_core::chrono::DateTimeBuilder;
     ///
     /// let datetime = DateTimeBuilder::new()
     ///     .with_ymd(2021, 1, 1).unwrap()

@@ -8,7 +8,7 @@ use std::{
 };
 
 use maplit::btreeset;
-use qcore_derive::{Listener, Node};
+use qrs_core_derive::{Listener, Node};
 
 use crate::{
     chrono::CalendarSymVariant,
@@ -183,7 +183,7 @@ mod tests {
     };
 
     use chrono::NaiveDate;
-    use qcore_derive::{Node, Notifier};
+    use qrs_core_derive::{Node, Notifier};
     use rstest::{fixture, rstest};
 
     use crate::{
