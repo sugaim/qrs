@@ -3,7 +3,7 @@ use core::panic;
 use either::Either;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse::Parser, parse_quote, punctuated::Punctuated, Attribute, Data, DeriveInput, Fields, Token,
 };
@@ -38,10 +38,11 @@ pub fn derive_notifier(input: TokenStream) -> TokenStream {
             // tuple
             match &s.fields {
                 Fields::Unnamed(fs) => {
-                    if fs.unnamed.len() <= *n as usize {
+                    let n = *n as usize;
+                    if fs.unnamed.len() <= n {
                         panic!("field index is out of range");
                     }
-                    (&fs.unnamed[*n as usize], quote!(#n))
+                    (&fs.unnamed[n], syn::Index::from(n).into_token_stream())
                 }
                 _ => panic!("field index is specified but the struct is not tuple"),
             }
@@ -73,6 +74,11 @@ pub fn derive_notifier(input: TokenStream) -> TokenStream {
             }
 
             #[inline]
+            fn state(&self) -> #root ::datasrc::StateId {
+                self. #field_name .state()
+            }
+
+            #[inline]
             fn tree(&self) -> #root ::datasrc::Tree {
                 self. #field_name .tree()
             }
@@ -81,9 +87,9 @@ pub fn derive_notifier(input: TokenStream) -> TokenStream {
             fn accept_listener(
                 &mut self,
                 subsc: std::sync::Weak<std::sync::Mutex<dyn #root ::datasrc::Listener>>
-            ) -> #root ::datasrc::StateId
+            )
             {
-                self. #field_name .accept_listener(subsc)
+                self. #field_name .accept_listener(subsc);
             }
 
             #[inline]

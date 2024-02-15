@@ -29,8 +29,8 @@ impl _UnaryPassThroughNode {
             src_id: src.id(),
             self_state,
         }));
-        let subsc = Arc::downgrade(&res);
-        let state = src.accept_listener(subsc) ^ self_state;
+        src.accept_listener(Arc::downgrade(&res) as _);
+        let state = src.state() ^ self_state;
         res.lock().unwrap().info.set_state(state);
         res
     }

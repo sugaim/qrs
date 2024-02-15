@@ -63,13 +63,18 @@ impl<K: 'static + Send + Sync, V: 'static + Send + Sync> Notifier for OnMemorySr
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.state.state()
+    }
+
+    #[inline]
     fn tree(&self) -> Tree {
         self.state.make_tree_as_leaf()
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.state.accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.state.accept_listener(subsc);
     }
 
     #[inline]
@@ -87,10 +92,10 @@ where
     type Output = V;
     type Err = anyhow::Error;
 
-    fn req(&self, key: &K) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key: &K) -> Result<V, Self::Err> {
         self.data
             .get(key)
-            .map(|v| (self.state.state(), v.clone()))
+            .map(|v| v.clone())
             .ok_or_else(|| anyhow::anyhow!("key not found"))
     }
 }
@@ -263,13 +268,18 @@ where
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.state.state()
+    }
+
+    #[inline]
     fn tree(&self) -> Tree {
         self.state.make_tree_as_leaf()
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.state.accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.state.accept_listener(subsc);
     }
 
     #[inline]
@@ -289,11 +299,11 @@ where
     type Output = V;
     type Err = anyhow::Error;
 
-    fn req(&self, key1: &K1, key2: &K2) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key1: &K1, key2: &K2) -> Result<Self::Output, Self::Err> {
         self.data
             .get(key1)
             .and_then(|m| m.get(key2))
-            .map(|v| (self.state.state(), v.clone()))
+            .map(|v| v.clone())
             .ok_or_else(|| anyhow::anyhow!("key not found"))
     }
 }
@@ -514,13 +524,18 @@ where
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.state.state()
+    }
+
+    #[inline]
     fn tree(&self) -> Tree {
         self.state.make_tree_as_leaf()
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.state.accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.state.accept_listener(subsc);
     }
 
     #[inline]
@@ -542,11 +557,11 @@ where
     type Output = V;
     type Err = anyhow::Error;
 
-    fn req(&self, key1: &K1, key2: &K2, key3: &K3) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key1: &K1, key2: &K2, key3: &K3) -> Result<Self::Output, Self::Err> {
         self.data
             .get(key1)
             .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3)))
-            .map(|v| (self.state.state(), v.clone()))
+            .map(|v| v.clone())
             .ok_or_else(|| anyhow::anyhow!("key not found"))
     }
 }

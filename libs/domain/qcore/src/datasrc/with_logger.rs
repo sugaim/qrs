@@ -67,6 +67,12 @@ impl<S: Notifier, F: 'static + Send + Sync> Notifier for WithLogger<S, F> {
     fn id(&self) -> NodeId {
         self.node.lock().unwrap().id()
     }
+
+    #[inline]
+    fn state(&self) -> StateId {
+        self.node.lock().unwrap().state()
+    }
+
     #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
@@ -80,10 +86,12 @@ impl<S: Notifier, F: 'static + Send + Sync> Notifier for WithLogger<S, F> {
             children: btreeset! {self.src.tree()},
         }
     }
+
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
+
     #[inline]
     fn remove_listener(&mut self, id: &NodeId) {
         self.node.lock().unwrap().remove_subscriber(id);
@@ -93,14 +101,14 @@ impl<S: Notifier, F: 'static + Send + Sync> Notifier for WithLogger<S, F> {
 impl<S, F> DataSrc for WithLogger<S, F>
 where
     S: DataSrc,
-    F: 'static + Send + Sync + Fn(&S::Key, &Result<(StateId, S::Output), S::Err>),
+    F: 'static + Send + Sync + Fn(&S::Key, &Result<S::Output, S::Err>),
 {
     type Key = S::Key;
     type Output = S::Output;
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
         let result = self.src.req(key);
         (self.logger)(key, &result);
         result
@@ -110,7 +118,7 @@ where
 impl<S, F> DataSrc2Args for WithLogger<S, F>
 where
     S: DataSrc2Args,
-    F: 'static + Send + Sync + Fn(&S::Key1, &S::Key2, &Result<(StateId, S::Output), S::Err>),
+    F: 'static + Send + Sync + Fn(&S::Key1, &S::Key2, &Result<S::Output, S::Err>),
 {
     type Key1 = S::Key1;
     type Key2 = S::Key2;
@@ -118,7 +126,7 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key1: &S::Key1, key2: &S::Key2) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key1: &S::Key1, key2: &S::Key2) -> Result<Self::Output, Self::Err> {
         let result = self.src.req(key1, key2);
         (self.logger)(key1, key2, &result);
         result
@@ -128,10 +136,7 @@ where
 impl<S, F> DataSrc3Args for WithLogger<S, F>
 where
     S: DataSrc3Args,
-    F: 'static
-        + Send
-        + Sync
-        + Fn(&S::Key1, &S::Key2, &S::Key3, &Result<(StateId, S::Output), S::Err>),
+    F: 'static + Send + Sync + Fn(&S::Key1, &S::Key2, &S::Key3, &Result<S::Output, S::Err>),
 {
     type Key1 = S::Key1;
     type Key2 = S::Key2;
@@ -145,7 +150,7 @@ where
         key1: &S::Key1,
         key2: &S::Key2,
         key3: &S::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
+    ) -> Result<Self::Output, Self::Err> {
         let result = self.src.req(key1, key2, key3);
         (self.logger)(key1, key2, key3, &result);
         result
@@ -155,7 +160,7 @@ where
 impl<S, F> TakeSnapshot for WithLogger<S, F>
 where
     S: TakeSnapshot,
-    F: 'static + Send + Sync + Clone + Fn(&S::Key, &Result<(StateId, S::Output), S::Err>),
+    F: 'static + Send + Sync + Clone + Fn(&S::Key, &Result<S::Output, S::Err>),
 {
     type SnapShot = WithLogger<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -174,11 +179,7 @@ where
 impl<S, F> TakeSnapshot2Args for WithLogger<S, F>
 where
     S: TakeSnapshot2Args,
-    F: 'static
-        + Send
-        + Sync
-        + Clone
-        + Fn(&S::Key1, &S::Key2, &Result<(StateId, S::Output), S::Err>),
+    F: 'static + Send + Sync + Clone + Fn(&S::Key1, &S::Key2, &Result<S::Output, S::Err>),
 {
     type SnapShot = WithLogger<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -198,11 +199,7 @@ where
 impl<S, F> TakeSnapshot3Args for WithLogger<S, F>
 where
     S: TakeSnapshot3Args,
-    F: 'static
-        + Send
-        + Sync
-        + Clone
-        + Fn(&S::Key1, &S::Key2, &S::Key3, &Result<(StateId, S::Output), S::Err>),
+    F: 'static + Send + Sync + Clone + Fn(&S::Key1, &S::Key2, &S::Key3, &Result<S::Output, S::Err>),
 {
     type SnapShot = WithLogger<S::SnapShot, F>;
     type SnapShotErr = S::SnapShotErr;
@@ -316,7 +313,7 @@ mod tests {
             let src = src_1arg.clone().with_logger("with_logger", move |k, r| {
                 let mut msg = msg.lock().unwrap();
                 match r {
-                    Ok((_, v)) => *msg = format!("[ok] {}: {}", k, v),
+                    Ok(v) => *msg = format!("[ok] {}: {}", k, v),
                     Err(_) => *msg = format!("[ng] {}", k),
                 }
             });
@@ -324,11 +321,11 @@ mod tests {
         };
 
         // ok
-        assert_eq!(src.req(&"a").unwrap().1, 1);
+        assert_eq!(src.req(&"a").unwrap(), 1);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] a: 1");
-        assert_eq!(src.req(&"b").unwrap().1, 2);
+        assert_eq!(src.req(&"b").unwrap(), 2);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] b: 2");
-        assert_eq!(src.req(&"c").unwrap().1, 3);
+        assert_eq!(src.req(&"c").unwrap(), 3);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] c: 3");
 
         // err
@@ -336,10 +333,12 @@ mod tests {
         assert_eq!(reader.lock().unwrap().as_str(), "[ng] d");
 
         // state change
-        let (current_state, current_val) = src.req(&"a").unwrap();
-
+        let current_state = src.state();
+        let current_val = src.req(&"a").unwrap();
         src_1arg.lock().unwrap().insert("a", 100);
-        let (new_state, new_val) = src.req(&"a").unwrap();
+
+        let new_state = src.state();
+        let new_val = src.req(&"a").unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 1);
@@ -356,7 +355,7 @@ mod tests {
             let src = src_2args.clone().with_logger("logger", move |k1, k2, r| {
                 let mut msg = msg.lock().unwrap();
                 match r {
-                    Ok((_, v)) => *msg = format!("[ok] ({}, {}): {}", k1, k2, v),
+                    Ok(v) => *msg = format!("[ok] ({}, {}): {}", k1, k2, v),
                     Err(_) => *msg = format!("[ng] ({}, {})", k1, k2),
                 }
             });
@@ -364,11 +363,11 @@ mod tests {
         };
 
         // ok
-        assert_eq!(src.req(&"a", &"x").unwrap().1, 1);
+        assert_eq!(src.req(&"a", &"x").unwrap(), 1);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x): 1");
-        assert_eq!(src.req(&"b", &"x").unwrap().1, 3);
+        assert_eq!(src.req(&"b", &"x").unwrap(), 3);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x): 3");
-        assert_eq!(src.req(&"c", &"x").unwrap().1, 5);
+        assert_eq!(src.req(&"c", &"x").unwrap(), 5);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x): 5");
 
         // err
@@ -376,10 +375,12 @@ mod tests {
         assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x)");
 
         // state change
-        let (current_state, current_val) = src.req(&"a", &"x").unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a", &"x").unwrap();
 
         src_2args.lock().unwrap().insert("a", "x", 100);
-        let (new_state, new_val) = src.req(&"a", &"x").unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a", &"x").unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 1);
@@ -398,7 +399,7 @@ mod tests {
             let src = src_3args.clone().with_logger("log", move |k1, k2, k3, r| {
                 let mut msg = msg.lock().unwrap();
                 match r {
-                    Ok((_, v)) => *msg = format!("[ok] ({}, {}, {}): {}", k1, k2, k3, v),
+                    Ok(v) => *msg = format!("[ok] ({}, {}, {}): {}", k1, k2, k3, v),
                     Err(_) => *msg = format!("[ng] ({}, {}, {})", k1, k2, k3),
                 }
             });
@@ -406,11 +407,11 @@ mod tests {
         };
 
         // ok
-        assert_eq!(src.req(&"a", &"x", &"i").unwrap().1, 1);
+        assert_eq!(src.req(&"a", &"x", &"i").unwrap(), 1);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (a, x, i): 1");
-        assert_eq!(src.req(&"b", &"x", &"i").unwrap().1, 5);
+        assert_eq!(src.req(&"b", &"x", &"i").unwrap(), 5);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (b, x, i): 5");
-        assert_eq!(src.req(&"c", &"x", &"i").unwrap().1, 9);
+        assert_eq!(src.req(&"c", &"x", &"i").unwrap(), 9);
         assert_eq!(reader.lock().unwrap().as_str(), "[ok] (c, x, i): 9");
 
         // err
@@ -418,10 +419,12 @@ mod tests {
         assert_eq!(reader.lock().unwrap().as_str(), "[ng] (d, x, i)");
 
         // state change
-        let (current_state, current_val) = src.req(&"a", &"x", &"i").unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a", &"x", &"i").unwrap();
 
         src_3args.lock().unwrap().insert("a", "x", "i", 100);
-        let (new_state, new_val) = src.req(&"a", &"x", &"i").unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a", &"x", &"i").unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 1);

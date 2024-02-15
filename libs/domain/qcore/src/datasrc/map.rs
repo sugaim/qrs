@@ -68,6 +68,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -82,8 +87,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
 
     #[inline]
@@ -102,10 +107,8 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &S::Key) -> Result<(StateId, Self::Output), Self::Err> {
-        self.src
-            .req(key)
-            .map(|(_, o)| (self.node.lock().unwrap().state(), (self.f)(o)))
+    fn req(&self, key: &S::Key) -> Result<Self::Output, Self::Err> {
+        self.src.req(key).map(|o| (self.f)(o))
     }
 }
 
@@ -120,13 +123,8 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &Self::Key1,
-        key2: &Self::Key2,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
-        let (_, output) = self.src.req(key1, key2)?;
-        Ok((self.node.lock().unwrap().state(), (self.f)(output)))
+    fn req(&self, key1: &Self::Key1, key2: &Self::Key2) -> Result<Self::Output, Self::Err> {
+        self.src.req(key1, key2).map(|o| (self.f)(o))
     }
 }
 
@@ -147,9 +145,8 @@ where
         key1: &Self::Key1,
         key2: &Self::Key2,
         key3: &Self::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
-        let (_, output) = self.src.req(key1, key2, key3)?;
-        Ok((self.node.lock().unwrap().state(), (self.f)(output)))
+    ) -> Result<Self::Output, Self::Err> {
+        self.src.req(key1, key2, key3).map(|o| (self.f)(o))
     }
 }
 
@@ -280,6 +277,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -294,8 +296,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
 
     #[inline]
@@ -314,11 +316,8 @@ where
     type Err = E;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
-        self.src
-            .req(key)
-            .map_err(|err| (self.f)(err))
-            .map(|(_, o)| (self.node.lock().unwrap().state(), o))
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
+        self.src.req(key).map_err(|err| (self.f)(err))
     }
 }
 
@@ -333,15 +332,8 @@ where
     type Err = E;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &Self::Key1,
-        key2: &Self::Key2,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
-        self.src
-            .req(key1, key2)
-            .map_err(|err| (self.f)(err))
-            .map(|(_, o)| (self.node.lock().unwrap().state(), o))
+    fn req(&self, key1: &Self::Key1, key2: &Self::Key2) -> Result<Self::Output, Self::Err> {
+        self.src.req(key1, key2).map_err(|err| (self.f)(err))
     }
 }
 
@@ -362,11 +354,8 @@ where
         key1: &Self::Key1,
         key2: &Self::Key2,
         key3: &Self::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
-        self.src
-            .req(key1, key2, key3)
-            .map_err(|err| (self.f)(err))
-            .map(|(_, o)| (self.node.lock().unwrap().state(), o))
+    ) -> Result<Self::Output, Self::Err> {
+        self.src.req(key1, key2, key3).map_err(|err| (self.f)(err))
     }
 }
 
@@ -493,6 +482,11 @@ impl<S: Notifier, F: 'static + Send + Sync> Notifier for Convert<S, F> {
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -507,8 +501,8 @@ impl<S: Notifier, F: 'static + Send + Sync> Notifier for Convert<S, F> {
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
 
     #[inline]
@@ -527,9 +521,8 @@ where
     type Err = E;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
-        let base = self.src.req(key).map(|(_, o)| o);
-        (self.f)(key, base).map(|o| (self.node.lock().unwrap().state(), o))
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
+        (self.f)(key, self.src.req(key))
     }
 }
 
@@ -544,13 +537,8 @@ where
     type Err = E;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &Self::Key1,
-        key2: &Self::Key2,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
-        let base = self.src.req(key1, key2).map(|(_, o)| o);
-        (self.f)(key1, key2, base).map(|o| (self.node.lock().unwrap().state(), o))
+    fn req(&self, key1: &Self::Key1, key2: &Self::Key2) -> Result<Self::Output, Self::Err> {
+        (self.f)(key1, key2, self.src.req(key1, key2))
     }
 }
 
@@ -574,9 +562,8 @@ where
         key1: &Self::Key1,
         key2: &Self::Key2,
         key3: &Self::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
-        let base = self.src.req(key1, key2, key3).map(|(_, o)| o);
-        (self.f)(key1, key2, key3, base).map(|o| (self.node.lock().unwrap().state(), o))
+    ) -> Result<Self::Output, Self::Err> {
+        (self.f)(key1, key2, key3, self.src.req(key1, key2, key3))
     }
 }
 
@@ -744,18 +731,20 @@ mod tests {
         let src = src_1arg.clone().map("map", |x| x * 2);
 
         // ok
-        assert_eq!(src.req(&"a".to_owned()).unwrap().1, 2);
-        assert_eq!(src.req(&"b".to_owned()).unwrap().1, 4);
-        assert_eq!(src.req(&"c".to_owned()).unwrap().1, 6);
+        assert_eq!(src.req(&"a".to_owned()).unwrap(), 2);
+        assert_eq!(src.req(&"b".to_owned()).unwrap(), 4);
+        assert_eq!(src.req(&"c".to_owned()).unwrap(), 6);
 
         // err
         assert!(src.req(&"d".to_owned()).is_err());
 
         // state change
-        let (current_state, current_val) = src.req(&"a".to_owned()).unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a".to_owned()).unwrap();
 
         src_1arg.lock().unwrap().insert("a".to_owned(), 100);
-        let (new_state, new_val) = src.req(&"a".to_owned()).unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a".to_owned()).unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 2);
@@ -768,26 +757,28 @@ mod tests {
         let src = src_2args.clone().map("map", |x| x * 2);
 
         // ok
-        assert_eq!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap().1, 2);
-        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap().1, 4);
-        assert_eq!(src.req(&"b".to_owned(), &"x".to_owned()).unwrap().1, 6);
-        assert_eq!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap().1, 8);
-        assert_eq!(src.req(&"c".to_owned(), &"x".to_owned()).unwrap().1, 10);
-        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap().1, 12);
+        assert_eq!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap(), 2);
+        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap(), 4);
+        assert_eq!(src.req(&"b".to_owned(), &"x".to_owned()).unwrap(), 6);
+        assert_eq!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap(), 8);
+        assert_eq!(src.req(&"c".to_owned(), &"x".to_owned()).unwrap(), 10);
+        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap(), 12);
 
         // err
         assert!(src.req(&"d".to_owned(), &"x".to_owned()).is_err());
         assert!(src.req(&"a".to_owned(), &"z".to_owned()).is_err());
 
         // state change
-        let (current_state, current_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
 
         src_2args
             .lock()
             .unwrap()
             .insert("a".to_owned(), "x".to_owned(), 100);
 
-        let (new_state, new_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 2);
@@ -802,74 +793,62 @@ mod tests {
         // ok
         assert_eq!(
             src.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             2
         );
         assert_eq!(
             src.req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             4
         );
         assert_eq!(
             src.req(&"a".to_owned(), &"y".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             6
         );
         assert_eq!(
             src.req(&"a".to_owned(), &"y".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             8
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"x".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             10
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             12
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"y".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             14
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             16
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             18
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             20
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"y".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             22
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"y".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             24
         );
 
@@ -885,7 +864,8 @@ mod tests {
             .is_err());
 
         // state change
-        let (current_state, current_val) = src
+        let current_state = src.state();
+        let current_val = src
             .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
             .unwrap();
 
@@ -894,7 +874,8 @@ mod tests {
             .unwrap()
             .insert("a".to_owned(), "x".to_owned(), "i".to_owned(), 100);
 
-        let (new_state, new_val) = src
+        let new_state = src.state();
+        let new_val = src
             .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
             .unwrap();
 
@@ -909,19 +890,21 @@ mod tests {
         let src = src_1arg.clone().map_err("map", |_| "error".to_owned());
 
         // ok
-        assert_eq!(src.req(&"a".to_owned()).unwrap().1, 1);
-        assert_eq!(src.req(&"b".to_owned()).unwrap().1, 2);
-        assert_eq!(src.req(&"c".to_owned()).unwrap().1, 3);
+        assert_eq!(src.req(&"a".to_owned()).unwrap(), 1);
+        assert_eq!(src.req(&"b".to_owned()).unwrap(), 2);
+        assert_eq!(src.req(&"c".to_owned()).unwrap(), 3);
 
         // err
         assert!(src.req(&"d".to_owned()).is_err());
         assert!(src.req(&"d".to_owned()).unwrap_err() == "error");
 
         // state change
-        let (current_state, current_val) = src.req(&"a".to_owned()).unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a".to_owned()).unwrap();
 
         src_1arg.lock().unwrap().insert("a".to_owned(), 100);
-        let (new_state, new_val) = src.req(&"a".to_owned()).unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a".to_owned()).unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 1);
@@ -934,12 +917,12 @@ mod tests {
         let src = src_2args.clone().map_err("map", |_| "error".to_owned());
 
         // ok
-        assert_eq!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap().1, 1);
-        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap().1, 2);
-        assert_eq!(src.req(&"b".to_owned(), &"x".to_owned()).unwrap().1, 3);
-        assert_eq!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap().1, 4);
-        assert_eq!(src.req(&"c".to_owned(), &"x".to_owned()).unwrap().1, 5);
-        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap().1, 6);
+        assert_eq!(src.req(&"a".to_owned(), &"x".to_owned()).unwrap(), 1);
+        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap(), 2);
+        assert_eq!(src.req(&"b".to_owned(), &"x".to_owned()).unwrap(), 3);
+        assert_eq!(src.req(&"b".to_owned(), &"y".to_owned()).unwrap(), 4);
+        assert_eq!(src.req(&"c".to_owned(), &"x".to_owned()).unwrap(), 5);
+        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap(), 6);
 
         // err
         assert!(src.req(&"d".to_owned(), &"x".to_owned()).is_err());
@@ -948,13 +931,15 @@ mod tests {
         assert!(src.req(&"a".to_owned(), &"z".to_owned()).unwrap_err() == "error");
 
         // state change
-        let (current_state, current_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
 
         src_2args
             .lock()
             .unwrap()
             .insert("a".to_owned(), "x".to_owned(), 100);
-        let (new_state, new_val) = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a".to_owned(), &"x".to_owned()).unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 1);
@@ -969,74 +954,62 @@ mod tests {
         // ok
         assert_eq!(
             src.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             1
         );
         assert_eq!(
             src.req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             2
         );
         assert_eq!(
             src.req(&"a".to_owned(), &"y".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             3
         );
         assert_eq!(
             src.req(&"a".to_owned(), &"y".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             4
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"x".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             5
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             6
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"y".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             7
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"y".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             8
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"x".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             9
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             10
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"y".to_owned(), &"i".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             11
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"y".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             12
         );
 
@@ -1067,7 +1040,8 @@ mod tests {
         );
 
         // state change
-        let (current_state, current_val) = src
+        let current_state = src.state();
+        let current_val = src
             .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
             .unwrap();
 
@@ -1076,7 +1050,8 @@ mod tests {
             .unwrap()
             .insert("a".to_owned(), "x".to_owned(), "i".to_owned(), 100);
 
-        let (new_state, new_val) = src
+        let new_state = src.state();
+        let new_val = src
             .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
             .unwrap();
 
@@ -1100,8 +1075,8 @@ mod tests {
         });
 
         // ok
-        assert_eq!(src.req(&"a".to_owned()).unwrap().1, 1);
-        assert_eq!(src.req(&"b".to_owned()).unwrap().1, 2);
+        assert_eq!(src.req(&"a".to_owned()).unwrap(), 1);
+        assert_eq!(src.req(&"b".to_owned()).unwrap(), 2);
 
         // err
         assert!(src.req(&"c".to_owned()).is_err());
@@ -1111,10 +1086,12 @@ mod tests {
         assert!(src.req(&"d".to_owned()).unwrap_err() == "downstream error");
 
         // state change
-        let (current_state, current_val) = src.req(&"a".to_owned()).unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a".to_owned()).unwrap();
 
         src_1arg.lock().unwrap().insert("a".to_owned(), 100);
-        let (new_state, new_val) = src.req(&"a".to_owned()).unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a".to_owned()).unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 1);
@@ -1140,8 +1117,8 @@ mod tests {
         });
 
         // ok
-        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap().1, 2);
-        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap().1, 6);
+        assert_eq!(src.req(&"a".to_owned(), &"y".to_owned()).unwrap(), 2);
+        assert_eq!(src.req(&"c".to_owned(), &"y".to_owned()).unwrap(), 6);
 
         // err
         assert!(src.req(&"a".to_owned(), &"x".to_owned()).is_err());
@@ -1154,13 +1131,15 @@ mod tests {
         assert!(src.req(&"d".to_owned(), &"x".to_owned()).unwrap_err() == "downstream error");
 
         // state change
-        let (current_state, current_val) = src.req(&"a".to_owned(), &"y".to_owned()).unwrap();
+        let current_state = src.state();
+        let current_val = src.req(&"a".to_owned(), &"y".to_owned()).unwrap();
 
         src_2args
             .lock()
             .unwrap()
             .insert("a".to_owned(), "y".to_owned(), 100);
-        let (new_state, new_val) = src.req(&"a".to_owned(), &"y".to_owned()).unwrap();
+        let new_state = src.state();
+        let new_val = src.req(&"a".to_owned(), &"y".to_owned()).unwrap();
 
         assert_ne!(current_state, new_state);
         assert_eq!(current_val, 2);
@@ -1191,20 +1170,17 @@ mod tests {
         // ok
         assert_eq!(
             src.req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             6
         );
         assert_eq!(
             src.req(&"b".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             12
         );
         assert_eq!(
             src.req(&"c".to_owned(), &"x".to_owned(), &"j".to_owned())
-                .unwrap()
-                .1,
+                .unwrap(),
             -10
         );
 
@@ -1237,7 +1213,8 @@ mod tests {
         );
 
         // state change
-        let (current_state, current_val) = src
+        let current_state = src.state();
+        let current_val = src
             .req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
             .unwrap();
 
@@ -1246,7 +1223,8 @@ mod tests {
             .unwrap()
             .insert("a".to_owned(), "x".to_owned(), "j".to_owned(), 100);
 
-        let (new_state, new_val) = src
+        let new_state = src.state();
+        let new_val = src
             .req(&"a".to_owned(), &"x".to_owned(), &"j".to_owned())
             .unwrap();
 

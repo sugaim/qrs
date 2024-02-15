@@ -70,8 +70,8 @@ impl<S: Notifier> CalendarSrc<S> {
             self_state,
             cache: HashMap::new(),
         }));
-        let subsc = Arc::downgrade(&node);
-        let state = src.accept_listener(subsc) ^ self_state;
+        src.accept_listener(Arc::downgrade(&node) as _);
+        let state = src.state() ^ self_state;
         node.lock().unwrap().info.set_state(state);
         Self { src, node }
     }
@@ -94,6 +94,11 @@ impl<S: Notifier> Notifier for CalendarSrc<S> {
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.node.lock().unwrap().info.state()
+    }
+
+    #[inline]
     fn tree(&self) -> crate::datasrc::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -108,8 +113,8 @@ impl<S: Notifier> Notifier for CalendarSrc<S> {
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.node.lock().unwrap().info.accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().info.accept_listener(subsc);
     }
 
     #[inline]
@@ -123,19 +128,18 @@ impl<S: DataSrc<Key = str, Output = Calendar>> DataSrc for CalendarSrc<S> {
     type Output = Calendar;
     type Err = S::Err;
 
-    fn req(&self, key: &CalendarSymbol) -> Result<(StateId, Self::Output), Self::Err> {
-        let state = self.node.lock().unwrap().info.state();
+    fn req(&self, key: &CalendarSymbol) -> Result<Self::Output, Self::Err> {
         if let Some(calendar) = self.node.lock().unwrap().cache.get(key) {
-            return Ok((state, calendar.clone()));
+            return Ok(calendar.clone());
         }
 
         use CalendarSymVariant::*;
         let cal = match key.dispatch() {
-            Single(s) => self.src.req(s).map(|(_, c)| c)?,
+            Single(s) => self.src.req(s)?,
             AllClosed(syms) | AnyClosed(syms) => {
                 let cals: Vec<Calendar> = syms
                     .iter()
-                    .map(|sym| self.req(sym).map(|(_, c)| c))
+                    .map(|sym| self.req(sym))
                     .collect::<Result<_, _>>()?;
                 match key.dispatch() {
                     AllClosed(_) => Calendar::of_all_closed(cals.iter()),
@@ -146,7 +150,7 @@ impl<S: DataSrc<Key = str, Output = Calendar>> DataSrc for CalendarSrc<S> {
         };
         let mut node = self.node.lock().unwrap();
         node.cache.insert(key.clone(), cal.clone());
-        Ok((state, cal))
+        Ok(cal)
     }
 }
 
@@ -182,22 +186,20 @@ mod tests {
 
     use crate::{
         chrono::{Calendar, CalendarSymbol},
-        datasrc::{DataSrc, Notifier, OnMemorySrc, StateId},
+        datasrc::{DataSrc, Notifier, OnMemorySrc},
     };
 
     #[derive(Debug, Clone, Notifier)]
-    #[notifier(transparent = "internal")]
-    struct MockSrc {
-        internal: OnMemorySrc<String, Calendar>,
-    }
+    #[notifier(transparent = 0)]
+    struct MockSrc(OnMemorySrc<String, Calendar>);
 
     impl DataSrc for MockSrc {
         type Key = str;
         type Output = Calendar;
         type Err = anyhow::Error;
 
-        fn req(&self, key: &str) -> Result<(StateId, Calendar), anyhow::Error> {
-            self.internal.req(&key.to_owned())
+        fn req(&self, key: &str) -> Result<Calendar, anyhow::Error> {
+            self.0.req(&key.to_owned())
         }
     }
 
@@ -247,14 +249,14 @@ mod tests {
                 .build()
                 .unwrap(),
         );
-        MockSrc { internal: src }
+        MockSrc(src)
     }
 
     #[rstest]
     fn test_req(single_src: MockSrc) {
-        let nyk = single_src.req("NYK").unwrap().1;
-        let tky = single_src.req("TKY").unwrap().1;
-        let ldn = single_src.req("LDN").unwrap().1;
+        let nyk = single_src.req("NYK").unwrap();
+        let tky = single_src.req("TKY").unwrap();
+        let ldn = single_src.req("LDN").unwrap();
 
         let nyk = &nyk;
         let tky = &tky;
@@ -264,7 +266,7 @@ mod tests {
 
         // single - ok
         let sym = CalendarSymbol::of_single("NYK").unwrap();
-        let cal = src.req(&sym).unwrap().1;
+        let cal = src.req(&sym).unwrap();
         assert_eq!(nyk, &cal);
 
         // single - err
@@ -273,7 +275,7 @@ mod tests {
 
         // all_closed - ok
         let sym = CalendarSymbol::from_str("NYK&TKY").unwrap();
-        let cal = src.req(&sym).unwrap().1;
+        let cal = src.req(&sym).unwrap();
         assert_eq!(nyk & tky, cal);
 
         // all_closed - err
@@ -282,7 +284,7 @@ mod tests {
 
         // any_closed - ok
         let sym = CalendarSymbol::from_str("NYK|TKY").unwrap();
-        let cal = src.req(&sym).unwrap().1;
+        let cal = src.req(&sym).unwrap();
         assert_eq!(nyk | tky, cal);
 
         // any_closed - err
@@ -291,7 +293,7 @@ mod tests {
 
         // combined - ok
         let sym = CalendarSymbol::from_str("NYK&TKY|LDN").unwrap();
-        let cal = src.req(&sym).unwrap().1;
+        let cal = src.req(&sym).unwrap();
         assert_eq!((nyk & tky) | ldn, cal);
 
         // combined - err
@@ -305,19 +307,13 @@ mod tests {
         let src = super::CalendarSrc::new(single_src.clone());
         let id = src.id();
 
-        let (old, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
+        let current_state = src.state();
 
-        single_src
-            .lock()
-            .unwrap()
-            .internal
-            .remove(&"TKY".to_owned());
-        let (new, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
-        let (cnew, _) = src.req(&CalendarSymbol::of_single("NYK").unwrap()).unwrap();
+        single_src.lock().unwrap().0.remove(&"TKY".to_owned());
+        let new_state = src.state();
 
         // state is changed, but node id is not changed.
-        assert_ne!(old, new);
-        assert_eq!(new, cnew);
+        assert_ne!(current_state, new_state);
         assert_eq!(id, src.id());
     }
 }

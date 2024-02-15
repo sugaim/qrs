@@ -3,7 +3,7 @@ use core::panic;
 use either::Either;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse::Parser, parse_quote, punctuated::Punctuated, Attribute, Data, DeriveInput, Fields, Token,
 };
@@ -41,7 +41,7 @@ pub fn derive_listener(input: TokenStream) -> TokenStream {
                     if fs.unnamed.len() <= *n as usize {
                         panic!("field index is out of range");
                     }
-                    (&fs.unnamed[*n as usize], quote!(#n))
+                    (&fs.unnamed[*n as usize], syn::Index::from(*n as usize).into_token_stream())
                 }
                 _ => panic!("field index is specified but the struct is not tuple"),
             }

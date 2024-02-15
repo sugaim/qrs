@@ -154,6 +154,8 @@ impl<G: RelPos, V: Vector<G::Output>> DestructibleInterp1d for Lerp1d<G, V> {
 mod tests {
     use approx::assert_abs_diff_eq;
 
+    use crate::func1d::Func1d;
+
     use super::*;
 
     #[test]
@@ -228,6 +230,60 @@ mod tests {
         assert_abs_diff_eq!(lerp.der1(&2.), -1., epsilon = eps);
         assert_abs_diff_eq!(lerp.der1(&2.5), -1., epsilon = eps);
         assert_abs_diff_eq!(lerp.der1(&3.), -1., epsilon = eps);
+    }
+
+    #[test]
+    fn test_lerp1d_der01() {
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 3., 2.];
+
+        let lerp = Lerp1d::new(grids, values).unwrap();
+        let eps = 1e-15;
+
+        let x = -1.;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = -0.5;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 0.;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 0.5;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 1.;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 1.5;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 2.;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 2.5;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+
+        let x = 3.;
+        let (der0, der1) = lerp.der01(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
     }
 
     #[test]

@@ -253,13 +253,15 @@ pub trait Notifier: 'static + Send + Sync {
     /// Implementations must ensure that the `NodeId` is immutable.
     fn id(&self) -> NodeId;
 
+    /// Get the `StateId` of this node.
+    fn state(&self) -> StateId;
+
     /// Get the tree structure of the node
     /// Mainly used for debugging
     fn tree(&self) -> Tree;
 
     /// Accept subscriber which subscribes the change of this node.
-    /// Return the state id of this node when the subscriber is accepted.
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId;
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>);
 
     /// Remove subscriber which subscribes the change of this node
     fn remove_listener(&mut self, id: &NodeId);
@@ -272,13 +274,18 @@ impl<P: Notifier> Notifier for Mutex<P> {
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> Tree {
         self.lock().unwrap().tree()
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.lock().unwrap().accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.lock().unwrap().accept_listener(subsc);
     }
 
     #[inline]
@@ -294,13 +301,18 @@ impl<P: Notifier> Notifier for Arc<Mutex<P>> {
     }
 
     #[inline]
+    fn state(&self) -> StateId {
+        self.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> Tree {
         self.lock().unwrap().tree()
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) -> StateId {
-        self.lock().unwrap().accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
+        self.lock().unwrap().accept_listener(subsc);
     }
 
     #[inline]
@@ -358,7 +370,7 @@ pub trait DataSrc: Notifier {
     ///
     /// - `Ok`: when the data is successfully retrieved
     /// - `Err`: when the data is not found or some error occurred
-    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err>;
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err>;
 
     /// Map the output of this data source
     fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
@@ -391,7 +403,7 @@ pub trait DataSrc: Notifier {
     fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
-        L: Fn(&Self::Key, &Result<(StateId, Self::Output), Self::Err>) + 'static,
+        L: Fn(&Self::Key, &Result<Self::Output, Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
     }
@@ -403,7 +415,7 @@ impl<T: DataSrc> DataSrc for Mutex<T> {
     type Err = T::Err;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key)
     }
 }
@@ -414,7 +426,7 @@ impl<T: DataSrc> DataSrc for Arc<Mutex<T>> {
     type Err = T::Err;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key)
     }
 }
@@ -433,11 +445,7 @@ pub trait DataSrc2Args: Notifier {
     ///
     /// - `Ok`: when the data is successfully retrieved
     /// - `Err`: when the data is not found or some error occurred
-    fn req(
-        &self,
-        key1: &Self::Key1,
-        key2: &Self::Key2,
-    ) -> Result<(StateId, Self::Output), Self::Err>;
+    fn req(&self, key1: &Self::Key1, key2: &Self::Key2) -> Result<Self::Output, Self::Err>;
 
     /// Map the output of this data source
     fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
@@ -473,7 +481,7 @@ pub trait DataSrc2Args: Notifier {
     fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
-        L: Fn(&Self::Key1, &Self::Key2, &Result<(StateId, Self::Output), Self::Err>) + 'static,
+        L: Fn(&Self::Key1, &Self::Key2, &Result<Self::Output, Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
     }
@@ -486,11 +494,7 @@ impl<T: DataSrc2Args> DataSrc2Args for Mutex<T> {
     type Err = T::Err;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &Self::Key1,
-        key2: &Self::Key2,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key1: &Self::Key1, key2: &Self::Key2) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key1, key2)
     }
 }
@@ -502,11 +506,7 @@ impl<T: DataSrc2Args> DataSrc2Args for Arc<Mutex<T>> {
     type Err = T::Err;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &Self::Key1,
-        key2: &Self::Key2,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
+    fn req(&self, key1: &Self::Key1, key2: &Self::Key2) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key1, key2)
     }
 }
@@ -531,7 +531,7 @@ pub trait DataSrc3Args: Notifier {
         key1: &Self::Key1,
         key2: &Self::Key2,
         key3: &Self::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err>;
+    ) -> Result<Self::Output, Self::Err>;
 
     /// Map the output of this data source
     fn map<F>(self, desc: impl Into<String>, f: F) -> Map<Self, F>
@@ -572,8 +572,7 @@ pub trait DataSrc3Args: Notifier {
     fn with_logger<L>(self, desc: impl Into<String>, logger: L) -> WithLogger<Self, L>
     where
         Self: Sized,
-        L: Fn(&Self::Key1, &Self::Key2, &Self::Key3, &Result<(StateId, Self::Output), Self::Err>)
-            + 'static,
+        L: Fn(&Self::Key1, &Self::Key2, &Self::Key3, &Result<Self::Output, Self::Err>) + 'static,
     {
         WithLogger::new(desc, self, logger)
     }
@@ -592,7 +591,7 @@ impl<T: DataSrc3Args> DataSrc3Args for Mutex<T> {
         key1: &Self::Key1,
         key2: &Self::Key2,
         key3: &Self::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
+    ) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key1, key2, key3)
     }
 }
@@ -610,7 +609,7 @@ impl<T: DataSrc3Args> DataSrc3Args for Arc<Mutex<T>> {
         key1: &Self::Key1,
         key2: &Self::Key2,
         key3: &Self::Key3,
-    ) -> Result<(StateId, Self::Output), Self::Err> {
+    ) -> Result<Self::Output, Self::Err> {
         self.lock().unwrap().req(key1, key2, key3)
     }
 }

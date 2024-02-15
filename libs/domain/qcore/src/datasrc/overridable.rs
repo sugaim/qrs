@@ -63,8 +63,8 @@ mod _node {
                 layers,
             }));
 
-            let lis = Arc::downgrade(&res);
-            let state = src.accept_listener(lis) ^ self_state;
+            src.accept_listener(Arc::downgrade(&res) as _);
+            let state = src.state() ^ self_state;
             res.lock().unwrap().info.set_state(state);
             res
         }
@@ -86,14 +86,14 @@ mod _node {
 
         /// Get a value from the override layers.
         /// The value is found from the top layer to the bottom layer.
-        pub fn get_from_top<O>(&self, f: impl Fn(&L) -> Option<O>) -> (StateId, Option<O>) {
-            (self.state(), self.layers.iter().rev().find_map(f))
+        pub fn get_from_top<O>(&self, f: impl Fn(&L) -> Option<O>) -> Option<O> {
+            self.layers.iter().rev().find_map(f)
         }
 
         /// Get a value from the override layers.
         /// The value is found from the bottom layer to the top layer.
-        pub fn get_from_bottom<O>(&self, f: impl Fn(&L) -> Option<O>) -> (StateId, Option<O>) {
-            (self.state(), self.layers.iter().find_map(f))
+        pub fn get_from_bottom<O>(&self, f: impl Fn(&L) -> Option<O>) -> Option<O> {
+            self.layers.iter().find_map(f)
         }
 
         /// Pop the top override layer.
@@ -251,6 +251,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> super::StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -265,8 +270,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
 
     #[inline]
@@ -287,12 +292,11 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(super::StateId, Self::Output), Self::Err> {
-        let state = self.node.lock().unwrap().state();
-        if let Some(val) = self.layer.get(key) {
-            return Ok((state, val.clone().into()));
-        }
-        self.src.req(key).map(|(_, v)| (state, v))
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
+        self.layer
+            .get(key)
+            .map(|v| Ok(v.clone().into()))
+            .unwrap_or_else(|| self.src.req(key))
     }
 }
 
@@ -392,6 +396,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> super::StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -406,8 +415,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
-        self.node.lock().unwrap().accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_listener(subsc);
     }
 
     #[inline]
@@ -428,16 +437,13 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(&self, key: &Self::Key) -> Result<(super::StateId, Self::Output), Self::Err> {
-        let (state, val) = self
-            .node
+    fn req(&self, key: &Self::Key) -> Result<Self::Output, Self::Err> {
+        self.node
             .lock()
             .unwrap()
-            .get_from_top(|layer| layer.get(key).cloned());
-        if let Some(val) = val {
-            return Ok((state, val.into()));
-        }
-        self.src.req(key).map(|(_, v)| (state, v))
+            .get_from_top(|layer| layer.get(key).cloned())
+            .map(|v| Ok(v.into()))
+            .unwrap_or_else(|| self.src.req(key))
     }
 }
 
@@ -463,7 +469,6 @@ where
             node.get_from_bottom(|layer| {
                 layer.get_key_value(k).map(|(k, v)| (k.clone(), v.clone()))
             })
-            .1
         });
         Ok(Overriden::new(
             self.node.lock().unwrap().desc(),
@@ -578,6 +583,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> super::StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -592,8 +602,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
 
     #[inline]
@@ -617,16 +627,12 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &S::Key1,
-        key2: &S::Key2,
-    ) -> Result<(super::StateId, Self::Output), Self::Err> {
-        let state = self.node.lock().unwrap().state();
-        if let Some(val) = self.layer.get(key1).and_then(|m| m.get(key2)) {
-            return Ok((state, val.clone().into()));
-        }
-        self.src.req(key1, key2).map(|(_, v)| (state, v))
+    fn req(&self, key1: &S::Key1, key2: &S::Key2) -> Result<Self::Output, Self::Err> {
+        self.layer
+            .get(key1)
+            .and_then(|m| m.get(key2))
+            .map(|v| Ok(v.clone().into()))
+            .unwrap_or_else(|| self.src.req(key1, key2))
     }
 }
 
@@ -740,6 +746,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> super::StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -754,8 +765,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
-        self.node.lock().unwrap().accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_listener(subsc);
     }
 
     #[inline]
@@ -779,20 +790,13 @@ where
     type Err = S::Err;
 
     #[inline]
-    fn req(
-        &self,
-        key1: &S::Key1,
-        key2: &S::Key2,
-    ) -> Result<(super::StateId, Self::Output), Self::Err> {
-        let (state, val) = self
-            .node
+    fn req(&self, key1: &S::Key1, key2: &S::Key2) -> Result<Self::Output, Self::Err> {
+        self.node
             .lock()
             .unwrap()
-            .get_from_top(|layer| layer.get(key1).and_then(|m| m.get(key2).cloned()));
-        if let Some(val) = val {
-            return Ok((state, val.into()));
-        }
-        self.src.req(key1, key2).map(|(_, v)| (state, v))
+            .get_from_top(|layer| layer.get(key1).and_then(|m| m.get(key2).cloned()))
+            .map(|v| Ok(v.into()))
+            .unwrap_or_else(|| self.src.req(key1, key2))
     }
 }
 
@@ -826,7 +830,6 @@ where
                         .map(|(k2, v)| (k1.clone(), k2.clone(), v.clone()))
                 })
             })
-            .1
         });
         let mut layer = HashMap::new();
         for (k1, k2, v) in contained {
@@ -957,6 +960,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> super::StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -971,8 +979,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
-        self.node.lock().unwrap().accept_subscriber(subsc)
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_subscriber(subsc);
     }
 
     #[inline]
@@ -1004,16 +1012,12 @@ where
         key1: &S::Key1,
         key2: &S::Key2,
         key3: &S::Key3,
-    ) -> Result<(super::StateId, Self::Output), Self::Err> {
-        let state = self.node.lock().unwrap().state();
-        if let Some(val) = self
-            .layer
+    ) -> Result<Self::Output, Self::Err> {
+        self.layer
             .get(key1)
-            .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3).cloned()))
-        {
-            return Ok((state, val.clone().into()));
-        }
-        self.src.req(key1, key2, key3).map(|(_, v)| (state, v))
+            .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3)))
+            .map(|v| Ok(v.clone().into()))
+            .unwrap_or_else(|| self.src.req(key1, key2, key3))
     }
 }
 
@@ -1136,6 +1140,11 @@ where
     }
 
     #[inline]
+    fn state(&self) -> super::StateId {
+        self.node.lock().unwrap().state()
+    }
+
+    #[inline]
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
@@ -1150,8 +1159,8 @@ where
     }
 
     #[inline]
-    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) -> super::StateId {
-        self.node.lock().unwrap().accept_listener(subsc)
+    fn accept_listener(&mut self, subsc: std::sync::Weak<Mutex<dyn Listener>>) {
+        self.node.lock().unwrap().accept_listener(subsc);
     }
 
     #[inline]
@@ -1183,16 +1192,17 @@ where
         key1: &S::Key1,
         key2: &S::Key2,
         key3: &S::Key3,
-    ) -> Result<(super::StateId, Self::Output), Self::Err> {
-        let (state, val) = self.node.lock().unwrap().get_from_top(|layer| {
-            layer
-                .get(key1)
-                .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3).cloned()))
-        });
-        if let Some(val) = val {
-            return Ok((state, val.clone().into()));
-        }
-        self.src.req(key1, key2, key3).map(|(_, v)| (state, v))
+    ) -> Result<Self::Output, Self::Err> {
+        self.node
+            .lock()
+            .unwrap()
+            .get_from_top(|layer| {
+                layer
+                    .get(key1)
+                    .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3).cloned()))
+            })
+            .map(|v| Ok(v.into()))
+            .unwrap_or_else(|| self.src.req(key1, key2, key3))
     }
 }
 
@@ -1231,7 +1241,6 @@ where
                     })
                 })
             })
-            .1
         });
         let mut layer = HashMap::new();
         for (k1, k2, k3, v) in contained {
