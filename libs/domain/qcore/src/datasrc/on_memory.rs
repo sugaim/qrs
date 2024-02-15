@@ -155,45 +155,34 @@ impl<K: Eq + Hash, V> OnMemorySrc<K, V> {
         self.data.is_empty()
     }
 
-    pub fn insert(&mut self, key: K, value: V) -> StateId {
+    pub fn insert(&mut self, key: K, value: V) {
         self.data.insert(key, value);
-        let new_state = StateId::gen();
-        self.state.set_state(new_state);
-        new_state
+        self.state.set_state(StateId::gen());
     }
 
-    pub fn remove<Q>(&mut self, key: &Q) -> Option<(StateId, V)>
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
     where
         K: Borrow<Q>,
         Q: Eq + Hash + ?Sized,
     {
         self.data.remove(key).map(|v| {
-            let new_state = StateId::gen();
-            self.state.set_state(new_state);
-            (new_state, v)
+            self.state.set_state(StateId::gen());
+            v
         })
     }
 
-    pub fn retain(&mut self, f: impl FnMut(&K, &mut V) -> bool) -> Option<StateId> {
+    pub fn retain(&mut self, f: impl FnMut(&K, &mut V) -> bool) {
         let orig_len = self.data.len();
         self.data.retain(f);
-        if orig_len == self.data.len() {
-            None
-        } else {
-            let new_state = StateId::gen();
-            self.state.set_state(new_state);
-            Some(new_state)
+        if orig_len != self.data.len() {
+            self.state.set_state(StateId::gen());
         }
     }
 
-    pub fn clear(&mut self) -> Option<StateId> {
-        if self.data.is_empty() {
-            None
-        } else {
+    pub fn clear(&mut self) {
+        if !self.data.is_empty() {
             self.data.clear();
-            let new_state = StateId::gen();
-            self.state.set_state(new_state);
-            Some(new_state)
+            self.state.set_state(StateId::gen());
         }
     }
 }
@@ -372,17 +361,15 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         self.data.is_empty()
     }
 
-    pub fn insert(&mut self, key1: K1, key2: K2, value: V) -> StateId {
+    pub fn insert(&mut self, key1: K1, key2: K2, value: V) {
         self.data
             .entry(key1)
             .or_insert_with(HashMap::new)
             .insert(key2, value);
-        let new_state = StateId::gen();
-        self.state.set_state(new_state);
-        new_state
+        self.state.set_state(StateId::gen());
     }
 
-    pub fn remove<Q1, Q2>(&mut self, key1: &Q1, key2: &Q2) -> Option<(StateId, V)>
+    pub fn remove<Q1, Q2>(&mut self, key1: &Q1, key2: &Q2) -> Option<V>
     where
         K1: Borrow<Q1>,
         K2: Borrow<Q2>,
@@ -393,9 +380,8 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
             None => None,
             Some(m) => {
                 let res = m.remove(key2).map(|v| {
-                    let new_state = StateId::gen();
-                    self.state.set_state(new_state);
-                    (new_state, v)
+                    self.state.set_state(StateId::gen());
+                    v
                 });
                 if m.is_empty() {
                     self.data.remove(key1);
@@ -405,7 +391,7 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         }
     }
 
-    pub fn retain(&mut self, mut f: impl FnMut(&K1, &K2, &mut V) -> bool) -> Option<StateId> {
+    pub fn retain(&mut self, mut f: impl FnMut(&K1, &K2, &mut V) -> bool) {
         let mut has_modified = false;
         self.data.iter_mut().for_each(|(k1, m)| {
             let orig_len = m.len();
@@ -416,22 +402,14 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
         });
         self.data.retain(|_, m| !m.is_empty());
         if has_modified {
-            let new_state = StateId::gen();
-            self.state.set_state(new_state);
-            Some(new_state)
-        } else {
-            None
+            self.state.set_state(StateId::gen());
         }
     }
 
-    pub fn clear(&mut self) -> Option<StateId> {
-        if self.data.is_empty() {
-            None
-        } else {
+    pub fn clear(&mut self) {
+        if !self.data.is_empty() {
             self.data.clear();
-            let new_state = StateId::gen();
-            self.state.set_state(new_state);
-            Some(new_state)
+            self.state.set_state(StateId::gen());
         }
     }
 }
@@ -640,19 +618,17 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
         self.data.is_empty()
     }
 
-    pub fn insert(&mut self, key1: K1, key2: K2, key3: K3, value: V) -> StateId {
+    pub fn insert(&mut self, key1: K1, key2: K2, key3: K3, value: V) {
         self.data
             .entry(key1)
             .or_insert_with(HashMap::new)
             .entry(key2)
             .or_insert_with(HashMap::new)
             .insert(key3, value);
-        let new_state = StateId::gen();
-        self.state.set_state(new_state);
-        new_state
+        self.state.set_state(StateId::gen());
     }
 
-    pub fn remove<Q1, Q2, Q3>(&mut self, key1: &Q1, key2: &Q2, key3: &Q3) -> Option<(StateId, V)>
+    pub fn remove<Q1, Q2, Q3>(&mut self, key1: &Q1, key2: &Q2, key3: &Q3) -> Option<V>
     where
         K1: Borrow<Q1>,
         K2: Borrow<Q2>,
@@ -668,9 +644,8 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
                     None => None,
                     Some(m2) => {
                         let res = m2.remove(key3).map(|v| {
-                            let new_state = StateId::gen();
-                            self.state.set_state(new_state);
-                            (new_state, v)
+                            self.state.set_state(StateId::gen());
+                            v
                         });
                         if m2.is_empty() {
                             m1.remove(key2);
@@ -686,7 +661,7 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
         }
     }
 
-    pub fn retain(&mut self, mut f: impl FnMut(&K1, &K2, &K3, &mut V) -> bool) -> Option<StateId> {
+    pub fn retain(&mut self, mut f: impl FnMut(&K1, &K2, &K3, &mut V) -> bool) {
         let mut has_modified = false;
         self.data.iter_mut().for_each(|(k1, m1)| {
             m1.iter_mut().for_each(|(k2, m2)| {
@@ -700,23 +675,17 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
         });
         if has_modified {
             self.data.retain(|_, m1| !m1.is_empty());
-            let new_state = StateId::gen();
-            self.state.set_state(new_state);
-            Some(new_state)
-        } else {
-            None
+            self.state.set_state(StateId::gen());
         }
     }
 
     #[inline]
-    pub fn clear(&mut self) -> Option<StateId> {
+    pub fn clear(&mut self) {
         if self.data.is_empty() {
-            return None;
+            return;
         }
         self.data.clear();
-        let new_state = StateId::gen();
-        self.state.set_state(new_state);
-        Some(new_state)
+        self.state.set_state(StateId::gen());
     }
 }
 
@@ -895,17 +864,31 @@ mod tests {
     fn test_1arg_retain(src_1arg: OnMemorySrc<String, u32>) {
         let mut src = src_1arg;
         let state = src.state();
-        let new_state = src.retain(|k, v| k == "a" || *v == 3);
-        assert_eq!(new_state, Some(src.state()));
-        assert_ne!(new_state, Some(state));
+        src.retain(|k, v| k == "a" || *v == 3);
+        assert_ne!(src.state(), state);
         assert_eq!(src.get("a"), Some(&1));
         assert_eq!(src.get("b"), None);
         assert_eq!(src.get("c"), Some(&3));
 
         // no change
         let state = src.state();
-        let new_state = src.retain(|_, _| true);
-        assert_eq!(new_state, None);
+        src.retain(|_, _| true);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_1arg_remove(src_1arg: OnMemorySrc<String, u32>) {
+        let mut src = src_1arg;
+        let state = src.state();
+        src.remove("a");
+        assert_ne!(src.state(), state);
+        assert_eq!(src.get("a"), None);
+        assert_eq!(src.get("b"), Some(&2));
+        assert_eq!(src.get("c"), Some(&3));
+
+        // no change
+        let state = src.state();
+        src.remove("d");
         assert_eq!(src.state(), state);
     }
 
@@ -913,15 +896,13 @@ mod tests {
     fn test_1arg_clear(src_1arg: OnMemorySrc<String, u32>) {
         let mut src = src_1arg;
         let state = src.state();
-        let new_state = src.clear();
-        assert_eq!(new_state, Some(src.state()));
-        assert_ne!(new_state, Some(state));
+        src.clear();
+        assert_ne!(src.state(), state);
         assert_eq!(src.is_empty(), true);
 
         // no change
         let state = src.state();
-        let new_state = src.clear();
-        assert_eq!(new_state, None);
+        src.clear();
         assert_eq!(src.state(), state);
     }
 
@@ -984,17 +965,31 @@ mod tests {
     fn test_2args_retain(src_2args: OnMemorySrc2Args<String, String, u32>) {
         let mut src = src_2args;
         let state = src.state();
-        let new_state = src.retain(|k1, k2, _| k1 == "a" || k2 == "z");
-        assert_eq!(new_state, Some(src.state()));
-        assert_ne!(new_state, Some(state));
+        src.retain(|k1, k2, _| k1 == "a" || k2 == "z");
+        assert_ne!(src.state(), state);
         assert_eq!(src.get("a", "x"), Some(&1));
         assert_eq!(src.get("b", "y"), None);
         assert_eq!(src.get("c", "z"), Some(&9));
 
         // no change
         let state = src.state();
-        let new_state = src.retain(|_, _, _| true);
-        assert_eq!(new_state, None);
+        src.retain(|_, _, _| true);
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_2args_remove(src_2args: OnMemorySrc2Args<String, String, u32>) {
+        let mut src = src_2args;
+        let state = src.state();
+        src.remove("a", "x");
+        assert_ne!(src.state(), state);
+        assert_eq!(src.get("a", "x"), None);
+        assert_eq!(src.get("b", "y"), Some(&5));
+        assert_eq!(src.get("c", "z"), Some(&9));
+
+        // no change
+        let state = src.state();
+        src.remove("d", "z");
         assert_eq!(src.state(), state);
     }
 
@@ -1002,15 +997,13 @@ mod tests {
     fn test_2args_clear(src_2args: OnMemorySrc2Args<String, String, u32>) {
         let mut src = src_2args;
         let state = src.state();
-        let new_state = src.clear();
-        assert_eq!(new_state, Some(src.state()));
-        assert_ne!(new_state, Some(state));
+        src.clear();
+        assert_ne!(src.state(), state);
         assert_eq!(src.is_empty(), true);
 
         // no change
         let state = src.state();
-        let new_state = src.clear();
-        assert_eq!(new_state, None);
+        src.clear();
         assert_eq!(src.state(), state);
     }
 
@@ -1076,17 +1069,15 @@ mod tests {
     fn test_3args_retain(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
         let mut src = src_3args;
         let state = src.state();
-        let new_state = src.retain(|k1, _, k3, _| k1 == "a" || k3 == "j");
-        assert_eq!(new_state, Some(src.state()));
-        assert_ne!(new_state, Some(state));
+        src.retain(|k1, _, k3, _| k1 == "a" || k3 == "j");
+        assert_ne!(src.state(), state);
         assert_eq!(src.get("a", "x", "i"), Some(&1));
         assert_eq!(src.get("b", "y", "j"), Some(&14));
         assert_eq!(src.get("c", "z", "k"), None);
 
         // no change
         let state = src.state();
-        let new_state = src.retain(|_, _, _, _| true);
-        assert_eq!(new_state, None);
+        src.retain(|_, _, _, _| true);
         assert_eq!(src.state(), state);
     }
 
@@ -1094,15 +1085,29 @@ mod tests {
     fn test_3args_clear(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
         let mut src = src_3args;
         let state = src.state();
-        let new_state = src.clear();
-        assert_eq!(new_state, Some(src.state()));
-        assert_ne!(new_state, Some(state));
+        src.clear();
+        assert_ne!(src.state(), state);
         assert_eq!(src.is_empty(), true);
 
         // no change
         let state = src.state();
-        let new_state = src.clear();
-        assert_eq!(new_state, None);
+        src.clear();
+        assert_eq!(src.state(), state);
+    }
+
+    #[rstest]
+    fn test_3args_remove(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
+        let mut src = src_3args;
+        let state = src.state();
+        src.remove("a", "x", "i");
+        assert_ne!(src.state(), state);
+        assert_eq!(src.get("a", "x", "i"), None);
+        assert_eq!(src.get("b", "y", "j"), Some(&14));
+        assert_eq!(src.get("c", "z", "k"), Some(&27));
+
+        // no change
+        let state = src.state();
+        src.remove("d", "z", "k");
         assert_eq!(src.state(), state);
     }
 
