@@ -9,12 +9,14 @@ use chrono::{format::DelayedFormat, TimeZone};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::num::RelPos;
+
 // -----------------------------------------------------------------------------
 // DateTime
 //
 
 /// Thin wrapper around [chrono::DateTime] to override some traits
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Hash)]
 pub struct DateTime<Tz: chrono::TimeZone> {
     internal: chrono::DateTime<Tz>,
 }
@@ -106,6 +108,40 @@ where
     #[inline]
     pub fn format<'a>(&self, fmt: &'a str) -> DelayedFormat<chrono::format::StrftimeItems<'a>> {
         self.internal.format(fmt)
+    }
+}
+
+//
+// comparison
+//
+impl<Tz1, Tz2> PartialEq<DateTime<Tz2>> for DateTime<Tz1>
+where
+    Tz1: TimeZone,
+    Tz2: TimeZone,
+{
+    #[inline]
+    fn eq(&self, other: &DateTime<Tz2>) -> bool {
+        self.internal.eq(&other.internal)
+    }
+}
+
+impl<Tz: TimeZone> Eq for DateTime<Tz> {}
+
+impl<Tz1, Tz2> PartialOrd<DateTime<Tz2>> for DateTime<Tz1>
+where
+    Tz1: TimeZone,
+    Tz2: TimeZone,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &DateTime<Tz2>) -> Option<std::cmp::Ordering> {
+        self.internal.partial_cmp(&other.internal)
+    }
+}
+
+impl<Tz: TimeZone> Ord for DateTime<Tz> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.internal.cmp(&other.internal)
     }
 }
 
@@ -434,6 +470,20 @@ macro_rules! define_self_duration_op {
 }
 define_self_duration_op!(Add, add);
 define_self_duration_op!(Sub, sub);
+
+impl<Tz1, Tz2> RelPos<DateTime<Tz2>> for DateTime<Tz1>
+where
+    Tz1: TimeZone,
+    Tz2: TimeZone,
+{
+    type Output = f64;
+
+    #[inline]
+    fn relpos_between(&self, left: &DateTime<Tz2>, right: &DateTime<Tz2>) -> Self::Output {
+        self.internal
+            .relpos_between(&left.internal, &right.internal)
+    }
+}
 
 // =============================================================================
 #[cfg(test)]
@@ -1023,5 +1073,53 @@ mod tests {
                 chrono_dt.with_nanosecond(1).map(|dt| dt.into())
             );
         }
+    }
+
+    #[test]
+    fn test_relpos() {
+        // fixed
+        let dt1: DateTime<_> =
+            chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
+                .unwrap()
+                .into();
+        let dt2: DateTime<_> =
+            chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-06T10:42:12+09:00")
+                .unwrap()
+                .into();
+        let dt3: DateTime<_> =
+            chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-11T10:42:13+09:00")
+                .unwrap()
+                .into();
+
+        assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
+
+        // utc
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-06T10:42:12Z")
+            .unwrap()
+            .into();
+        let dt3: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-11T10:42:13Z")
+            .unwrap()
+            .into();
+
+        assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
+
+        // IANA
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-06T10:42:12Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let dt3: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-11T10:42:13Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+
+        assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
     }
 }
