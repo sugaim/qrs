@@ -69,7 +69,7 @@ impl JsonSchema for DateTime<chrono::FixedOffset> {
         "DateTimeFixedOffset".to_string()
     }
     fn schema_id() -> Cow<'static, str> {
-        Cow::Borrowed("qrs_core::chrono::DateTime<chrono::FixedOffset>")
+        Cow::Borrowed("qrs_core::chrono::DateTimeFixedOffset")
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut res =
@@ -103,10 +103,10 @@ impl<'de> Deserialize<'de> for DateTime<chrono::Utc> {
 
 impl JsonSchema for DateTime<chrono::Utc> {
     fn schema_name() -> String {
-        "DateTimeUTC".to_string()
+        "DateTimeUtc".to_string()
     }
     fn schema_id() -> Cow<'static, str> {
-        Cow::Borrowed("qrs_core::chrono::DateTime<chrono::Utc>")
+        Cow::Borrowed("qrs_core::chrono::DateTimeUtc")
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut res = <chrono::DateTime<chrono::Utc> as JsonSchema>::json_schema(gen).into_object();
@@ -145,10 +145,10 @@ impl<'de> Deserialize<'de> for DateTime<chrono_tz::Tz> {
 
 impl JsonSchema for DateTime<chrono_tz::Tz> {
     fn schema_name() -> String {
-        "DateTimeIANA".to_string()
+        "DateTimeIana".to_string()
     }
     fn schema_id() -> Cow<'static, str> {
-        Cow::Borrowed("qrs_core::chrono::DateTime<chrono_tz::Tz>")
+        Cow::Borrowed("qrs_core::chrono::DateTimeIana")
     }
     fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut res = schemars::schema::SchemaObject::default();
@@ -157,6 +157,10 @@ impl JsonSchema for DateTime<chrono_tz::Tz> {
             Some("A datetime with IANA timezone, {RFC3339}[{IANA timezone}]".to_string());
         res.metadata().title = Some(Self::schema_name());
         res.metadata().id = Some(Self::schema_id().into_owned());
+        res.metadata().examples = vec![
+            serde_json::json!("2021-01-01T10:42:11+09:00[Asia/Tokyo]"),
+            serde_json::json!("2021-01-01T10:42:11Z[America/New_York]"),
+        ];
 
         res.string().pattern = Some(
             r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[\+-]\d{2}:\d{2}|[\+-]\d{4})\[.+\]$"

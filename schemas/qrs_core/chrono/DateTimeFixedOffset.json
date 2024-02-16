@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "qrs_core::chrono::DateTime<chrono::FixedOffset>",
+  "$id": "qrs_core::chrono::DateTimeFixedOffset",
   "title": "DateTimeFixedOffset",
   "description": "A datetime with fixed offset timezone",
   "type": "string",

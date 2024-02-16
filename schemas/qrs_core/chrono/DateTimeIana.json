@@ -1,8 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "qrs_core::chrono::DateTime<chrono_tz::Tz>",
-  "title": "DateTimeIANA",
+  "$id": "qrs_core::chrono::DateTimeIana",
+  "title": "DateTimeIana",
   "description": "A datetime with IANA timezone, {RFC3339}[{IANA timezone}]",
+  "examples": [
+    "2021-01-01T10:42:11+09:00[Asia/Tokyo]",
+    "2021-01-01T10:42:11Z[America/New_York]"
+  ],
   "type": "string",
   "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(Z|[\\+-]\\d{2}:\\d{2}|[\\+-]\\d{4})\\[.+\\]$"
 }
