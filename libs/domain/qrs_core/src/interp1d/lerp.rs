@@ -30,8 +30,12 @@ use super::{DestructibleInterp1d, Interp1d, Interp1dBuilder, _knots::Knots};
 /// assert_eq!(interp.interp(&0.5), 0.5);
 /// assert_eq!(interp.interp(&1.0), 1.0);
 /// ```
-#[derive(Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Lerp1d<G, V> {
+    #[serde(bound(
+        serialize = "G: Serialize + PartialOrd, V: Serialize",
+        deserialize = "G: Deserialize<'de> + PartialOrd, V: Deserialize<'de>"
+    ))]
     knots: Knots<G, V>,
 }
 
@@ -51,6 +55,9 @@ impl<G: PartialOrd, V> Lerp1d<G, V> {
     }
 }
 
+//
+// methods
+//
 impl<G: RelPos, V: Vector<G::Output>> Interp1d for Lerp1d<G, V> {
     type Grid = G;
     type Value = V;
@@ -123,15 +130,24 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+// -----------------------------------------------------------------------------
+// Lerp1dBuilder
+//
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Lerp1dBuilder;
 
+//
+// construction
+//
 impl Default for Lerp1dBuilder {
     fn default() -> Self {
         Self
     }
 }
 
+//
+// methods
+//
 impl<G: RelPos, V: Vector<G::Output>> Interp1dBuilder<G, V> for Lerp1dBuilder {
     type Output = Lerp1d<G, V>;
     type Err = anyhow::Error;
@@ -150,6 +166,7 @@ impl<G: RelPos, V: Vector<G::Output>> DestructibleInterp1d for Lerp1d<G, V> {
     }
 }
 
+// =============================================================================
 #[cfg(test)]
 mod tests {
     use approx::assert_abs_diff_eq;
@@ -180,6 +197,27 @@ mod tests {
 
         let lerp = Lerp1d::new(grids, values);
         assert!(lerp.is_ok());
+    }
+
+    #[test]
+    fn test_lerp1d_serialize() {
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 1., 2.];
+
+        let lerp = Lerp1d::new(grids, values).unwrap();
+        let serialized = serde_json::to_string(&lerp).unwrap();
+        assert_eq!(serialized, r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,2.0]]}"#);
+    }
+
+    #[test]
+    fn test_lerp1d_deserialize() {
+        let serialized = r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,2.0]]}"#;
+        let deserialized: Lerp1d<f64, f64> = serde_json::from_str(serialized).unwrap();
+
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 1., 2.];
+        let lerp = Lerp1d::new(grids, values).unwrap();
+        assert_eq!(deserialized, lerp);
     }
 
     #[test]
@@ -303,6 +341,69 @@ mod tests {
         assert_abs_diff_eq!(lerp.der2(&2.), 0., epsilon = eps);
         assert_abs_diff_eq!(lerp.der2(&2.5), 0., epsilon = eps);
         assert_abs_diff_eq!(lerp.der2(&3.), 0., epsilon = eps);
+    }
+
+    #[test]
+    fn test_lerp_der012() {
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 3., 2.];
+
+        let lerp = Lerp1d::new(grids, values).unwrap();
+        let eps = 1e-15;
+
+        let x = -1.;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = -0.5;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 0.;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 0.5;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 1.;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 1.5;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 2.;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 2.5;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+
+        let x = 3.;
+        let (der0, der1, der2) = lerp.der012(&x);
+        assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
+        assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
+        assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
     }
 
     #[test]

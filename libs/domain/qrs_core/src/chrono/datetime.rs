@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::anyhow;
 use chrono::{format::DelayedFormat, TimeZone};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -43,7 +44,7 @@ where
     }
 }
 
-impl<Tz: TimeZone> Serialize for DateTime<Tz> {
+impl Serialize for DateTime<chrono::FixedOffset> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -53,10 +54,7 @@ impl<Tz: TimeZone> Serialize for DateTime<Tz> {
     }
 }
 
-impl<'de, Tz: TimeZone> Deserialize<'de> for DateTime<Tz>
-where
-    chrono::DateTime<Tz>: Deserialize<'de>,
-{
+impl<'de> Deserialize<'de> for DateTime<chrono::FixedOffset> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -66,18 +64,104 @@ where
     }
 }
 
-impl<Tz: TimeZone> JsonSchema for DateTime<Tz> {
+impl JsonSchema for DateTime<chrono::FixedOffset> {
     fn schema_name() -> String {
-        "DateTime".to_string()
+        "DateTimeFixedOffset".to_string()
     }
     fn schema_id() -> Cow<'static, str> {
-        Cow::Borrowed("qrs_core::chrono::DateTime")
+        Cow::Borrowed("qrs_core::chrono::DateTime<chrono::FixedOffset>")
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let mut res = <chrono::DateTime<Tz> as JsonSchema>::json_schema(gen).into_object();
-        res.metadata().description = Some("A datetime with timezone".to_string());
+        let mut res =
+            <chrono::DateTime<chrono::FixedOffset> as JsonSchema>::json_schema(gen).into_object();
+        res.metadata().description = Some("A datetime with fixed offset timezone".to_string());
         res.metadata().title = Some(Self::schema_name());
         res.metadata().id = Some(Self::schema_id().into_owned());
+        res.into()
+    }
+}
+
+impl Serialize for DateTime<chrono::Utc> {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.internal.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for DateTime<chrono::Utc> {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        chrono::DateTime::deserialize(deserializer).map(Into::into)
+    }
+}
+
+impl JsonSchema for DateTime<chrono::Utc> {
+    fn schema_name() -> String {
+        "DateTimeUTC".to_string()
+    }
+    fn schema_id() -> Cow<'static, str> {
+        Cow::Borrowed("qrs_core::chrono::DateTime<chrono::Utc>")
+    }
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let mut res = <chrono::DateTime<chrono::Utc> as JsonSchema>::json_schema(gen).into_object();
+        res.metadata().description = Some("A datetime with UTC timezone".to_string());
+        res.metadata().title = Some(Self::schema_name());
+        res.metadata().id = Some(Self::schema_id().into_owned());
+        res.into()
+    }
+}
+
+impl Serialize for DateTime<chrono_tz::Tz> {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = format!(
+            "{}[{}]",
+            self.internal.to_rfc3339(),
+            self.internal.timezone()
+        );
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for DateTime<chrono_tz::Tz> {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        DateTime::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl JsonSchema for DateTime<chrono_tz::Tz> {
+    fn schema_name() -> String {
+        "DateTimeIANA".to_string()
+    }
+    fn schema_id() -> Cow<'static, str> {
+        Cow::Borrowed("qrs_core::chrono::DateTime<chrono_tz::Tz>")
+    }
+    fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let mut res = schemars::schema::SchemaObject::default();
+        res.instance_type = Some(schemars::schema::InstanceType::String.into());
+        res.metadata().description =
+            Some("A datetime with IANA timezone, {RFC3339}[{IANA timezone}]".to_string());
+        res.metadata().title = Some(Self::schema_name());
+        res.metadata().id = Some(Self::schema_id().into_owned());
+
+        res.string().pattern = Some(
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[\+-]\d{2}:\d{2}|[\+-]\d{4})\[.+\]$"
+                .to_owned(),
+        );
         res.into()
     }
 }
@@ -169,15 +253,55 @@ impl<Tz: TimeZone> DateTime<Tz> {
     }
 }
 
-impl<Tz: TimeZone> FromStr for DateTime<Tz>
-where
-    chrono::DateTime<Tz>: FromStr,
-{
-    type Err = <chrono::DateTime<Tz> as FromStr>::Err;
+impl FromStr for DateTime<chrono::FixedOffset> {
+    type Err = chrono::ParseError;
 
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         chrono::DateTime::from_str(s).map(|dt| dt.into())
+    }
+}
+
+impl FromStr for DateTime<chrono::Utc> {
+    type Err = chrono::ParseError;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        chrono::DateTime::from_str(s).map(|dt| dt.into())
+    }
+}
+
+impl FromStr for DateTime<chrono_tz::Tz> {
+    type Err = anyhow::Error;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (dt, tz) = {
+            let mut split = s.split('[');
+            let dt = split.next().ok_or_else(|| {
+                anyhow!(
+                    "Failed to parse datetime from string. Expected format is
+                    '{{RFC3339}}[{{IANA timezone}}]' but was '{s}'"
+                )
+            })?;
+            let tz = split.next().ok_or_else(|| {
+                anyhow!(
+                    "Failed to parse timezone from string
+                    '{{RFC3339}}[{{IANA timezone}}]' but was '{s}'"
+                )
+            })?;
+            if !tz.ends_with(']') {
+                return Err(anyhow!(
+                    "Failed to parse timezone from string
+                    '{{RFC3339}}[{{IANA timezone}}]' but was '{s}'"
+                ));
+            }
+            (dt, &tz[..tz.len() - 1])
+        };
+        let dt: chrono::DateTime<chrono::FixedOffset> = chrono::DateTime::from_str(dt)?;
+        let tz = chrono_tz::Tz::from_str(tz)
+            .map_err(|_| anyhow!("Invalid IANA timezone string: {tz}"))?;
+        Ok(dt.with_timezone(&tz).into())
     }
 }
 
@@ -544,6 +668,71 @@ mod tests {
     }
 
     #[test]
+    fn test_from_str() {
+        // fixed offset
+        let dt: DateTime<_> =
+            DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
+                .unwrap()
+                .into();
+        let expected: DateTime<_> =
+            chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
+                .unwrap()
+                .into();
+        assert_eq!(dt, expected);
+
+        // utc
+        let dt: DateTime<_> = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
+        let expected: DateTime<_> =
+            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+                .unwrap()
+                .into();
+        assert_eq!(dt, expected);
+
+        // IANA
+        let dt: DateTime<_> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[America/New_York]")
+                .unwrap();
+        let expected: DateTime<_> =
+            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+                .unwrap()
+                .with_timezone(&chrono_tz::Tz::America__New_York)
+                .into();
+        assert_eq!(dt, expected);
+
+        let dt: DateTime<_> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let expected: DateTime<_> =
+            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+                .unwrap()
+                .with_timezone(&chrono_tz::Tz::America__New_York)
+                .into();
+        assert_eq!(dt, expected);
+
+        // IANA: error
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00");
+        assert!(dt.is_err());
+
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[America/New_York]x");
+        assert!(dt.is_err());
+
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00x[America/New_York]");
+        assert!(dt.is_err());
+
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[DUMMY_TIMEZONE]");
+        assert!(dt.is_err());
+
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[]");
+        assert!(dt.is_err());
+    }
+
+    #[test]
     fn test_serialize() {
         // fixed offset
         let dt: DateTime<_> =
@@ -559,6 +748,17 @@ mod tests {
             .into();
         let serialized = serde_json::to_string(&dt).unwrap();
         assert_eq!(serialized, r#""2021-01-01T10:42:11Z""#);
+
+        // IANA
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let serialized = serde_json::to_string(&dt).unwrap();
+        assert_eq!(
+            serialized,
+            r#""2021-01-01T05:42:11-05:00[America/New_York]""#
+        );
     }
 
     #[test]
@@ -578,6 +778,16 @@ mod tests {
         let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
+                .into();
+        assert_eq!(deserialized, expected);
+
+        // IANA
+        let serialized = r#""2021-01-01T05:42:11-05:00[America/New_York]""#;
+        let deserialized: DateTime<chrono_tz::Tz> = serde_json::from_str(serialized).unwrap();
+        let expected: DateTime<_> =
+            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+                .unwrap()
+                .with_timezone(&chrono_tz::Tz::America__New_York)
                 .into();
         assert_eq!(deserialized, expected);
     }

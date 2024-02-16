@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SemiContinuity",
+  "oneOf": [
+    {
+      "description": "Left continuity: f(x-) = f(x)",
+      "type": "string",
+      "enum": [
+        "left_continuous"
+      ]
+    },
+    {
+      "description": "Right continuity: f(x) = f(x+)",
+      "type": "string",
+      "enum": [
+        "right_continuous"
+      ]
+    }
+  ]
+}

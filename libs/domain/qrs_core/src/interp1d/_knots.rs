@@ -209,11 +209,11 @@ mod tests {
         // error
         let serialized = r#"[["2021-01-07",1],["2021-01-01",0],["2021-01-01",2]]"#;
         let deserialized: Result<Knots<NaiveDate, i32>, _> = serde_json::from_str(serialized);
-        assert!(deserialized.is_err());
+        assert!(deserialized.is_err()); // duplicated grid
 
         let serialized = r#"[["2021-01-07",1]]"#;
         let deserialized: Result<Knots<NaiveDate, i32>, _> = serde_json::from_str(serialized);
-        assert!(deserialized.is_err());
+        assert!(deserialized.is_err()); // too short
     }
 
     #[test]

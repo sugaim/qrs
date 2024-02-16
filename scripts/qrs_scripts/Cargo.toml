@@ -8,6 +8,7 @@ exclude.workspace = true
 # external
 anyhow = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 schemars = { workspace = true }

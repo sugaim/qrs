@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "qrs_core::chrono::DateTime<chrono_tz::Tz>",
+  "title": "DateTimeIANA",
+  "description": "A datetime with IANA timezone, {RFC3339}[{IANA timezone}]",
+  "type": "string",
+  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(Z|[\\+-]\\d{2}:\\d{2}|[\\+-]\\d{4})\\[.+\\]$"
+}

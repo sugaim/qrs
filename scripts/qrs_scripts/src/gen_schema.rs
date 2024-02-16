@@ -20,9 +20,16 @@ pub fn gen_schema() -> anyhow::Result<()> {
         let mut dir = root_dir.clone();
         dir.push("qrs_core");
         std::fs::create_dir_all(&dir)?;
+
+        // chrono
         gen_schema_single::<qrs_core::chrono::Calendar>(&dir)?;
         gen_schema_single::<qrs_core::chrono::CalendarSymbol>(&dir)?;
         gen_schema_single::<qrs_core::chrono::DateTime<chrono::FixedOffset>>(&dir)?;
+        gen_schema_single::<qrs_core::chrono::DateTime<chrono::Utc>>(&dir)?;
+        gen_schema_single::<qrs_core::chrono::DateTime<chrono_tz::Tz>>(&dir)?;
+
+        // func1d
+        gen_schema_single::<qrs_core::func1d::SemiContinuity>(&dir)?;
     }
     Ok(())
 }

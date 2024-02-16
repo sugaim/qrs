@@ -1,5 +1,6 @@
 mod _knots;
 mod lerp;
+mod pwconst;
 mod traits;
 
 pub use lerp::{Lerp1d, Lerp1dBuilder};
