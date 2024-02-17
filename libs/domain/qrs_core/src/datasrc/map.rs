@@ -933,12 +933,10 @@ mod tests {
         let src = src_2args.map("map", |x| x * 2);
 
         let keys = [
-            ("a".to_owned(), "x".to_owned()),
-            ("b".to_owned(), "x".to_owned()),
+            (&"a".to_owned(), &"x".to_owned()),
+            (&"b".to_owned(), &"x".to_owned()),
         ];
-        let snap = src
-            .take_snapshot(keys.iter().map(|(k1, k2)| (k1, k2)))
-            .unwrap();
+        let snap = src.take_snapshot(keys).unwrap();
 
         assert_eq!(snap.req(&"a".to_owned(), &"x".to_owned()).unwrap(), 2);
         assert_eq!(snap.req(&"b".to_owned(), &"x".to_owned()).unwrap(), 6);
@@ -950,12 +948,10 @@ mod tests {
         let src = src_3args.map("map", |x| x * 2);
 
         let keys = [
-            ("a".to_owned(), "x".to_owned(), "i".to_owned()),
-            ("b".to_owned(), "y".to_owned(), "j".to_owned()),
+            (&"a".to_owned(), &"x".to_owned(), &"i".to_owned()),
+            (&"b".to_owned(), &"y".to_owned(), &"j".to_owned()),
         ];
-        let snap = src
-            .take_snapshot(keys.iter().map(|(k1, k2, k3)| (k1, k2, k3)))
-            .unwrap();
+        let snap = src.take_snapshot(keys).unwrap();
 
         assert_eq!(
             snap.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
@@ -1207,12 +1203,10 @@ mod tests {
         let src = src_2args.map_err("map", |_| "error".to_owned());
 
         let keys = [
-            ("a".to_owned(), "x".to_owned()),
-            ("b".to_owned(), "x".to_owned()),
+            (&"a".to_owned(), &"x".to_owned()),
+            (&"b".to_owned(), &"x".to_owned()),
         ];
-        let snap = src
-            .take_snapshot(keys.iter().map(|(k1, k2)| (k1, k2)))
-            .unwrap();
+        let snap = src.take_snapshot(keys).unwrap();
 
         assert_eq!(snap.req(&"a".to_owned(), &"x".to_owned()).unwrap(), 1);
         assert!(snap.req(&"c".to_owned(), &"x".to_owned()).is_err());
@@ -1227,12 +1221,10 @@ mod tests {
         let src = src_3args.map_err("map", |_| "error".to_owned());
 
         let keys = [
-            ("a".to_owned(), "x".to_owned(), "i".to_owned()),
-            ("b".to_owned(), "y".to_owned(), "j".to_owned()),
+            (&"a".to_owned(), &"x".to_owned(), &"i".to_owned()),
+            (&"b".to_owned(), &"y".to_owned(), &"j".to_owned()),
         ];
-        let snap = src
-            .take_snapshot(keys.iter().map(|(k1, k2, k3)| (k1, k2, k3)))
-            .unwrap();
+        let snap = src.take_snapshot(keys).unwrap();
 
         assert_eq!(
             snap.req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
@@ -1489,12 +1481,10 @@ mod tests {
         });
 
         let keys = [
-            ("a".to_owned(), "x".to_owned()),
-            ("b".to_owned(), "x".to_owned()),
+            (&"a".to_owned(), &"x".to_owned()),
+            (&"b".to_owned(), &"x".to_owned()),
         ];
-        let snap = src
-            .take_snapshot(keys.iter().map(|(k1, k2)| (k1, k2)))
-            .unwrap();
+        let snap = src.take_snapshot(keys).unwrap();
 
         assert!(snap.req(&"a".to_owned(), &"x".to_owned()).is_err());
         assert!(snap.req(&"a".to_owned(), &"x".to_owned()).unwrap_err() == "ax");
@@ -1511,12 +1501,10 @@ mod tests {
         });
 
         let keys = [
-            ("a".to_owned(), "x".to_owned(), "i".to_owned()),
-            ("b".to_owned(), "y".to_owned(), "j".to_owned()),
+            (&"a".to_owned(), &"x".to_owned(), &"i".to_owned()),
+            (&"b".to_owned(), &"y".to_owned(), &"j".to_owned()),
         ];
-        let snap = src
-            .take_snapshot(keys.iter().map(|(k1, k2, k3)| (k1, k2, k3)))
-            .unwrap();
+        let snap = src.take_snapshot(keys).unwrap();
 
         assert!(snap
             .req(&"a".to_owned(), &"x".to_owned(), &"i".to_owned())
