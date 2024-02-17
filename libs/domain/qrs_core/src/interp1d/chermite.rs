@@ -541,6 +541,7 @@ mod tests {
 
     #[derive(Deserialize)]
     struct Output {
+        #[allow(dead_code)]
         coefficients: Vec<HashMap<String, f64>>,
         evalated: Vec<(f64, f64)>,
     }
@@ -548,8 +549,8 @@ mod tests {
     #[test]
     fn test_cr_spline() {
         let cases = [
-            // ("fwd", CatmullRomScheme::new(FiniteDiffMethod::Forward)),
-            // ("bwd", CatmullRomScheme::new(FiniteDiffMethod::Backward)),
+            ("fwd", CatmullRomScheme::new(FiniteDiffMethod::Forward)),
+            ("bwd", CatmullRomScheme::new(FiniteDiffMethod::Backward)),
             ("cen", CatmullRomScheme::new(FiniteDiffMethod::Central)),
         ];
 
@@ -570,22 +571,13 @@ mod tests {
             sch.calc_slope(&mut slopes, &input.xs, &input.ys).unwrap();
             let interp = CHermite1d::new(input.xs, input.ys, sch).unwrap();
 
-            let s = expected
-                .evalated
-                .iter()
-                .map(|(x, _)| format!("{x},{}", interp.interp(&x)))
-                .join("\n");
-            // save s
-            let outpath = "/mnt/c/temp/interp1d.out.csv";
-            std::fs::write(outpath, s).unwrap();
-
-            // for (x, y) in expected.0 {
-            //     let tested = interp.interp(&x);
-            //     assert!(
-            //         (tested - &y).abs() < 1e-10,
-            //         "{name}:\n\t    x = {x}\n\ty.exp = {y}\n\ty.tst = {tested}"
-            //     );
-            // }
+            for (x, y) in expected.evalated {
+                let tested = interp.interp(&x);
+                assert!(
+                    (tested - &y).abs() < 1e-10,
+                    "{name}:\n\t    x = {x}\n\ty.exp = {y}\n\ty.tst = {tested}"
+                );
+            }
         }
     }
 }
