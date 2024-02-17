@@ -421,6 +421,24 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     }
 
+    // knots which a test case assumes
+    #[derive(Deserialize)]
+    struct Input {
+        xs: Vec<f64>,
+        ys: Vec<f64>,
+    }
+
+    // expected output data
+    #[derive(Deserialize)]
+    struct Output {
+        #[allow(dead_code)]
+        coefficients: Vec<HashMap<String, f64>>,
+        evalated: Vec<(f64, f64, f64, f64)>, // x, y, der1, der2
+    }
+
+    //
+    // common behaviors
+    //
     #[test]
     fn test_chermite1d_new() {
         let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
@@ -454,6 +472,91 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_chermite1d_knots() {
+        // case 1
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let interp = CHermite1d::new(vec![0., 1., 2.], vec![0., 1., 2.], scheme).unwrap();
+        assert_eq!(interp.knots().0, &[0., 1., 2.]);
+        assert_eq!(interp.knots().1, &[0., 1., 2.]);
+
+        // case 2
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Backward);
+        let interp = CHermite1d::new(vec![0., 2., 3., 7.], vec![0., 4., 3., 5.], scheme).unwrap();
+        assert_eq!(interp.knots().0, &[0., 2., 3., 7.]);
+        assert_eq!(interp.knots().1, &[0., 4., 3., 5.]);
+    }
+
+    #[test]
+    fn test_chermite1d_builder() {
+        // case 1
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let builder = CHermite1dBuilder::new(scheme.clone());
+        let interp = builder.build(vec![0., 1., 2.], vec![0., 1., 2.]).unwrap();
+        let expected = CHermite1d::new(vec![0., 1., 2.], vec![0., 1., 2.], scheme.clone()).unwrap();
+        assert_eq!(interp, expected);
+
+        // case 2
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Backward);
+        let builder = CHermite1dBuilder::new(scheme.clone());
+        let interp = builder
+            .build(vec![0., 2., 3., 7.], vec![0., 4., 3., 5.])
+            .unwrap();
+        let expected = CHermite1d::new(vec![0., 2., 3., 7.], vec![0., 4., 3., 5.], scheme).unwrap();
+        assert_eq!(interp, expected);
+
+        // error
+        let scheme = AlwaysFailScheme;
+        let builder = CHermite1dBuilder::new(scheme);
+        let interp = builder.build(vec![0., 1., 2.], vec![0., 1., 2.]);
+        assert!(interp.is_err());
+
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let builder = CHermite1dBuilder::new(scheme);
+        let interp = builder.build(vec![0., 1., 2.], vec![0., 1., 2., 3.]);
+        assert!(interp.is_err());
+
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let builder = CHermite1dBuilder::new(scheme);
+        let interp = builder.build(vec![0.], vec![0.]);
+        assert!(interp.is_err());
+
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let builder = CHermite1dBuilder::new(scheme);
+        let interp = builder.build(Vec::<f64>::new(), Vec::<f64>::new());
+        assert!(interp.is_err());
+
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let builder = CHermite1dBuilder::new(scheme);
+        let interp = builder.build(vec![0., 1., 1.], vec![0., 1., 2.]);
+        assert!(interp.is_err());
+    }
+
+    #[test]
+    fn test_chermite1d_destruct() {
+        // case 1
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
+        let interp = CHermite1d::new(vec![0., 1., 2.], vec![0., 1., 2.], scheme.clone()).unwrap();
+        let (builder, gs, vs) = interp.destruct();
+        let expected = CHermite1dBuilder::new(scheme);
+        assert_eq!(builder, expected);
+        assert_eq!(gs, vec![0., 1., 2.]);
+        assert_eq!(vs, vec![0., 1., 2.]);
+
+        // case 2
+        let scheme = CatmullRomScheme::new(FiniteDiffMethod::Backward);
+        let interp =
+            CHermite1d::new(vec![0., 2., 3., 7.], vec![0., 4., 3., 5.], scheme.clone()).unwrap();
+        let (builder, gs, vs) = interp.destruct();
+        let expected = CHermite1dBuilder::new(scheme);
+        assert_eq!(builder, expected);
+        assert_eq!(gs, vec![0., 2., 3., 7.]);
+        assert_eq!(vs, vec![0., 4., 3., 5.]);
+    }
+
+    //
+    // CatmullRom specifics
+    //
     #[test]
     fn test_cr_scheme() {
         let fwd = CatmullRomScheme::new(FiniteDiffMethod::Forward);
@@ -503,19 +606,6 @@ mod tests {
         let values = vec![0., 1., 2.];
         assert!(fwd.calc_slope(&mut slopes, &grids, &values).is_err());
         assert_eq!(slopes, current_slopes);
-    }
-
-    #[derive(Deserialize)]
-    struct Input {
-        xs: Vec<f64>,
-        ys: Vec<f64>,
-    }
-
-    #[derive(Deserialize)]
-    struct Output {
-        #[allow(dead_code)]
-        coefficients: Vec<HashMap<String, f64>>,
-        evalated: Vec<(f64, f64, f64, f64)>, // x, y, der1, der2
     }
 
     #[test]

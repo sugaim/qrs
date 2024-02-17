@@ -19,6 +19,7 @@ jobs:
     - run: cargo fmt --check
     - run: cargo clippy -- -D warnings
     - run: cargo nextest run -r --workspace
+    - run: cargo test -r --doc
 
   coverage:
     runs-on: ubuntu-latest
