@@ -24,6 +24,8 @@ use anyhow::anyhow;
 /// this buffer may be useless when the alignment is different frequently.
 ///
 /// # Example
+/// Please see an implementation of [`qrs_core::interp1d::CHermite1d`] for more practical example.
+///
 /// ```
 /// use std::convert::TryInto;
 /// use std::alloc::Layout;
