@@ -543,7 +543,7 @@ mod tests {
     struct Output {
         #[allow(dead_code)]
         coefficients: Vec<HashMap<String, f64>>,
-        evalated: Vec<(f64, f64)>,
+        evalated: Vec<(f64, f64, f64, f64)>, // x, y, der1, der2
     }
 
     #[test]
@@ -571,11 +571,43 @@ mod tests {
             sch.calc_slope(&mut slopes, &input.xs, &input.ys).unwrap();
             let interp = CHermite1d::new(input.xs, input.ys, sch).unwrap();
 
-            for (x, y) in expected.evalated {
+            for (x, y, der1, der2) in expected.evalated {
                 let tested = interp.interp(&x);
                 assert!(
                     (tested - &y).abs() < 1e-10,
                     "{name}:\n\t    x = {x}\n\ty.exp = {y}\n\ty.tst = {tested}"
+                );
+                let tested = interp.der1(&x);
+                assert!(
+                    (tested - &der1).abs() < 1e-10,
+                    "{name}:\n\t    x = {x}\n\tder1.exp = {der1}\n\tder1.tst = {tested}"
+                );
+                let tested = interp.der2(&x);
+                assert!(
+                    (tested - &der2).abs() < 1e-10,
+                    "{name}:\n\t    x = {x}\n\tder2.exp = {der2}\n\tder2.tst = {tested}"
+                );
+                let (y, der1) = interp.der01(&x);
+                assert!(
+                    (y - &y).abs() < 1e-10,
+                    "{name}/der01:\n\t    x = {x}\n\tder01.exp = {y}\n\tder01.tst = {y}"
+                );
+                assert!(
+                    (der1 - &der1).abs() < 1e-10,
+                    "{name}/der01:\n\t    x = {x}\n\tder01.exp = {der1}\n\tder01.tst = {der1}"
+                );
+                let (y, der1, der2) = interp.der012(&x);
+                assert!(
+                    (y - &y).abs() < 1e-10,
+                    "{name}/der012:\n\t    x = {x}\n\tder012.exp = {y}\n\tder012.tst = {y}"
+                );
+                assert!(
+                    (der1 - &der1).abs() < 1e-10,
+                    "{name}/der012:\n\t    x = {x}\n\tder012.exp = {der1}\n\tder012.tst = {der1}"
+                );
+                assert!(
+                    (der2 - &der2).abs() < 1e-10,
+                    "{name}/der012:\n\t    x = {x}\n\tder012.exp = {der2}\n\tder012.tst = {der2}"
                 );
             }
         }

@@ -14,6 +14,8 @@ def gen_test_data(inpath: str):
 
   # instantinate
   spline = spi.CubicHermiteSpline(xs, ys, dydxs)
+  der1 = spline.derivative(nu=1)
+  der2 = spline.derivative(nu=2)
   argmin = min(xs) - 2.0
   argmax = max(xs) + 2.0
   args = []
@@ -22,19 +24,20 @@ def gen_test_data(inpath: str):
     args.append(cursor)
     cursor += 0.05
   
-  evalated = spline(args)
+  evaluated = spline(args)
+  evaluated_der1 = der1(args)
+  evaluated_der2 = der2(args)
 
   res = []
-  for arg, val in zip(args, evalated):
-    res.append([arg, val])
+  for arg, val, der1, der2 in zip(args, evaluated, evaluated_der1, evaluated_der2):
+    res.append([arg, val, der1, der2])
   
   coeffs = spline.c
   _, n_polys = coeffs.shape
   coeffs = []
   for i in range(n_polys):
-    dx = spline.x[i+1] - spline.x[i]
     coeffs.append({
-      f"{3 - k}-th": c * (dx ** k)
+      f"{3 - k}th": c
       for k, c in enumerate(spline.c[:, i])
     })
 
