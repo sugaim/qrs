@@ -17,3 +17,9 @@ pub use overridable::{
 };
 pub use snapshot::{TakeSnapshot, TakeSnapshot2Args};
 pub use with_logger::WithLogger;
+
+#[cfg(feature = "qrs_core_derive")]
+extern crate qrs_core_derive;
+
+#[cfg(feature = "qrs_core_derive")]
+pub use qrs_core_derive::{Listener, Node, Notifier};

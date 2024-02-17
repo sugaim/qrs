@@ -170,6 +170,15 @@ impl LazyTypedVecBuffer {
             vec: shallow_copy.try_into().unwrap_or_default(),
         }
     }
+
+    #[inline]
+    pub fn free(&mut self) {
+        if self.layout.size() != 0 {
+            unsafe { std::alloc::dealloc(self.ptr.as_ptr(), self.layout) }
+        }
+        self.ptr = NonNull::dangling();
+        self.layout = Layout::from_size_align(0, self.layout.align()).unwrap();
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -391,6 +400,24 @@ mod tests {
         assert_eq!(
             buffer.layout(),
             Layout::from_size_align(cap * 4, std::mem::align_of::<u32>()).unwrap()
+        );
+    }
+
+    #[rstest]
+    #[case(Layout::from_size_align(0, 1).unwrap())]
+    #[case(Layout::from_size_align(100, 1).unwrap())]
+    #[case(Layout::from_size_align(0, 4).unwrap())]
+    #[case(Layout::from_size_align(80, 4).unwrap())]
+    #[case(Layout::from_size_align(0, 8).unwrap())]
+    #[case(Layout::from_size_align(80, 8).unwrap())]
+    #[case(Layout::from_size_align(0, 16).unwrap())]
+    #[case(Layout::from_size_align(80, 16).unwrap())]
+    fn test_free(#[case] layout: Layout) {
+        let mut buffer = LazyTypedVecBuffer::new(layout);
+        buffer.free();
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(0, layout.align()).unwrap()
         );
     }
 }

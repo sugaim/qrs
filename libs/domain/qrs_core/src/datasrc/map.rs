@@ -3,7 +3,6 @@
 use std::sync::{Arc, Mutex, Weak};
 
 use maplit::btreeset;
-use qrs_core_derive::{Listener, Node};
 
 use super::{
     DataSrc, Listener, NodeId, Notifier, StateId, Tree, _private::_UnaryPassThroughNode,

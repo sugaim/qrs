@@ -7,7 +7,6 @@ use std::{
 };
 
 use maplit::btreeset;
-use qrs_core_derive::{Listener, Node};
 
 use super::{
     DataSrc, Listener, Notifier, TakeSnapshot, Tree, _private::_UnaryPassThroughNode,
