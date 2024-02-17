@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: taiki-e/install-action@nextest
-    - run: cargo fmt -- --check
+    - run: cargo fmt --check
     - run: cargo clippy -- -D warnings
     - run: cargo nextest run -r --workspace
 
