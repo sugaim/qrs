@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    collection::VecBuffer,
+    collection::LazyTypedVecBuffer,
     func1d::{FiniteDiffMethod, Func1dDer1, Func1dDer2},
     num::{RelPos, Scalar, Vector},
 };
@@ -45,7 +45,7 @@ pub struct CHermite1d<G, V, S> {
     coeffs: Vec<CubicCoeff<V>>,
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
-    slope_buf: VecBuffer,
+    slope_buf: LazyTypedVecBuffer,
     scheme: S,
 }
 
@@ -83,10 +83,10 @@ where
         vs: Vec<V>,
         scheme: S,
         mut coeffs: Vec<CubicCoeff<V>>,
-        buf: VecBuffer,
+        buf: LazyTypedVecBuffer,
     ) -> Result<Self, anyhow::Error> {
         let knots = Knots::new(gs, vs)?;
-        let mut slopes = buf.into_vec();
+        let mut slopes = buf.try_into_vec().unwrap_or_default();
         scheme.calc_slope(&mut slopes, knots.grids(), knots.values())?;
         ensure!(
             slopes.len() == knots.grids().len(),
@@ -111,7 +111,7 @@ where
         Ok(Self {
             knots,
             coeffs,
-            slope_buf: VecBuffer::reuse(slopes),
+            slope_buf: LazyTypedVecBuffer::reuse(slopes),
             scheme,
         })
     }
@@ -274,10 +274,10 @@ pub struct CHermite1dBuilder<S> {
     scheme: S,
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
-    slope_buf: VecBuffer,
+    slope_buf: LazyTypedVecBuffer,
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
-    coeff_buf: VecBuffer,
+    coeff_buf: LazyTypedVecBuffer,
 }
 
 //
@@ -320,7 +320,7 @@ where
             grids,
             values,
             self.scheme,
-            self.coeff_buf.into_vec(),
+            self.coeff_buf.try_into_vec().unwrap_or_default(),
             self.slope_buf,
         )
     }
@@ -538,20 +538,28 @@ mod tests {
         let scheme = CatmullRomScheme::new(FiniteDiffMethod::Central);
         let interp = CHermite1d::new(vec![0., 1., 2.], vec![0., 1., 2.], scheme.clone()).unwrap();
         let (builder, gs, vs) = interp.destruct();
-        let expected = CHermite1dBuilder::new(scheme);
+        let expected = CHermite1dBuilder::new(scheme.clone());
         assert_eq!(builder, expected);
         assert_eq!(gs, vec![0., 1., 2.]);
         assert_eq!(vs, vec![0., 1., 2.]);
+
+        let rebuilt = builder.build(gs, vs).unwrap();
+        let expected = CHermite1d::new(vec![0., 1., 2.], vec![0., 1., 2.], scheme).unwrap();
+        assert_eq!(rebuilt, expected);
 
         // case 2
         let scheme = CatmullRomScheme::new(FiniteDiffMethod::Backward);
         let interp =
             CHermite1d::new(vec![0., 2., 3., 7.], vec![0., 4., 3., 5.], scheme.clone()).unwrap();
         let (builder, gs, vs) = interp.destruct();
-        let expected = CHermite1dBuilder::new(scheme);
+        let expected = CHermite1dBuilder::new(scheme.clone());
         assert_eq!(builder, expected);
         assert_eq!(gs, vec![0., 2., 3., 7.]);
         assert_eq!(vs, vec![0., 4., 3., 5.]);
+
+        let rebuilt = builder.build(gs, vs).unwrap();
+        let expected = CHermite1d::new(vec![0., 2., 3., 7.], vec![0., 4., 3., 5.], scheme).unwrap();
+        assert_eq!(rebuilt, expected);
     }
 
     //

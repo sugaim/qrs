@@ -1,3 +1,3 @@
-mod vec_buffer;
+mod lazy_typed_vec;
 
-pub use vec_buffer::VecBuffer;
+pub use lazy_typed_vec::{LazyTypedVec, LazyTypedVecBuffer};
