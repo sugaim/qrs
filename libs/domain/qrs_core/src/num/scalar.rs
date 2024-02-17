@@ -61,18 +61,22 @@ impl<T> Arithmetic for T where
 /// This trait provides a way to access the base floating point type.
 pub trait FloatBased {
     type BaseFloat: num::Float + Arithmetic;
+
+    fn nearest_base_float_of(v: f64) -> Self::BaseFloat {
+        <Self::BaseFloat as num::NumCast>::from(v).expect("Should calculate nearest value")
+    }
 }
 
 impl FloatBased for f32 {
     type BaseFloat = f32;
+
+    fn nearest_base_float_of(v: f64) -> f32 {
+        v as f32
+    }
 }
 
 impl FloatBased for f64 {
     type BaseFloat = f64;
-}
-
-impl<T: num::Float + Arithmetic> FloatBased for num::Complex<T> {
-    type BaseFloat = T;
 }
 
 /// Trait for scalar types.
@@ -89,6 +93,9 @@ impl<T: num::Float + Arithmetic> FloatBased for num::Complex<T> {
 pub trait Scalar:
     Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
 {
+    fn nearest_value_of(v: f64) -> Self {
+        Self::from(<Self as FloatBased>::nearest_base_float_of(v))
+    }
 }
 
 impl<T> Scalar for T where

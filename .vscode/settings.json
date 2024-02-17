@@ -4,5 +4,8 @@
   },
   "[toml]": {
     "editor.formatOnSave": true,
+  },
+  "[json]": {
+    "editor.formatOnSave": true,
   }
 }

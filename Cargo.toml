@@ -22,6 +22,7 @@ derivative = { version = "2.2.0" }
 dyn-clone = { version = "1.0.16" }
 either = { version = "1.9.0" }
 env_logger = { version = "0.11.1" }
+itertools = { version = "0.12.1" }
 log = { version = "0.4.20" }
 num = { version = "0.4.1" }
 maplit = { version = "1.0.2" }

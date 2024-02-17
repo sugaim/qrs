@@ -13,6 +13,7 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 derivative = { workspace = true }
 dyn-clone = { workspace = true }
+itertools = { workspace = true }
 num = { workspace = true }
 maplit = { workspace = true }
 moka = { workspace = true }

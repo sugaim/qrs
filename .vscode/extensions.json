@@ -5,6 +5,7 @@
         "tamasfe.even-better-toml",
         "rust-lang.rust-analyzer",
         "github.copilot",
-        "github.copilot-chat"
+        "github.copilot-chat",
+        "ms-python.python",
     ]
 }
