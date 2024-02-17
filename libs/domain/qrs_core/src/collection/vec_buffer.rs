@@ -9,9 +9,9 @@
 ///
 /// # Example
 /// ```
-/// use qrs_core::buffer::VecBuffer;
+/// use qrs_core::collection::VecBuffer;
 ///
-/// let mut buf = VecBuffer::with_capacity::<f64>(10);
+/// let mut buf = VecBuffer::reuse(vec![0f64; 10]);
 /// assert_eq!(buf.capacity(), 80); // 80 bytes
 ///
 /// // use `buf` as a buffer for `Vec<i32>`
@@ -75,6 +75,19 @@ impl<T> From<VecBuffer> for Vec<T> {
 // methods
 //
 impl VecBuffer {
+    /// Get the current buffer size
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.data.capacity()
+    }
+
+    /// Release buffered memory
+    #[inline]
+    pub fn release(&mut self) {
+        self.data.clear();
+        self.data.shrink_to_fit();
+    }
+
     /// Convert the buffer into a concrete empty vector.
     pub fn into_vec<T>(mut self) -> Vec<T> {
         let unit_sz = std::mem::size_of::<T>();
