@@ -113,15 +113,15 @@ impl<T> TryFrom<LazyTypedVecBuffer> for Vec<T> {
     /// When alignment matches, the ownership of memory held by the buffer
     /// is moved to the returned vector.
     fn try_from(value: LazyTypedVecBuffer) -> Result<Self, Self::Error> {
-        if value.layout.size() == 0 || std::mem::size_of::<T>() == 0 {
-            return Ok(Vec::new());
-        }
         if std::mem::align_of::<T>() != value.layout.align() {
             return Err(anyhow!(
                 "Alignment mismatch. Allocated memory assumes {} but requested {}",
                 value.layout.align(),
                 std::mem::align_of::<T>()
             ));
+        }
+        if value.layout.size() == 0 || std::mem::size_of::<T>() == 0 {
+            return Ok(Vec::new());
         }
         let cap = value.layout.size() / std::mem::size_of::<T>();
         let new_size = cap * std::mem::size_of::<T>();
