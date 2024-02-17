@@ -151,8 +151,10 @@ impl JsonSchema for DateTime<chrono_tz::Tz> {
         Cow::Borrowed("qrs_core::chrono::DateTimeIana")
     }
     fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let mut res = schemars::schema::SchemaObject::default();
-        res.instance_type = Some(schemars::schema::InstanceType::String.into());
+        let mut res = schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            ..Default::default()
+        };
         res.metadata().description =
             Some("A datetime with IANA timezone, {RFC3339}[{IANA timezone}]".to_string());
         res.metadata().title = Some(Self::schema_name());
@@ -675,9 +677,7 @@ mod tests {
     fn test_from_str() {
         // fixed offset
         let dt: DateTime<_> =
-            DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
-                .unwrap()
-                .into();
+            DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let expected: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
@@ -685,9 +685,7 @@ mod tests {
         assert_eq!(dt, expected);
 
         // utc
-        let dt: DateTime<_> = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-            .unwrap()
-            .into();
+        let dt: DateTime<_> = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z").unwrap();
         let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
@@ -832,6 +830,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn test_sub() {
         // fixed offset
         let dt1: DateTime<_> =
@@ -931,6 +930,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn test_add_sub_duration() {
         // fixed offset
         let dt: DateTime<_> =

@@ -88,7 +88,7 @@ impl<G: PartialOrd, V> PwConst1d<G, V> {
         partition: f64,
     ) -> Result<Self, anyhow::Error> {
         let knots = Knots::new(gs, vs)?;
-        if partition < 0. || 1. < partition {
+        if !(0. ..=1.).contains(&partition) {
             return Err(anyhow::anyhow!("partition must be in [0, 1]"));
         }
         Ok(Self {
@@ -200,7 +200,7 @@ impl PwConst1dBuilder {
     /// Create a new `PwConst1dBuilder` instance.
     #[inline]
     pub fn new(cont: SemiContinuity, partition: f64) -> Result<Self, anyhow::Error> {
-        if partition < 0. || 1. < partition {
+        if !(0. ..=1.).contains(&partition) {
             return Err(anyhow::anyhow!("partition must be in [0, 1]"));
         }
         Ok(Self {

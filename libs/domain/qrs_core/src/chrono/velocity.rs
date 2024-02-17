@@ -10,7 +10,7 @@ use super::Duration;
 //
 
 /// A velocity, which is a change per given duration.
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub struct Velocity<V> {
     chg: V,
     is_diverged: bool,
@@ -31,7 +31,7 @@ fn _dur2cnt<T: num::Float + Arithmetic>(dur: Duration) -> T {
 // display, serde
 //
 
-impl<'de, V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Velocity<V>
+impl<V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Velocity<V>
 where
     V::BaseFloat: Serialize,
 {

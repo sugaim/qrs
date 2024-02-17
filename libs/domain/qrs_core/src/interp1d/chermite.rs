@@ -87,7 +87,7 @@ where
     ) -> Result<Self, anyhow::Error> {
         let knots = Knots::new(gs, vs)?;
         let mut slopes = buf.into_vec();
-        scheme.calc_slope(&mut slopes, &knots.grids(), &knots.values())?;
+        scheme.calc_slope(&mut slopes, knots.grids(), knots.values())?;
         ensure!(
             slopes.len() == knots.grids().len(),
             "The number of slopes must be the same as the number of knots."
@@ -104,8 +104,8 @@ where
                 sr.clone() * (gr.clone() - gl.clone()),
             );
             let ord1 = dyl.clone();
-            let ord2 = (vr.clone() - &vl) * &f2s(3.) + dyl.clone() * &f2s(-2.) - &dyr;
-            let ord3 = (vl.clone() - &vr) * &f2s(2.) + &dyl + &dyr;
+            let ord2 = (vr.clone() - vl) * &f2s(3.) + dyl.clone() * &f2s(-2.) - &dyr;
+            let ord3 = (vl.clone() - vr) * &f2s(2.) + &dyl + &dyr;
             coeffs.push(CubicCoeff { ord1, ord2, ord3 });
         }
         Ok(Self {
@@ -232,13 +232,13 @@ where
     V: Vector<<G as RelPos>::Output>,
     S: CHermiteScheme<G, V>,
 {
-    type Builer = BufferReusedCHermite1dBuilder<V, S>;
+    type Builer = CHermite1dBuilder<S>;
 
     fn destruct(self) -> (Self::Builer, Vec<Self::Grid>, Vec<Self::Value>) {
         let (gs, vs) = self.knots.destruct();
-        let builder = BufferReusedCHermite1dBuilder {
+        let builder = CHermite1dBuilder {
             scheme: self.scheme,
-            coeffs: self.coeffs,
+            coeff_buf: self.coeffs.into(),
             slope_buf: self.slope_buf,
         };
         (builder, gs, vs)
@@ -268,17 +268,38 @@ pub trait CHermiteScheme<G: Sub, V> {
 // -----------------------------------------------------------------------------
 // CHermite1dBuilder
 //
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Derivative, Serialize, Deserialize, JsonSchema)]
+#[derivative(PartialEq)]
 pub struct CHermite1dBuilder<S> {
     scheme: S,
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    slope_buf: VecBuffer,
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    coeff_buf: VecBuffer,
 }
 
 //
 // construction
 //
+impl<S: Clone> Clone for CHermite1dBuilder<S> {
+    fn clone(&self) -> Self {
+        Self {
+            scheme: self.scheme.clone(),
+            slope_buf: Default::default(),
+            coeff_buf: Default::default(),
+        }
+    }
+}
+
 impl<S> CHermite1dBuilder<S> {
     pub fn new(scheme: S) -> Self {
-        Self { scheme }
+        Self {
+            scheme,
+            slope_buf: Default::default(),
+            coeff_buf: Default::default(),
+        }
     }
 }
 
@@ -295,62 +316,13 @@ where
     type Output = CHermite1d<G, V, S>;
 
     fn build(self, grids: Vec<G>, values: Vec<V>) -> Result<Self::Output, Self::Err> {
-        CHermite1d::new(grids, values, self.scheme)
-    }
-}
-
-// -----------------------------------------------------------------------------
-// BufferReusedCHermite1dBuilder
-//
-#[derive(Debug, Derivative, Serialize, Deserialize, JsonSchema)]
-#[derivative(PartialEq)]
-pub struct BufferReusedCHermite1dBuilder<V, S> {
-    scheme: S,
-    #[serde(skip)]
-    coeffs: Vec<CubicCoeff<V>>,
-    #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
-    slope_buf: VecBuffer,
-}
-
-//
-// construction
-//
-impl<V, S> Clone for BufferReusedCHermite1dBuilder<V, S>
-where
-    V: Clone,
-    S: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            scheme: self.scheme.clone(),
-            coeffs: self.coeffs.clone(),
-            slope_buf: Default::default(),
-        }
-    }
-}
-
-//
-// methods
-//
-impl<V, S> BufferReusedCHermite1dBuilder<V, S> {
-    #[inline]
-    pub fn without_buffer(self) -> CHermite1dBuilder<S> {
-        CHermite1dBuilder::new(self.scheme)
-    }
-}
-
-impl<G, V, S> Interp1dBuilder<G, V> for BufferReusedCHermite1dBuilder<V, S>
-where
-    G: Clone + PartialOrd + Sub + RelPos,
-    V: Vector<<G as RelPos>::Output>,
-    S: CHermiteScheme<G, V>,
-{
-    type Err = anyhow::Error;
-    type Output = CHermite1d<G, V, S>;
-
-    fn build(self, grids: Vec<G>, values: Vec<V>) -> Result<Self::Output, Self::Err> {
-        CHermite1d::_new(grids, values, self.scheme, self.coeffs, self.slope_buf)
+        CHermite1d::_new(
+            grids,
+            values,
+            self.scheme,
+            self.coeff_buf.into_vec(),
+            self.slope_buf,
+        )
     }
 }
 
@@ -413,7 +385,7 @@ where
             };
             let (gl, gr) = (&grids[il], &grids[ir]);
             let (vl, vr) = (&values[il], &values[ir]);
-            dst.push((vr.clone() - &vl) / (gr.clone() - gl.clone()));
+            dst.push((vr.clone() - vl) / (gr.clone() - gl.clone()));
         }
         Ok(())
     }
@@ -574,39 +546,39 @@ mod tests {
             for (x, y, der1, der2) in expected.evalated {
                 let tested = interp.interp(&x);
                 assert!(
-                    (tested - &y).abs() < 1e-10,
+                    (tested - y).abs() < 1e-10,
                     "{name}:\n\t    x = {x}\n\ty.exp = {y}\n\ty.tst = {tested}"
                 );
                 let tested = interp.der1(&x);
                 assert!(
-                    (tested - &der1).abs() < 1e-10,
+                    (tested - der1).abs() < 1e-10,
                     "{name}:\n\t    x = {x}\n\tder1.exp = {der1}\n\tder1.tst = {tested}"
                 );
                 let tested = interp.der2(&x);
                 assert!(
-                    (tested - &der2).abs() < 1e-10,
+                    (tested - der2).abs() < 1e-10,
                     "{name}:\n\t    x = {x}\n\tder2.exp = {der2}\n\tder2.tst = {tested}"
                 );
-                let (y, der1) = interp.der01(&x);
+                let (tested, tested_der1) = interp.der01(&x);
                 assert!(
-                    (y - &y).abs() < 1e-10,
+                    (tested - y).abs() < 1e-10,
                     "{name}/der01:\n\t    x = {x}\n\tder01.exp = {y}\n\tder01.tst = {y}"
                 );
                 assert!(
-                    (der1 - &der1).abs() < 1e-10,
+                    (der1 - tested_der1).abs() < 1e-10,
                     "{name}/der01:\n\t    x = {x}\n\tder01.exp = {der1}\n\tder01.tst = {der1}"
                 );
-                let (y, der1, der2) = interp.der012(&x);
+                let (tested, tested_der1, tested_der2) = interp.der012(&x);
                 assert!(
-                    (y - &y).abs() < 1e-10,
+                    (tested - y).abs() < 1e-10,
                     "{name}/der012:\n\t    x = {x}\n\tder012.exp = {y}\n\tder012.tst = {y}"
                 );
                 assert!(
-                    (der1 - &der1).abs() < 1e-10,
+                    (der1 - tested_der1).abs() < 1e-10,
                     "{name}/der012:\n\t    x = {x}\n\tder012.exp = {der1}\n\tder012.tst = {der1}"
                 );
                 assert!(
-                    (der2 - &der2).abs() < 1e-10,
+                    (der2 - tested_der2).abs() < 1e-10,
                     "{name}/der012:\n\t    x = {x}\n\tder012.exp = {der2}\n\tder012.tst = {der2}"
                 );
             }

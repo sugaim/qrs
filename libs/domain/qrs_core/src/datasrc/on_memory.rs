@@ -101,7 +101,7 @@ where
     fn req(&self, key: &K) -> Result<V, Self::Err> {
         self.data
             .get(key)
-            .map(|v| v.clone())
+            .cloned()
             .ok_or_else(|| anyhow::anyhow!("key not found"))
     }
 }
@@ -296,7 +296,7 @@ where
         self.data
             .get(key1)
             .and_then(|m| m.get(key2))
-            .map(|v| v.clone())
+            .cloned()
             .ok_or_else(|| anyhow::anyhow!("key not found"))
     }
 }
@@ -362,10 +362,7 @@ impl<K1: Eq + Hash, K2: Eq + Hash, V> OnMemorySrc2Args<K1, K2, V> {
     }
 
     pub fn insert(&mut self, key1: K1, key2: K2, value: V) {
-        self.data
-            .entry(key1)
-            .or_insert_with(HashMap::new)
-            .insert(key2, value);
+        self.data.entry(key1).or_default().insert(key2, value);
         self.state.set_state(StateId::gen());
     }
 
@@ -423,7 +420,7 @@ where
     fn extend<T: IntoIterator<Item = (K1, It)>>(&mut self, iter: T) {
         let mut has_modified = false;
         for (k1, m) in iter {
-            let sub = self.data.entry(k1).or_insert_with(HashMap::new);
+            let sub = self.data.entry(k1).or_default();
             let orig_len = sub.len();
             sub.extend(m);
             has_modified |= orig_len != sub.len();
@@ -540,7 +537,7 @@ where
         self.data
             .get(key1)
             .and_then(|m1| m1.get(key2).and_then(|m2| m2.get(key3)))
-            .map(|v| v.clone())
+            .cloned()
             .ok_or_else(|| anyhow::anyhow!("key not found"))
     }
 }
@@ -621,9 +618,9 @@ impl<K1: Eq + Hash, K2: Eq + Hash, K3: Eq + Hash, V> OnMemorySrc3Args<K1, K2, K3
     pub fn insert(&mut self, key1: K1, key2: K2, key3: K3, value: V) {
         self.data
             .entry(key1)
-            .or_insert_with(HashMap::new)
+            .or_default()
             .entry(key2)
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(key3, value);
         self.state.set_state(StateId::gen());
     }
@@ -699,7 +696,7 @@ where
     fn extend<T: IntoIterator<Item = (K1, It)>>(&mut self, iter: T) {
         let mut has_modified = false;
         for (k1, m) in iter {
-            let sub = self.data.entry(k1).or_insert_with(HashMap::new);
+            let sub = self.data.entry(k1).or_default();
             let orig_len = sub.len();
             sub.extend(m);
             has_modified |= orig_len != sub.len();
@@ -836,27 +833,27 @@ mod tests {
     #[rstest]
     fn test_1arg_contains_key(src_1arg: OnMemorySrc<String, u32>) {
         let state = src_1arg.state();
-        assert_eq!(src_1arg.contains_key("a"), true);
+        assert!(src_1arg.contains_key("a"));
         assert_eq!(state, src_1arg.state());
-        assert_eq!(src_1arg.contains_key("b"), true);
+        assert!(src_1arg.contains_key("b"));
         assert_eq!(state, src_1arg.state());
-        assert_eq!(src_1arg.contains_key("c"), true);
+        assert!(src_1arg.contains_key("c"));
         assert_eq!(state, src_1arg.state());
-        assert_eq!(src_1arg.contains_key("d"), false);
+        assert!(!src_1arg.contains_key("d"));
         assert_eq!(state, src_1arg.state());
     }
 
     #[rstest]
     fn test_1arg_is_empty(src_1arg: OnMemorySrc<String, u32>) {
         let state = src_1arg.state();
-        assert_eq!(src_1arg.is_empty(), false);
+        assert!(!src_1arg.is_empty());
         assert_eq!(state, src_1arg.state());
         let mut src = OnMemorySrc::new("src");
         let state = src.state();
-        assert_eq!(src.is_empty(), true);
+        assert!(src.is_empty());
         assert_eq!(state, src.state());
         src.insert("a".to_string(), 1);
-        assert_eq!(src.is_empty(), false);
+        assert!(!src.is_empty());
         assert_ne!(state, src.state());
     }
 
@@ -898,7 +895,7 @@ mod tests {
         let state = src.state();
         src.clear();
         assert_ne!(src.state(), state);
-        assert_eq!(src.is_empty(), true);
+        assert!(src.is_empty());
 
         // no change
         let state = src.state();
@@ -937,27 +934,27 @@ mod tests {
     #[rstest]
     fn test_2args_contains_key(src_2args: OnMemorySrc2Args<String, String, u32>) {
         let state = src_2args.state();
-        assert_eq!(src_2args.contains_key("a", "x"), true);
+        assert!(src_2args.contains_key("a", "x"));
         assert_eq!(state, src_2args.state());
-        assert_eq!(src_2args.contains_key("b", "y"), true);
+        assert!(src_2args.contains_key("b", "y"));
         assert_eq!(state, src_2args.state());
-        assert_eq!(src_2args.contains_key("c", "z"), true);
+        assert!(src_2args.contains_key("c", "z"));
         assert_eq!(state, src_2args.state());
-        assert_eq!(src_2args.contains_key("d", "z"), false);
+        assert!(!src_2args.contains_key("d", "z"));
         assert_eq!(src_2args.state(), state);
     }
 
     #[rstest]
     fn test_2args_is_empty(src_2args: OnMemorySrc2Args<String, String, u32>) {
         let state = src_2args.state();
-        assert_eq!(src_2args.is_empty(), false);
+        assert!(!src_2args.is_empty());
         assert_eq!(state, src_2args.state());
         let mut src = OnMemorySrc2Args::new("src");
         let state = src.state();
-        assert_eq!(src.is_empty(), true);
+        assert!(src.is_empty());
         assert_eq!(state, src.state());
         src.insert("a".to_string(), "x".to_string(), 1);
-        assert_eq!(src.is_empty(), false);
+        assert!(!src.is_empty());
         assert_ne!(state, src.state());
     }
 
@@ -999,7 +996,7 @@ mod tests {
         let state = src.state();
         src.clear();
         assert_ne!(src.state(), state);
-        assert_eq!(src.is_empty(), true);
+        assert!(src.is_empty());
 
         // no change
         let state = src.state();
@@ -1041,27 +1038,27 @@ mod tests {
     #[rstest]
     fn test_3args_contains_key(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
         let state = src_3args.state();
-        assert_eq!(src_3args.contains_key("a", "x", "i"), true);
+        assert!(src_3args.contains_key("a", "x", "i"));
         assert_eq!(state, src_3args.state());
-        assert_eq!(src_3args.contains_key("b", "y", "j"), true);
+        assert!(src_3args.contains_key("b", "y", "j"));
         assert_eq!(state, src_3args.state());
-        assert_eq!(src_3args.contains_key("c", "z", "k"), true);
+        assert!(src_3args.contains_key("c", "z", "k"));
         assert_eq!(state, src_3args.state());
-        assert_eq!(src_3args.contains_key("d", "z", "k"), false);
+        assert!(!src_3args.contains_key("d", "z", "k"));
         assert_eq!(src_3args.state(), state);
     }
 
     #[rstest]
     fn test_3args_is_empty(src_3args: OnMemorySrc3Args<String, String, String, u32>) {
         let state = src_3args.state();
-        assert_eq!(src_3args.is_empty(), false);
+        assert!(!src_3args.is_empty());
         assert_eq!(state, src_3args.state());
         let mut src = OnMemorySrc3Args::new("src");
         let state = src.state();
-        assert_eq!(src.is_empty(), true);
+        assert!(src.is_empty());
         assert_eq!(state, src.state());
         src.insert("a".to_string(), "x".to_string(), "i".to_string(), 1);
-        assert_eq!(src.is_empty(), false);
+        assert!(!src.is_empty());
         assert_ne!(state, src.state());
     }
 
@@ -1087,7 +1084,7 @@ mod tests {
         let state = src.state();
         src.clear();
         assert_ne!(src.state(), state);
-        assert_eq!(src.is_empty(), true);
+        assert!(src.is_empty());
 
         // no change
         let state = src.state();

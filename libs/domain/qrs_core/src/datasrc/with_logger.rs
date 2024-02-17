@@ -227,20 +227,19 @@ mod tests {
 
     #[fixture]
     fn src_1arg() -> OnMemorySrc<&'static str, i32> {
-        let src = OnMemorySrc::with_data(
+        OnMemorySrc::with_data(
             "src",
             hashmap! {
                 "a" => 1,
                 "b" => 2,
                 "c" => 3,
             },
-        );
-        src
+        )
     }
 
     #[fixture]
     fn src_2args() -> OnMemorySrc2Args<&'static str, &'static str, i32> {
-        let src = OnMemorySrc2Args::with_data(
+        OnMemorySrc2Args::with_data(
             "src",
             hashmap! {
                 "a" => hashmap! {
@@ -256,13 +255,12 @@ mod tests {
                     "y" => 6,
                 },
             },
-        );
-        src
+        )
     }
 
     #[fixture]
     fn src_3args() -> OnMemorySrc3Args<&'static str, &'static str, &'static str, i32> {
-        let src = OnMemorySrc3Args::with_data(
+        OnMemorySrc3Args::with_data(
             "src",
             hashmap! {
                 "a" => hashmap! {
@@ -296,8 +294,7 @@ mod tests {
                     },
                 },
             },
-        );
-        src
+        )
     }
 
     #[rstest]

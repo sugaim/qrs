@@ -32,20 +32,20 @@ impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
 }
 
 fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
-    let mut map = HashMap::new();
+    let mut map: HashMap<_, Vec<Box<dyn ISchemaItem>>> = HashMap::new();
     map.insert(
         "qrs_core/chrono",
         vec![
-            Box::new(SchemaItem::<qrs_core::chrono::Calendar>::default()) as _,
-            Box::new(SchemaItem::<qrs_core::chrono::CalendarSymbol>::default()) as _,
-            Box::new(SchemaItem::<qrs_core::chrono::DateTime<chrono::FixedOffset>>::default()) as _,
-            Box::new(SchemaItem::<qrs_core::chrono::DateTime<chrono::Utc>>::default()) as _,
-            Box::new(SchemaItem::<qrs_core::chrono::DateTime<chrono_tz::Tz>>::default()) as _,
+            Box::<SchemaItem<qrs_core::chrono::Calendar>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::CalendarSymbol>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::DateTime<chrono::FixedOffset>>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::DateTime<chrono::Utc>>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::DateTime<chrono_tz::Tz>>>::default() as _,
         ],
     );
     map.insert(
         "qrs_core/func1d",
-        vec![Box::new(SchemaItem::<qrs_core::func1d::SemiContinuity>::default()) as _],
+        vec![Box::<SchemaItem<qrs_core::func1d::SemiContinuity>>::default() as _],
     );
     map
 }
@@ -59,7 +59,7 @@ pub fn gen_schema() -> anyhow::Result<()> {
 
     for (subdir, items) in get_schema_items() {
         let mut dir = root_dir.clone();
-        dir.push(&subdir);
+        dir.push(subdir);
         std::fs::create_dir_all(&dir)?;
         for item in items {
             item.gen(&dir)?;
@@ -121,7 +121,7 @@ mod tests {
 
         for (subdir, items) in get_schema_items() {
             let mut dir = root_dir.clone();
-            dir.push(&subdir);
+            dir.push(subdir);
             for item in items {
                 item.check(&dir).unwrap();
             }

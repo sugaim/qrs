@@ -100,7 +100,7 @@ impl VecBuffer {
         let ptr = self.data.as_ptr() as *const T;
         let cap = self.data.capacity() / unit_sz;
         std::mem::forget(self.data); // to avoid freeing the memory via drop
-        let data = unsafe { Vec::from_raw_parts(ptr as *mut T, 0, cap) };
-        data
+
+        unsafe { Vec::from_raw_parts(ptr as *mut T, 0, cap) }
     }
 }

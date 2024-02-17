@@ -55,7 +55,7 @@ mod _node {
             let override_state = (0..(layers.len() + 1))
                 .map(|_| StateId::gen())
                 .collect::<Vec<_>>();
-            let self_state = override_state.last().unwrap().clone();
+            let self_state = *override_state.last().unwrap();
             let res = Arc::new(Mutex::new(Self {
                 src_id: src.id(),
                 info: PublisherState::new(desc),
@@ -101,11 +101,9 @@ mod _node {
         /// The state id of the node after the layer is popped is also returned.
         pub fn pop(&mut self) -> Option<(StateId, L)> {
             let popped = self.layers.pop();
-            if popped.is_none() {
-                return None;
-            }
+            popped.as_ref()?;
             let prev_state = self.override_state.pop().unwrap();
-            let new_state = self.override_state.last().unwrap().clone();
+            let new_state = *self.override_state.last().unwrap();
             let mut node_state = self.info.state();
 
             // remove prev state(see bitxor property) and reflect new state
@@ -119,7 +117,7 @@ mod _node {
         ///
         /// The state id of the node after the layer is pushed is returned.
         pub fn push(&mut self, layer: L) -> StateId {
-            let prev_state = self.override_state.last().unwrap().clone();
+            let prev_state = *self.override_state.last().unwrap();
             let new_state = StateId::gen();
             let mut node_state = self.info.state();
 
@@ -147,10 +145,10 @@ mod _node {
             self.layers.extend(iter);
             let num_incr = self.layers.len() - orig_len;
 
-            let cur_state = self.override_state.last().unwrap().clone();
+            let cur_state = *self.override_state.last().unwrap();
             self.override_state
                 .extend((0..num_incr).map(|_| StateId::gen()));
-            let new_state = self.override_state.last().unwrap().clone();
+            let new_state = *self.override_state.last().unwrap();
 
             let mut node_state = self.info.state();
             node_state ^= cur_state;
@@ -176,6 +174,8 @@ mod _node {
             self.info.set_state(state ^ layer_state);
         }
     }
+
+    pub(super) type SharedNode<L> = Arc<Mutex<_Node<L>>>;
 }
 
 // -----------------------------------------------------------------------------
@@ -257,7 +257,7 @@ where
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
-            (node.desc().into(), node.id(), node.state())
+            (node.desc(), node.id(), node.state())
         };
         Tree::Branch {
             desc,
@@ -336,7 +336,7 @@ where
 #[listener(transparent = "node")]
 pub struct Overridable<S, K, V> {
     src: S,
-    node: Arc<Mutex<_node::_Node<HashMap<K, V>>>>,
+    node: _node::SharedNode<HashMap<K, V>>,
 }
 
 //
@@ -586,7 +586,7 @@ where
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
-            (node.desc().into(), node.id(), node.state())
+            (node.desc(), node.id(), node.state())
         };
         Tree::Branch {
             desc,
@@ -681,7 +681,7 @@ where
 #[listener(transparent = "node")]
 pub struct Overridable2Args<S, K1, K2, V> {
     src: S,
-    node: Arc<Mutex<_node::_Node<HashMap<K1, HashMap<K2, V>>>>>,
+    node: _node::SharedNode<HashMap<K1, HashMap<K2, V>>>,
 }
 
 //
@@ -960,7 +960,7 @@ where
     fn tree(&self) -> super::Tree {
         let (desc, id, state) = {
             let node = self.node.lock().unwrap();
-            (node.desc().into(), node.id(), node.state())
+            (node.desc(), node.id(), node.state())
         };
         Tree::Branch {
             desc,
@@ -1068,9 +1068,10 @@ where
 #[derive(Debug, Node, Listener)]
 #[node(transparent = "node")]
 #[listener(transparent = "node")]
+#[allow(clippy::type_complexity)]
 pub struct Overridable3Args<S, K1, K2, K3, V> {
     src: S,
-    node: Arc<Mutex<_node::_Node<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>>>,
+    node: _node::SharedNode<HashMap<K1, HashMap<K2, HashMap<K3, V>>>>,
 }
 
 //

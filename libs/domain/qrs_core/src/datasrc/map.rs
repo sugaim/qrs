@@ -646,20 +646,19 @@ mod tests {
 
     #[fixture]
     fn src_1arg() -> OnMemorySrc<String, i32> {
-        let src = OnMemorySrc::with_data(
+        OnMemorySrc::with_data(
             "src",
             hashmap! {
                 "a".to_owned() => 1,
                 "b".to_owned() => 2,
                 "c".to_owned() => 3,
             },
-        );
-        src
+        )
     }
 
     #[fixture]
     fn src_2args() -> OnMemorySrc2Args<String, String, i32> {
-        let src = OnMemorySrc2Args::with_data(
+        OnMemorySrc2Args::with_data(
             "src",
             hashmap! {
                 "a".to_owned() => hashmap! {
@@ -675,13 +674,12 @@ mod tests {
                     "y".to_owned() => 6,
                 },
             },
-        );
-        src
+        )
     }
 
     #[fixture]
     fn src_3args() -> OnMemorySrc3Args<String, String, String, i32> {
-        let src = OnMemorySrc3Args::with_data(
+        OnMemorySrc3Args::with_data(
             "src",
             hashmap! {
                 "a".to_owned() => hashmap! {
@@ -715,8 +713,7 @@ mod tests {
                     },
                 },
             },
-        );
-        src
+        )
     }
 
     #[rstest]

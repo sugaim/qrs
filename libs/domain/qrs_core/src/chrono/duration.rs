@@ -957,6 +957,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn test_add() {
         let tested = Duration::with_days(1) + Duration::with_days(2);
         let expected = Duration::with_days(3);
@@ -990,6 +991,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn test_sub() {
         let tested = Duration::with_days(1) - Duration::with_days(2);
         let expected = Duration::with_days(-1);
@@ -1081,6 +1083,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn test_mul() {
         let tested = Duration::with_days(1) * 2;
         let expected = Duration::with_days(2);
@@ -1092,6 +1095,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref)]
     fn test_div() {
         let tested = Duration::with_days(2) / 2;
         let expected = Duration::with_days(1);

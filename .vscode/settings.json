@@ -7,5 +7,7 @@
   },
   "[json]": {
     "editor.formatOnSave": true,
-  }
+  },
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy"
 }

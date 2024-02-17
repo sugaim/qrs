@@ -285,9 +285,9 @@ impl Calendar {
             return None;
         }
         if 5 < date.weekday().number_from_monday() {
-            return Some(self.0.extra_bizds.binary_search(date).is_err());
+            Some(self.0.extra_bizds.binary_search(date).is_err())
         } else {
-            return Some(self.0.extra_holds.binary_search(date).is_ok());
+            Some(self.0.extra_holds.binary_search(date).is_ok())
         }
     }
 
@@ -298,9 +298,9 @@ impl Calendar {
             return None;
         }
         if 5 < date.weekday().number_from_monday() {
-            return Some(self.0.extra_bizds.binary_search(date).is_ok());
+            Some(self.0.extra_bizds.binary_search(date).is_ok())
         } else {
-            return Some(self.0.extra_holds.binary_search(date).is_err());
+            Some(self.0.extra_holds.binary_search(date).is_err())
         }
     }
 
@@ -333,10 +333,10 @@ impl Calendar {
     /// assert_eq!(iter.next(), None);
     /// ```
     #[inline]
-    pub fn iter_bizdays<'a>(
-        &'a self,
+    pub fn iter_bizdays(
+        &self,
         start: NaiveDate,
-    ) -> impl DoubleEndedIterator<Item = NaiveDate> + 'a {
+    ) -> impl DoubleEndedIterator<Item = NaiveDate> + '_ {
         DateIterator {
             cur: start,
             from: self.0.valid_from,
@@ -372,10 +372,10 @@ impl Calendar {
     /// assert_eq!(iter.next(), None);
     /// ```
     #[inline]
-    pub fn iter_holidays<'a>(
-        &'a self,
+    pub fn iter_holidays(
+        &self,
         start: NaiveDate,
-    ) -> impl DoubleEndedIterator<Item = NaiveDate> + 'a {
+    ) -> impl DoubleEndedIterator<Item = NaiveDate> + '_ {
         DateIterator {
             cur: start,
             from: self.0.valid_from,
@@ -707,7 +707,7 @@ mod tests {
         )
         .unwrap();
 
-        let cal = Calendar::of_any_closed(vec![&cal1, &cal2].into_iter());
+        let cal = Calendar::of_any_closed(vec![&cal1, &cal2]);
         assert_eq!(
             cal.extra_holidays(),
             &[
@@ -741,7 +741,7 @@ mod tests {
         )
         .unwrap();
 
-        let cal = Calendar::of_all_closed(vec![&cal1, &cal2].into_iter());
+        let cal = Calendar::of_all_closed(vec![&cal1, &cal2]);
         assert_eq!(
             cal.extra_holidays(),
             &[NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()]

@@ -302,12 +302,12 @@ impl<P: Notifier> Notifier for Mutex<P> {
 
     #[inline]
     fn accept_listener(&mut self, subsc: Weak<Mutex<dyn Listener>>) {
-        self.lock().unwrap().accept_listener(subsc);
+        self.get_mut().unwrap().accept_listener(subsc);
     }
 
     #[inline]
     fn remove_listener(&mut self, id: &NodeId) {
-        self.lock().unwrap().remove_listener(id)
+        self.get_mut().unwrap().remove_listener(id)
     }
 }
 
@@ -345,7 +345,7 @@ pub trait Listener: Node {
 impl<S: Listener> Listener for Mutex<S> {
     #[inline]
     fn listen(&mut self, publisher: &NodeId, state: &StateId) {
-        self.lock().unwrap().listen(publisher, state)
+        self.get_mut().unwrap().listen(publisher, state)
     }
 }
 
