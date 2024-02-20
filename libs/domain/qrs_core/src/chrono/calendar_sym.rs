@@ -144,9 +144,9 @@ impl JsonSchema for CalendarSymbol {
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut sch = <String as JsonSchema>::json_schema(gen).into_object();
-        sch.metadata().description = Some("A symbol for a calendar.".to_owned());
-        sch.metadata().title = Some(Self::schema_name());
-        sch.metadata().id = Some(Self::schema_id().into_owned());
+        sch.metadata().description = Some(
+            "A symbol for a calendar. Combined calendars are available. As an atom, only alphanumeric characters or '_' are allowed.".to_owned(),
+        );
         sch.metadata().examples = vec![
             "TK".into(),
             "TK|NY".into(),

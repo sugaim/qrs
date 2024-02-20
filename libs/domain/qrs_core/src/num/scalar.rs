@@ -2,7 +2,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssi
 
 use num::{One, Zero};
 
-use super::{Exp, Log};
+use super::{Exp, Log, Vector};
 
 /// Trait for arithmetic operations.
 /// Intentionally declared loosely, such as no `Copy` requirement.
@@ -91,7 +91,12 @@ impl FloatBased for f64 {
 /// assert_impl_all!(f64: Scalar);
 /// ```
 pub trait Scalar:
-    Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
+    Arithmetic
+    + FloatBased
+    + Vector<Self::BaseFloat>
+    + From<Self::BaseFloat>
+    + Exp<Output = Self>
+    + Log<Output = Self>
 {
     fn nearest_value_of(v: f64) -> Self {
         Self::from(<Self as FloatBased>::nearest_base_float_of(v))
@@ -99,7 +104,12 @@ pub trait Scalar:
 }
 
 impl<T> Scalar for T where
-    T: Arithmetic + FloatBased + From<Self::BaseFloat> + Exp<Output = Self> + Log<Output = Self>
+    T: Arithmetic
+        + FloatBased
+        + Vector<Self::BaseFloat>
+        + From<Self::BaseFloat>
+        + Exp<Output = Self>
+        + Log<Output = Self>
 {
 }
 

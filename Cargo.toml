@@ -9,6 +9,7 @@ resolver = "2"
 members = [
     "libs/domain/qrs_core",
     "libs/domain/qrs_core/qrs_core_derive",
+    "libs/domain/qrs_model",
     "scripts/qrs_scripts",
 ]
 
@@ -48,3 +49,4 @@ quote = { version = "1.0.35" }
 
 # internal
 qrs_core = { path = "libs/domain/qrs_core" }
+qrs_model = { path = "libs/domain/qrs_model" }

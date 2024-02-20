@@ -18,7 +18,7 @@ use chrono::{NaiveDate, NaiveTime, TimeZone};
 ///
 /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DateTimeBuilder<D, T, Tz> {
     date: D,
     time: T,
@@ -321,7 +321,7 @@ impl<Tz: TimeZone> DateTimeBuilder<NaiveDate, NaiveTime, Tz> {
     /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
     /// ```
     #[inline]
-    pub fn build(self) -> super::DateTime<Tz> {
+    pub fn build(self) -> super::GenericDateTime<Tz> {
         self.timezone
             .from_local_datetime(&self.date.and_time(self.time))
             .single()

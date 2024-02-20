@@ -2,6 +2,7 @@
 name = "qrs_core"
 version.workspace = true
 edition.workspace = true
+exclude.workspace = true
 
 [features]
 default = ["derive"]
@@ -12,15 +13,12 @@ anyhow = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 derivative = { workspace = true }
-dyn-clone = { workspace = true }
 itertools = { workspace = true }
 num = { workspace = true }
 maplit = { workspace = true }
-moka = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-static_assertions = { workspace = true }
 rust_decimal = { workspace = true }
 thiserror = { workspace = true }
 peg = { workspace = true }
@@ -33,3 +31,4 @@ qrs_core_derive = { path = "qrs_core_derive", optional = true }
 approx = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
+static_assertions = { workspace = true }

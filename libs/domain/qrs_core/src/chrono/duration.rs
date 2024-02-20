@@ -9,7 +9,7 @@ use num::Zero;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize, Serializer};
 
-use super::Velocity;
+use super::Rate;
 
 // -----------------------------------------------------------------------------
 // Duration
@@ -734,19 +734,19 @@ define_datetime_self_assign!(SubAssign, sub_assign);
 macro_rules! define_div_to_velocity {
     ($t:ty) => {
         impl std::ops::Div<Duration> for $t {
-            type Output = Velocity<$t>;
+            type Output = Rate<$t>;
 
             #[inline]
             fn div(self, rhs: Duration) -> Self::Output {
-                Velocity::new(self, rhs)
+                Rate::new(self, rhs)
             }
         }
         impl std::ops::Div<&Duration> for $t {
-            type Output = Velocity<$t>;
+            type Output = Rate<$t>;
 
             #[inline]
             fn div(self, rhs: &Duration) -> Self::Output {
-                Velocity::new(self, *rhs)
+                Rate::new(self, *rhs)
             }
         }
     };
@@ -982,10 +982,12 @@ mod tests {
 
         // datetime + duration
         let base_date =
-            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z").unwrap();
+            crate::chrono::GenericDateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z")
+                .unwrap();
         let dur = Duration::with_days(1);
         let expected =
-            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z").unwrap();
+            crate::chrono::GenericDateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z")
+                .unwrap();
         assert_eq!(base_date + dur, expected);
         assert_eq!(base_date + &dur, expected);
     }
@@ -1016,10 +1018,12 @@ mod tests {
 
         // datetime - duration
         let base_date =
-            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z").unwrap();
+            crate::chrono::GenericDateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z")
+                .unwrap();
         let dur = Duration::with_days(1);
         let expected =
-            crate::chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z").unwrap();
+            crate::chrono::GenericDateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z")
+                .unwrap();
         assert_eq!(base_date - dur, expected);
         assert_eq!(base_date - &dur, expected);
     }
@@ -1125,23 +1129,23 @@ mod tests {
     #[test]
     fn test_velocity() {
         let tested = 1.0 / Duration::with_secs(1);
-        let expected = Velocity::new(1.0, Duration::with_secs(1));
+        let expected = Rate::new(1.0, Duration::with_secs(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / &Duration::with_secs(1);
-        let expected = Velocity::new(1.0, Duration::with_secs(1));
+        let expected = Rate::new(1.0, Duration::with_secs(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / Duration::with_mins(1);
-        let expected = Velocity::new(1.0, Duration::with_mins(1));
+        let expected = Rate::new(1.0, Duration::with_mins(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / &Duration::with_mins(1);
-        let expected = Velocity::new(1.0, Duration::with_mins(1));
+        let expected = Rate::new(1.0, Duration::with_mins(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / Duration::with_days(1);
-        let expected = Velocity::new(1.0, Duration::with_days(1));
+        let expected = Rate::new(1.0, Duration::with_days(1));
         assert_eq!(tested, expected);
     }
 }

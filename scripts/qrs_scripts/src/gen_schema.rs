@@ -38,9 +38,12 @@ fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
         vec![
             Box::<SchemaItem<qrs_core::chrono::Calendar>>::default() as _,
             Box::<SchemaItem<qrs_core::chrono::CalendarSymbol>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::DateTime<chrono::FixedOffset>>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::DateTime<chrono::Utc>>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::DateTime<chrono_tz::Tz>>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono::FixedOffset>>>::default()
+                as _,
+            Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono::Utc>>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono_tz::Tz>>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::DateTime>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::TimeZone>>::default() as _,
         ],
     );
     map.insert(

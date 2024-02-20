@@ -86,7 +86,7 @@ where
         buf: LazyTypedVecBuffer,
     ) -> Result<Self, anyhow::Error> {
         let knots = Knots::new(gs, vs)?;
-        let mut slopes = buf.try_into_vec().unwrap_or_default();
+        let mut slopes = buf.into_empty_vec();
         scheme.calc_slope(&mut slopes, knots.grids(), knots.values())?;
         ensure!(
             slopes.len() == knots.grids().len(),
@@ -229,7 +229,7 @@ where
 impl<G, V, S> DestructibleInterp1d for CHermite1d<G, V, S>
 where
     G: Clone + PartialOrd + Sub + RelPos,
-    V: Vector<<G as RelPos>::Output>,
+    V: 'static + Vector<<G as RelPos>::Output>,
     S: CHermiteScheme<G, V>,
 {
     type Builer = CHermite1dBuilder<S>;
@@ -255,7 +255,7 @@ where
 /// This trait behaves as a interpolation scheme for cubic hermite spline by
 /// providing the way to calculate the slopes at the knots.
 pub trait CHermiteScheme<G: Sub, V> {
-    type Slope: Clone + Mul<G::Output, Output = V>;
+    type Slope: 'static + Clone + Mul<G::Output, Output = V>;
 
     fn calc_slope(
         &self,
@@ -309,7 +309,7 @@ impl<S> CHermite1dBuilder<S> {
 impl<G, V, S> Interp1dBuilder<G, V> for CHermite1dBuilder<S>
 where
     G: Clone + PartialOrd + Sub + RelPos,
-    V: Vector<<G as RelPos>::Output>,
+    V: 'static + Vector<<G as RelPos>::Output>,
     S: CHermiteScheme<G, V>,
 {
     type Err = anyhow::Error;
@@ -320,7 +320,7 @@ where
             grids,
             values,
             self.scheme,
-            self.coeff_buf.try_into_vec().unwrap_or_default(),
+            self.coeff_buf.into_empty_vec(),
             self.slope_buf,
         )
     }
@@ -350,7 +350,7 @@ impl<G, V> CHermiteScheme<G, V> for CatmullRomScheme
 where
     G: Clone + Sub + RelPos,
     V: Vector<<G as RelPos>::Output> + Div<<G as Sub>::Output>,
-    <V as Div<<G as Sub>::Output>>::Output: Clone + Mul<<G as Sub>::Output, Output = V>,
+    <V as Div<<G as Sub>::Output>>::Output: 'static + Clone + Mul<<G as Sub>::Output, Output = V>,
 {
     type Slope = <V as Div<<G as Sub>::Output>>::Output;
 

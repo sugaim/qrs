@@ -1,17 +1,17 @@
 use num::{One, Zero};
 use serde::{Deserialize, Serialize};
 
-use crate::num::{Arithmetic, FloatBased, Scalar, Vector};
+use crate::num::{Arithmetic, FloatBased, Vector};
 
 use super::Duration;
 
 // -----------------------------------------------------------------------------
-// Velocity
+// Rate
 //
 
-/// A velocity, which is a change per given duration.
+/// A Rate, which is a change per given duration.
 #[derive(Debug, Clone, Copy)]
-pub struct Velocity<V> {
+pub struct Rate<V> {
     chg: V,
     is_diverged: bool,
 }
@@ -31,7 +31,7 @@ fn _dur2cnt<T: num::Float + Arithmetic>(dur: Duration) -> T {
 // display, serde
 //
 
-impl<V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Velocity<V>
+impl<V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Rate<V>
 where
     V::BaseFloat: Serialize,
 {
@@ -57,10 +57,8 @@ where
     }
 }
 
-impl<'de, V: FloatBased + Vector<V::BaseFloat> + Deserialize<'de>> Deserialize<'de>
-    for Velocity<V>
-{
-    fn deserialize<D>(deserializer: D) -> Result<Velocity<V>, D::Error>
+impl<'de, V: FloatBased + Vector<V::BaseFloat> + Deserialize<'de>> Deserialize<'de> for Rate<V> {
+    fn deserialize<D>(deserializer: D) -> Result<Rate<V>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -70,15 +68,15 @@ impl<'de, V: FloatBased + Vector<V::BaseFloat> + Deserialize<'de>> Deserialize<'
             duration: Duration,
         }
         let helper = VelocityHelper::deserialize(deserializer)?;
-        Ok(Velocity::new(helper.change, helper.duration))
+        Ok(Rate::new(helper.change, helper.duration))
     }
 }
 
 //
 // construction
 //
-impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
-    /// Create a new velocity.
+impl<V: FloatBased + Vector<V::BaseFloat>> Rate<V> {
+    /// Create a new Rate.
     /// Note that this function does not check if the duration is zero.
     #[inline]
     pub fn new(chg: V, dur: Duration) -> Self {
@@ -98,7 +96,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
         }
     }
 
-    /// Create a new velocity.
+    /// Create a new Rate.
     /// If the duration is zero, this function returns `None`.
     #[inline]
     pub fn safe_new(chg: V, dur: Duration) -> Option<Self> {
@@ -108,9 +106,19 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
             Some(Self::new(chg, dur))
         }
     }
+
+    /// Create a new Rate with annual(365 days) duration
+    ///
+    /// Note that this assumes a year is 365 days.
+    /// In financial context, this means that ACT/365 fixed convention
+    /// is assumed when this rate is used to get the change.
+    #[inline]
+    pub fn with_annual(chg: V) -> Self {
+        Self::new(chg, Duration::with_secs(60 * 60 * 24 * 365))
+    }
 }
 
-impl<V: FloatBased + Vector<V::BaseFloat>> Zero for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> Zero for Rate<V> {
     #[inline]
     fn zero() -> Self {
         Self {
@@ -128,7 +136,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Zero for Velocity<V> {
 //
 // comparison
 //
-impl<V: PartialEq + FloatBased + Vector<V::BaseFloat>> PartialEq for Velocity<V> {
+impl<V: PartialEq + FloatBased + Vector<V::BaseFloat>> PartialEq for Rate<V> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         if self.is_diverged() || other.is_diverged() {
@@ -138,7 +146,7 @@ impl<V: PartialEq + FloatBased + Vector<V::BaseFloat>> PartialEq for Velocity<V>
     }
 }
 
-impl<V: PartialOrd + FloatBased + Vector<V::BaseFloat>> PartialOrd for Velocity<V> {
+impl<V: PartialOrd + FloatBased + Vector<V::BaseFloat>> PartialOrd for Rate<V> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.is_diverged() || other.is_diverged() {
@@ -151,14 +159,18 @@ impl<V: PartialOrd + FloatBased + Vector<V::BaseFloat>> PartialOrd for Velocity<
 //
 // methods
 //
-impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
+impl<V: FloatBased> FloatBased for Rate<V> {
+    type BaseFloat = V::BaseFloat;
+}
+
+impl<V: FloatBased + Vector<V::BaseFloat>> Rate<V> {
     /// Get the change per given duration.
     ///
     /// # Examples
     /// ```
     /// use qrs_core::chrono::Duration;
     ///
-    /// let vel = qrs_core::chrono::Velocity::new(10.0, Duration::with_secs(1));
+    /// let vel = qrs_core::chrono::Rate::new(10.0, Duration::with_secs(1));
     ///
     /// assert_eq!(vel.to_change(Duration::with_mins(1)), 600.0);
     /// ```
@@ -177,6 +189,12 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
         }
     }
 
+    /// Get the change per a year(365 days).
+    #[inline]
+    pub fn to_annual_change(self) -> V {
+        self.to_change(Duration::with_secs(60 * 60 * 24 * 365))
+    }
+
     /// Check that zero-division occurred.
     ///
     /// # Examples
@@ -184,10 +202,10 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
     /// use qrs_core::chrono::Duration;
     /// use num::Zero;
     ///
-    /// let vel = qrs_core::chrono::Velocity::new(10.0, Duration::with_secs(1));
+    /// let vel = qrs_core::chrono::Rate::new(10.0, Duration::with_secs(1));
     /// assert!(!vel.is_diverged());
     ///
-    /// let vel = qrs_core::chrono::Velocity::new(10.0, Duration::zero());
+    /// let vel = qrs_core::chrono::Rate::new(10.0, Duration::zero());
     /// assert!(vel.is_diverged());
     /// ```
     #[inline]
@@ -200,7 +218,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
 // operators
 //
 // neg
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Neg for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Neg for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -213,7 +231,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Neg for Velocity<V> {
 }
 
 // add
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Add for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Add for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -221,7 +239,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Add for Velocity<V> {
         self + &rhs
     }
 }
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Add<&Velocity<V>> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Add<&Self> for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -232,7 +250,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Add<&Velocity<V>> for Veloc
 }
 
 // add assign
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::AddAssign<&Velocity<V>> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::AddAssign<&Self> for Rate<V> {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         if self.is_diverged() {
@@ -245,7 +263,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::AddAssign<&Velocity<V>> for
         self.chg += &rhs.chg;
     }
 }
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::AddAssign<Velocity<V>> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::AddAssign for Rate<V> {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         *self += &rhs;
@@ -253,7 +271,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::AddAssign<Velocity<V>> for 
 }
 
 // sub
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Sub for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Sub for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -261,7 +279,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Sub for Velocity<V> {
         self - &rhs
     }
 }
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Sub<&Velocity<V>> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Sub<&Self> for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -272,7 +290,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Sub<&Velocity<V>> for Veloc
 }
 
 // sub assign
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::SubAssign<&Self> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::SubAssign<&Self> for Rate<V> {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         if self.is_diverged() {
@@ -285,7 +303,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::SubAssign<&Self> for Veloci
         self.chg -= &rhs.chg;
     }
 }
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::SubAssign<Velocity<V>> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::SubAssign for Rate<V> {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         *self -= &rhs;
@@ -293,7 +311,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::SubAssign<Velocity<V>> for 
 }
 
 // mul
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Mul<Duration> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Mul<Duration> for Rate<V> {
     type Output = V;
 
     #[inline]
@@ -301,7 +319,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Mul<Duration> for Velocity<
         self.to_change(rhs)
     }
 }
-impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Mul<&Duration> for Velocity<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Mul<&Duration> for Rate<V> {
     type Output = V;
 
     #[inline]
@@ -309,7 +327,7 @@ impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Mul<&Duration> for Velocity
         self.to_change(*rhs)
     }
 }
-impl<K: Scalar, V: Vector<K>> std::ops::Mul<&K> for Velocity<V> {
+impl<K: Arithmetic, V: Vector<K>> std::ops::Mul<&K> for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -318,7 +336,7 @@ impl<K: Scalar, V: Vector<K>> std::ops::Mul<&K> for Velocity<V> {
         self
     }
 }
-impl<K: Scalar, V: Vector<K>> std::ops::MulAssign<&K> for Velocity<V> {
+impl<K: Arithmetic, V: Vector<K>> std::ops::MulAssign<&K> for Rate<V> {
     #[inline]
     fn mul_assign(&mut self, rhs: &K) {
         self.chg *= rhs;
@@ -326,7 +344,7 @@ impl<K: Scalar, V: Vector<K>> std::ops::MulAssign<&K> for Velocity<V> {
 }
 
 // div
-impl<K: Scalar, V: Vector<K>> std::ops::Div<&K> for Velocity<V> {
+impl<K: Arithmetic, V: Vector<K>> std::ops::Div<&K> for Rate<V> {
     type Output = Self;
 
     #[inline]
@@ -335,10 +353,18 @@ impl<K: Scalar, V: Vector<K>> std::ops::Div<&K> for Velocity<V> {
         self
     }
 }
-impl<K: Scalar, V: Vector<K>> std::ops::DivAssign<&K> for Velocity<V> {
+impl<K: Arithmetic, V: Vector<K>> std::ops::DivAssign<&K> for Rate<V> {
     #[inline]
     fn div_assign(&mut self, rhs: &K) {
         self.chg /= rhs;
+    }
+}
+impl<V: FloatBased + Vector<V::BaseFloat>> std::ops::Div<Duration> for Rate<V> {
+    type Output = Rate<Rate<V>>;
+
+    #[inline]
+    fn div(self, rhs: Duration) -> Self::Output {
+        Rate::new(self, rhs)
     }
 }
 
@@ -356,16 +382,16 @@ mod tests {
     #[rstest]
     fn cases_for_single(
         #[values(
-            Velocity::new(10.0, Duration::with_secs(1)),
-            Velocity::new(-10.0, Duration::with_secs(1)),
-            Velocity::new(10.0, Duration::with_secs(-2)),
-            Velocity::new(-10.0, Duration::with_secs(-2)),
-            Velocity::new(15.0, Duration::with_mins(2)),
-            Velocity::new(-15.0, Duration::with_mins(2)),
-            Velocity::new(10.0, Duration::zero()),
-            Velocity::new(-10.0, Duration::zero())
+            Rate::new(10.0, Duration::with_secs(1)),
+            Rate::new(-10.0, Duration::with_secs(1)),
+            Rate::new(10.0, Duration::with_secs(-2)),
+            Rate::new(-10.0, Duration::with_secs(-2)),
+            Rate::new(15.0, Duration::with_mins(2)),
+            Rate::new(-15.0, Duration::with_mins(2)),
+            Rate::new(10.0, Duration::zero()),
+            Rate::new(-10.0, Duration::zero())
         )]
-        vel: Velocity<f64>,
+        vel: Rate<f64>,
     ) {
     }
 
@@ -373,118 +399,105 @@ mod tests {
     #[rstest]
     fn cases_for_symmetric_pair(
         #[values(
-            Velocity::new(10.0, Duration::with_secs(1)),
-            Velocity::new(-10.0, Duration::with_secs(1)),
-            Velocity::new(10.0, Duration::with_secs(-2)),
-            Velocity::new(-10.0, Duration::with_secs(-2)),
-            Velocity::new(15.0, Duration::with_mins(2)),
-            Velocity::new(-15.0, Duration::with_mins(2)),
-            Velocity::new(10.0, Duration::zero()),
-            Velocity::new(-10.0, Duration::zero())
+            Rate::new(10.0, Duration::with_secs(1)),
+            Rate::new(-10.0, Duration::with_secs(1)),
+            Rate::new(10.0, Duration::with_secs(-2)),
+            Rate::new(-10.0, Duration::with_secs(-2)),
+            Rate::new(15.0, Duration::with_mins(2)),
+            Rate::new(-15.0, Duration::with_mins(2)),
+            Rate::new(10.0, Duration::zero()),
+            Rate::new(-10.0, Duration::zero())
         )]
-        lhs: Velocity<f64>,
+        lhs: Rate<f64>,
         #[values(
-            Velocity::new(10.0, Duration::with_secs(1)),
-            Velocity::new(-10.0, Duration::with_secs(1)),
-            Velocity::new(10.0, Duration::with_secs(-2)),
-            Velocity::new(-10.0, Duration::with_secs(-2)),
-            Velocity::new(15.0, Duration::with_mins(2)),
-            Velocity::new(-15.0, Duration::with_mins(2)),
-            Velocity::new(10.0, Duration::zero()),
-            Velocity::new(-10.0, Duration::zero())
+            Rate::new(10.0, Duration::with_secs(1)),
+            Rate::new(-10.0, Duration::with_secs(1)),
+            Rate::new(10.0, Duration::with_secs(-2)),
+            Rate::new(-10.0, Duration::with_secs(-2)),
+            Rate::new(15.0, Duration::with_mins(2)),
+            Rate::new(-15.0, Duration::with_mins(2)),
+            Rate::new(10.0, Duration::zero()),
+            Rate::new(-10.0, Duration::zero())
         )]
-        rhs: Velocity<f64>,
+        rhs: Rate<f64>,
     ) {
     }
 
     #[test]
     fn test_is_vector() {
-        assert_impl_all!(Velocity<f32>: Vector<f32>);
-        assert_impl_all!(Velocity<f64>: Vector<f64>);
+        assert_impl_all!(Rate<f32>: Vector<f32>);
+        assert_impl_all!(Rate<f64>: Vector<f64>);
     }
 
     #[test]
     fn test_new() {
-        let vel = Velocity::new(10.0, Duration::with_secs(1));
+        let vel = Rate::new(10.0, Duration::with_secs(1));
         assert_eq!(vel.chg, 10.0);
         assert!(!vel.is_diverged());
-        assert_eq!(
-            vel,
-            Velocity::safe_new(10.0, Duration::with_secs(1)).unwrap()
-        );
+        assert_eq!(vel, Rate::safe_new(10.0, Duration::with_secs(1)).unwrap());
 
-        let vel = Velocity::new(10.0, Duration::with_secs(2));
+        let vel = Rate::new(10.0, Duration::with_secs(2));
         assert_abs_diff_eq!(vel.chg, 5.0, epsilon = 1e-15);
         assert!(!vel.is_diverged());
-        assert_eq!(
-            vel,
-            Velocity::safe_new(10.0, Duration::with_secs(2)).unwrap()
-        );
+        assert_eq!(vel, Rate::safe_new(10.0, Duration::with_secs(2)).unwrap());
 
-        let vel = Velocity::new(10.0, Duration::with_secs(0));
+        let vel = Rate::new(10.0, Duration::with_secs(0));
         assert_eq!(vel.chg, 10.0);
         assert!(vel.is_diverged());
-        assert!(Velocity::safe_new(10.0, Duration::with_secs(0)).is_none());
+        assert!(Rate::safe_new(10.0, Duration::with_secs(0)).is_none());
     }
 
     #[test]
     fn test_serialize() {
-        let vel = Velocity::new(10.0, Duration::with_secs(1));
+        let vel = Rate::new(10.0, Duration::with_secs(1));
         let ser = serde_json::to_string(&vel).unwrap();
         assert_eq!(ser, r#"{"change":10.0,"duration":"PT1S"}"#);
 
-        let vel = Velocity::new(60.0, Duration::with_mins(2));
+        let vel = Rate::new(60.0, Duration::with_mins(2));
         let ser = serde_json::to_string(&vel).unwrap();
         assert_eq!(ser, r#"{"change":0.5,"duration":"PT1S"}"#);
 
-        let vel = Velocity::new(60.0, Duration::with_mins(-2));
+        let vel = Rate::new(60.0, Duration::with_mins(-2));
         let ser = serde_json::to_string(&vel).unwrap();
         assert_eq!(ser, r#"{"change":-0.5,"duration":"PT1S"}"#);
 
-        let vel = Velocity::new(10.0, Duration::with_secs(0));
+        let vel = Rate::new(10.0, Duration::with_secs(0));
         let ser = serde_json::to_string(&vel).unwrap();
         assert_eq!(ser, r#"{"change":10.0,"duration":"PT0S"}"#);
 
-        let vel = Velocity::new(-12.5, Duration::zero());
+        let vel = Rate::new(-12.5, Duration::zero());
         let ser = serde_json::to_string(&vel).unwrap();
         assert_eq!(ser, r#"{"change":-12.5,"duration":"PT0S"}"#);
     }
 
     #[test]
     fn test_deserialize() {
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change":10.0,"duration":"PT1S"}"#).unwrap();
-        assert_eq!(vel, Velocity::new(10.0, Duration::with_secs(1)));
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change":10.0,"duration":"PT1S"}"#).unwrap();
+        assert_eq!(vel, Rate::new(10.0, Duration::with_secs(1)));
 
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change":0.5,"duration":"PT1S"}"#).unwrap();
-        assert_eq!(vel, Velocity::new(60.0, Duration::with_mins(2)));
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change":0.5,"duration":"PT1S"}"#).unwrap();
+        assert_eq!(vel, Rate::new(60.0, Duration::with_mins(2)));
 
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change":-0.5,"duration":"PT1S"}"#).unwrap();
-        assert_eq!(vel, Velocity::new(60.0, Duration::with_mins(-2)));
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change":-0.5,"duration":"PT1S"}"#).unwrap();
+        assert_eq!(vel, Rate::new(60.0, Duration::with_mins(-2)));
 
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change": 60.0,"duration":"PT2M"}"#).unwrap();
-        assert_eq!(vel, Velocity::new(60.0, Duration::with_mins(2)));
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change": 60.0,"duration":"PT2M"}"#).unwrap();
+        assert_eq!(vel, Rate::new(60.0, Duration::with_mins(2)));
 
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change":60.0,"duration":"PT-2M"}"#).unwrap();
-        assert_eq!(vel, Velocity::new(60.0, Duration::with_mins(-2)));
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change":60.0,"duration":"PT-2M"}"#).unwrap();
+        assert_eq!(vel, Rate::new(60.0, Duration::with_mins(-2)));
 
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change":10.0,"duration":"PT0S"}"#).unwrap();
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change":10.0,"duration":"PT0S"}"#).unwrap();
         assert_eq!(vel.chg, 10.0);
         assert!(vel.is_diverged());
 
-        let vel: Velocity<f64> =
-            serde_json::from_str(r#"{"change":-12.5,"duration":"PT0S"}"#).unwrap();
+        let vel: Rate<f64> = serde_json::from_str(r#"{"change":-12.5,"duration":"PT0S"}"#).unwrap();
         assert_eq!(vel.chg, -12.5);
         assert!(vel.is_diverged());
     }
 
     #[apply(cases_for_symmetric_pair)]
-    fn test_partial_cmp(lhs: Velocity<f64>, rhs: Velocity<f64>) {
+    fn test_partial_cmp(lhs: Rate<f64>, rhs: Rate<f64>) {
         let act = lhs.partial_cmp(&rhs);
         if lhs.is_diverged() || rhs.is_diverged() {
             assert_eq!(act, None);
@@ -513,7 +526,7 @@ mod tests {
 
     #[test]
     fn test_to_change() {
-        let vel = Velocity::new(10.0, Duration::with_secs(1));
+        let vel = Rate::new(10.0, Duration::with_secs(1));
         assert_eq!(vel.to_change(Duration::with_secs(1)), 10.0);
         assert_eq!(vel.to_change(Duration::with_secs(-1)), -10.0);
         assert_eq!(vel.to_change(Duration::with_mins(1)), 600.0);
@@ -522,7 +535,7 @@ mod tests {
         assert_eq!(vel.to_change(Duration::with_mins(-2)), -1200.0);
         assert_eq!(vel.to_change(Duration::zero()), 0.0);
 
-        let vel = Velocity::new(-3600.0, Duration::with_mins(2));
+        let vel = Rate::new(-3600.0, Duration::with_mins(2));
         assert_eq!(vel.to_change(Duration::with_secs(1)), -30.0);
         assert_eq!(vel.to_change(Duration::with_secs(-1)), 30.0);
         assert_eq!(vel.to_change(Duration::with_mins(1)), -1800.0);
@@ -534,7 +547,7 @@ mod tests {
     }
 
     #[apply(cases_for_single)]
-    fn test_neg(vel: Velocity<f64>) {
+    fn test_neg(vel: Rate<f64>) {
         let act = -vel;
         if vel.is_diverged() {
             assert!(act.is_diverged());
@@ -553,7 +566,7 @@ mod tests {
     }
 
     #[apply(cases_for_symmetric_pair)]
-    fn test_add(lhs: Velocity<f64>, rhs: Velocity<f64>) {
+    fn test_add(lhs: Rate<f64>, rhs: Rate<f64>) {
         let act = lhs + rhs;
         if lhs.is_diverged() || rhs.is_diverged() {
             assert!(act.is_diverged());
@@ -576,7 +589,7 @@ mod tests {
     }
 
     #[apply(cases_for_symmetric_pair)]
-    fn test_add_assign(lhs: Velocity<f64>, rhs: Velocity<f64>) {
+    fn test_add_assign(lhs: Rate<f64>, rhs: Rate<f64>) {
         let mut act = lhs;
         act += &rhs;
         if lhs.is_diverged() || rhs.is_diverged() {
@@ -587,7 +600,7 @@ mod tests {
     }
 
     #[apply(cases_for_symmetric_pair)]
-    fn test_sub(lhs: Velocity<f64>, rhs: Velocity<f64>) {
+    fn test_sub(lhs: Rate<f64>, rhs: Rate<f64>) {
         let act = lhs - rhs;
         if lhs.is_diverged() || rhs.is_diverged() {
             assert!(act.is_diverged());
@@ -610,7 +623,7 @@ mod tests {
     }
 
     #[apply(cases_for_symmetric_pair)]
-    fn test_sub_assign(lhs: Velocity<f64>, rhs: Velocity<f64>) {
+    fn test_sub_assign(lhs: Rate<f64>, rhs: Rate<f64>) {
         let mut act = lhs;
         act -= &rhs;
         if lhs.is_diverged() || rhs.is_diverged() {
@@ -621,7 +634,7 @@ mod tests {
     }
 
     #[apply(cases_for_single)]
-    fn test_mul_with_dur(vel: Velocity<f64>) {
+    fn test_mul_with_dur(vel: Rate<f64>) {
         let durs = vec![
             Duration::with_secs(1),
             Duration::with_secs(-2),
@@ -638,7 +651,7 @@ mod tests {
     }
 
     #[apply(cases_for_single)]
-    fn test_mul_with_scalar(vel: Velocity<f64>) {
+    fn test_mul_with_scalar(vel: Rate<f64>) {
         let scals = vec![0.0, 1.0, -1.0, 2.0, -2.0];
 
         for scal in scals {
@@ -666,7 +679,7 @@ mod tests {
     }
 
     #[apply(cases_for_single)]
-    fn test_mul_assign_with_scalar(vel: Velocity<f64>) {
+    fn test_mul_assign_with_scalar(vel: Rate<f64>) {
         let scals = vec![0.0, 1.0, -1.0, 2.0, -2.0];
 
         for scal in scals {
@@ -690,7 +703,7 @@ mod tests {
     }
 
     #[apply(cases_for_single)]
-    fn test_div_with_scalar(vel: Velocity<f64>) {
+    fn test_div_with_scalar(vel: Rate<f64>) {
         let scals = vec![1.0, -1.0, 2.0, -2.0];
 
         for scal in scals {
@@ -718,7 +731,7 @@ mod tests {
     }
 
     #[apply(cases_for_single)]
-    fn test_div_assign_with_scalar(vel: Velocity<f64>) {
+    fn test_div_assign_with_scalar(vel: Rate<f64>) {
         let scals = vec![1.0, -1.0, 2.0, -2.0];
 
         for scal in scals {
