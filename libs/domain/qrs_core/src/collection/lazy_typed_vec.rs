@@ -328,160 +328,228 @@ mod tests {
         assert_eq!(buffer.layout(), Layout::from_size_align(0, 1).unwrap());
     }
 
-    // #[rstest]
-    // fn test_reuse() {
-    //     let vec = vec![1u8, 2u8, 3u8];
-    //     let buffer = LazyTypedVecBuffer::reuse(vec);
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(3, std::mem::align_of::<u8>()).unwrap()
-    //     );
-    //     let vec = buffer.try_into_vec::<u8>().unwrap();
-    //     assert_eq!(vec.capacity(), 3);
-    //     assert_eq!(vec.len(), 0);
+    #[rstest]
+    fn test_reuse() {
+        let vec = vec![1u8, 2u8, 3u8];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(3, std::mem::align_of::<u8>()).unwrap()
+        );
+        let vec = buffer.into_empty_vec::<u8>();
+        assert_eq!(vec.capacity(), 3);
+        assert_eq!(vec.len(), 0);
 
-    //     let vec = vec![1u32, 2u32, 3u32];
-    //     let buffer = LazyTypedVecBuffer::reuse(vec);
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(12, std::mem::align_of::<u32>()).unwrap()
-    //     );
-    //     let vec = buffer.try_into_vec::<u32>().unwrap();
-    //     assert_eq!(vec.capacity(), 3);
-    //     assert_eq!(vec.len(), 0);
+        let vec = vec![1u32, 2u32, 3u32];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(12, std::mem::align_of::<u32>()).unwrap()
+        );
+        let vec = buffer.into_empty_vec::<u32>();
+        assert_eq!(vec.capacity(), 3);
+        assert_eq!(vec.len(), 0);
 
-    //     let vec = vec![1f64, 2f64, 3f64];
-    //     let buffer = LazyTypedVecBuffer::reuse(vec);
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(24, std::mem::align_of::<f64>()).unwrap()
-    //     );
-    //     let vec = buffer.try_into_vec::<f64>().unwrap();
-    //     assert_eq!(vec.capacity(), 3);
-    //     assert_eq!(vec.len(), 0);
+        let vec = vec![1f64, 2f64, 3f64];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(24, std::mem::align_of::<f64>()).unwrap()
+        );
+        let vec = buffer.into_empty_vec::<f64>();
+        assert_eq!(vec.capacity(), 3);
+        assert_eq!(vec.len(), 0);
 
-    //     let vec = vec!["hoge".to_string(), "fuga".to_string()];
-    //     let buffer = LazyTypedVecBuffer::reuse(vec);
-    //     let unit_sz = std::mem::size_of::<String>();
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(2 * unit_sz, std::mem::align_of::<String>()).unwrap()
-    //     );
-    //     let vec = buffer.try_into_vec::<String>().unwrap();
-    //     assert_eq!(vec.capacity(), 2);
-    //     assert_eq!(vec.len(), 0);
+        let vec = vec!["hoge".to_string(), "fuga".to_string()];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let unit_sz = std::mem::size_of::<String>();
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(2 * unit_sz, std::mem::align_of::<String>()).unwrap()
+        );
+        let vec = buffer.into_empty_vec::<String>();
+        assert_eq!(vec.capacity(), 2);
+        assert_eq!(vec.len(), 0);
 
-    //     // zero size
-    //     let vec = vec![(), (), ()];
-    //     let buffer = LazyTypedVecBuffer::reuse(vec);
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(0, std::mem::align_of::<()>()).unwrap()
-    //     );
-    //     let vec = buffer.try_into_vec::<()>().unwrap();
-    //     assert_eq!(vec.capacity(), usize::MAX);
-    //     assert_eq!(vec.len(), 0);
+        // zero size
+        let vec = vec![(), (), ()];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(0, std::mem::align_of::<()>()).unwrap()
+        );
+        let vec = buffer.into_empty_vec::<()>();
+        assert_eq!(vec.capacity(), usize::MAX);
+        assert_eq!(vec.len(), 0);
 
-    //     let vec: Vec<u128> = Vec::new();
-    //     let buffer = LazyTypedVecBuffer::reuse(vec);
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(0, std::mem::align_of::<u128>()).unwrap()
-    //     );
-    //     let vec = buffer.try_into_vec::<u128>().unwrap();
-    //     assert_eq!(vec.capacity(), 0);
-    //     assert_eq!(vec.len(), 0);
-    // }
+        let vec: Vec<u128> = Vec::new();
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(0, std::mem::align_of::<u128>()).unwrap()
+        );
+        let vec = buffer.into_empty_vec::<u128>();
+        assert_eq!(vec.capacity(), 0);
+        assert_eq!(vec.len(), 0);
+    }
 
-    // #[rstest]
-    // #[case(Layout::from_size_align(0, 1).unwrap())]
-    // #[case(Layout::from_size_align(100, 1).unwrap())]
-    // #[case(Layout::from_size_align(0, 4).unwrap())]
-    // #[case(Layout::from_size_align(80, 4).unwrap())]
-    // #[case(Layout::from_size_align(0, 8).unwrap())]
-    // #[case(Layout::from_size_align(80, 8).unwrap())]
-    // #[case(Layout::from_size_align(0, 16).unwrap())]
-    // #[case(Layout::from_size_align(80, 16).unwrap())]
-    // fn test_try_into_vec(#[case] layout: Layout) {
-    //     // layout 1: bool
-    //     let buffer = LazyTypedVecBuffer::new(layout);
-    //     let vec = buffer.try_into_vec::<bool>();
-    //     assert_eq!(vec.is_ok(), layout.align() == std::mem::align_of::<bool>());
-    //     if let Ok(vec) = vec {
-    //         assert_eq!(vec.capacity(), layout.size());
-    //     }
+    #[test]
+    fn test_try_restore() {
+        let vec = vec![1u8, 2u8, 3u8];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<u8>();
+        assert!(vec.is_ok());
+        assert_eq!(vec.unwrap(), vec![1, 2, 3]);
 
-    //     // layout 1: u8
-    //     let buffer = LazyTypedVecBuffer::new(layout);
-    //     let vec = buffer.try_into_vec::<u8>();
-    //     assert_eq!(vec.is_ok(), layout.align() == std::mem::align_of::<u8>());
-    //     if let Ok(vec) = vec {
-    //         assert_eq!(vec.capacity(), layout.size());
-    //     }
+        let vec = vec![1u32, 2u32, 3u32];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<u32>();
+        assert!(vec.is_ok());
+        assert_eq!(vec.unwrap(), vec![1, 2, 3]);
 
-    //     // layout 4: u32
-    //     let buffer = LazyTypedVecBuffer::new(layout);
-    //     let vec = buffer.try_into_vec::<u32>();
-    //     assert_eq!(vec.is_ok(), layout.align() == std::mem::align_of::<u32>());
-    //     if let Ok(vec) = vec {
-    //         assert_eq!(vec.capacity(), layout.size() / 4);
-    //     }
+        let vec = vec![1f64, 2f64, 3f64];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<f64>();
+        assert!(vec.is_ok());
+        assert_eq!(vec.unwrap(), vec![1.0, 2.0, 3.0]);
 
-    //     // layout 8: u64
-    //     let buffer = LazyTypedVecBuffer::new(layout);
-    //     let vec = buffer.try_into_vec::<u64>();
-    //     assert_eq!(vec.is_ok(), layout.align() == std::mem::align_of::<u64>());
-    //     if let Ok(vec) = vec {
-    //         assert_eq!(vec.capacity(), layout.size() / 8);
-    //     }
+        let vec = vec!["hoge".to_string(), "fuga".to_string()];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<String>();
+        assert!(vec.is_ok());
+        assert_eq!(vec.unwrap(), vec!["hoge".to_string(), "fuga".to_string()]);
 
-    //     // layout 16: u128
-    //     let buffer = LazyTypedVecBuffer::new(layout);
-    //     let vec = buffer.try_into_vec::<u128>();
-    //     assert_eq!(vec.is_ok(), layout.align() == std::mem::align_of::<u128>());
-    //     if let Ok(vec) = vec {
-    //         assert_eq!(vec.capacity(), layout.size() / 16);
-    //     }
-    // }
+        // zero size
+        let vec = vec![(), (), ()];
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<()>();
+        assert!(vec.is_ok());
+        assert_eq!(vec.unwrap(), vec![(), (), ()]);
 
-    // #[test]
-    // fn test_as_vec_mut() {
-    //     let mut buffer = LazyTypedVecBuffer::default();
-    //     let cap = {
-    //         let mut vec = buffer.as_vec_mut::<u8>();
-    //         assert_eq!(vec.capacity(), 0);
-    //         assert_eq!(vec.len(), 0);
-    //         vec.push(1);
-    //         vec.push(2);
-    //         vec.push(3);
-    //         vec.capacity()
-    //     };
-    //     // buffer inherits the ownership of the allocated memory used by vec.
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(cap, std::mem::align_of::<u8>()).unwrap()
-    //     );
-    //     {
-    //         let vec = buffer.as_vec_mut::<u8>();
-    //         assert_eq!(vec.capacity(), cap);
-    //         assert_eq!(vec.len(), 0);
-    //     };
+        let vec: Vec<u128> = Vec::new();
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<u128>();
+        assert!(vec.is_ok());
+        assert_eq!(vec.unwrap(), vec![]);
 
-    //     let cap = {
-    //         let mut vec = buffer.as_vec_mut::<u32>();
-    //         // buffer is deallocated because the alignment is different.
-    //         assert_eq!(vec.capacity(), 0);
-    //         assert_eq!(vec.len(), 0);
-    //         vec.push(1);
-    //         vec.push(2);
-    //         vec.push(3);
-    //         vec.capacity()
-    //     };
-    //     assert_eq!(
-    //         buffer.layout(),
-    //         Layout::from_size_align(cap * 4, std::mem::align_of::<u32>()).unwrap()
-    //     );
-    // }
+        // error cases
+        let mut vec = vec![1u8, 2u8, 3u8];
+        vec.shrink_to_fit();
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<u32>();
+        assert!(vec.is_err());
+        let vec = vec.unwrap_err();
+        assert_eq!(vec.len(), 0);
+        assert_eq!(vec.capacity(), 0);
+
+        let mut vec = vec![1u32, 2u32, 3u32];
+        vec.shrink_to_fit();
+        let buffer = LazyTypedVecBuffer::reuse(vec);
+        let vec = buffer.try_restore::<i32>();
+        assert!(vec.is_err());
+        let vec = vec.unwrap_err();
+        assert_eq!(vec.len(), 0);
+        assert_eq!(vec.capacity(), 3);
+    }
+
+    #[test]
+    fn test_as_empty_vec() {
+        let mut buffer = LazyTypedVecBuffer::default();
+        let cap = {
+            let mut vec = buffer.as_empty_vec::<u8>();
+            assert_eq!(vec.capacity(), 0);
+            assert_eq!(vec.len(), 0);
+            vec.push(1);
+            vec.push(2);
+            vec.push(3);
+            vec.capacity()
+        };
+        // buffer inherits the ownership of the allocated memory used by vec.
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(cap, std::mem::align_of::<u8>()).unwrap()
+        );
+        {
+            let vec = buffer.as_empty_vec::<u8>();
+            assert_eq!(vec.capacity(), cap);
+            assert_eq!(vec.len(), 0);
+        };
+
+        let cap = {
+            let mut vec = buffer.as_empty_vec::<u32>();
+            // buffer is deallocated because the alignment is different.
+            assert_eq!(vec.capacity(), 0);
+            assert_eq!(vec.len(), 0);
+            vec.push(1);
+            vec.push(2);
+            vec.push(3);
+            vec.capacity()
+        };
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(cap * 4, std::mem::align_of::<u32>()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_as_restored_vec() {
+        let mut buffer = LazyTypedVecBuffer::default();
+        let cap = {
+            let vec = buffer.as_restored_vec::<u8>();
+            assert!(vec.is_err());
+            let mut vec = vec.unwrap_err();
+            assert_eq!(vec.capacity(), 0);
+            assert_eq!(vec.len(), 0);
+            vec.push(1);
+            vec.push(2);
+            vec.push(3);
+            vec.capacity()
+        };
+        // buffer inherits the ownership of the allocated memory used by vec.
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(cap, std::mem::align_of::<u8>()).unwrap()
+        );
+        {
+            let vec = buffer.as_restored_vec::<u8>();
+            assert!(vec.is_ok());
+            let vec = vec.unwrap();
+            assert_eq!(vec.capacity(), cap);
+            assert_eq!(vec.len(), 3);
+            assert_eq!(vec.deref(), &vec![1, 2, 3]);
+        };
+
+        let cap = {
+            let mut vec = buffer.as_empty_vec::<u32>();
+            // buffer is deallocated because the alignment is different.
+            assert_eq!(vec.capacity(), 0);
+            assert_eq!(vec.len(), 0);
+            vec.push(1);
+            vec.push(2);
+            vec.push(3);
+            vec.capacity()
+        };
+        assert_eq!(
+            buffer.layout(),
+            Layout::from_size_align(cap * 4, std::mem::align_of::<u32>()).unwrap()
+        );
+        {
+            let vec = buffer.as_restored_vec::<u32>();
+            assert!(vec.is_ok());
+            let mut vec = vec.unwrap();
+            assert_eq!(vec.capacity(), cap);
+            assert_eq!(vec.len(), 3);
+            assert_eq!(vec.deref(), &vec![1, 2, 3]);
+            vec.shrink_to_fit();
+        };
+        {
+            let vec = buffer.as_restored_vec::<i32>();
+            assert!(vec.is_err());
+            let vec = vec.unwrap_err();
+            assert_eq!(vec.capacity(), 3);
+            assert_eq!(vec.len(), 0);
+        };
+    }
 
     #[rstest]
     #[case(Layout::from_size_align(0, 1).unwrap())]
