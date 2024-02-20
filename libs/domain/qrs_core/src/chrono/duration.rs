@@ -759,7 +759,7 @@ define_div_to_velocity!(f64);
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
-    use rstest_reuse::{self, *};
+    use rstest_reuse::*;
 
     use super::*;
 

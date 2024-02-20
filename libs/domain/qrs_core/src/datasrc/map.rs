@@ -634,8 +634,6 @@ where
 // =============================================================================
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use maplit::hashmap;
     use rstest::{fixture, rstest};
 

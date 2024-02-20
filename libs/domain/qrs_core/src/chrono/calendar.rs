@@ -591,7 +591,6 @@ impl CalendarBuilder<Vec<NaiveDate>, Vec<NaiveDate>, NaiveDate> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
 
     #[test]
     fn test_new() {

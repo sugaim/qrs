@@ -250,7 +250,7 @@ where
     /// use qrs_core::chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(format!("{}", dt.format("%Y-%m-%d %H:%M:%S %:z")), "2021-01-01 10:42:11 +09:00");
     /// assert_eq!(format!("{}", dt.format("%Y%m%dT%H%M%S%z")), "20210101T104211+0900")
     /// ```
@@ -507,10 +507,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// let chrono_obj = chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     ///
     /// assert_eq!(dt.as_chrono(), &chrono_obj);
@@ -524,10 +524,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.local(), chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap().and_hms_opt(10, 42, 11).unwrap());
     /// ```
     #[inline]
@@ -539,10 +539,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.date(), chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap());
     /// ```
     #[inline]
@@ -554,10 +554,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.time(), chrono::NaiveTime::from_hms_opt(10, 42, 11).unwrap());
     /// ```
     #[inline]
@@ -569,10 +569,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.offset(), &chrono::FixedOffset::east(9 * 3600));
     /// ```
     #[inline]
@@ -580,14 +580,20 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
         self.internal.offset()
     }
 
+    /// Same as [chrono::DateTime::timezone]
+    #[inline]
+    pub fn timezone(&self) -> Tz {
+        self.internal.timezone()
+    }
+
     /// Same as [chrono::DateTime::with_timezone]
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// let dt_utc = dt.with_timezone(&chrono::Utc);
     ///
     /// assert_eq!(dt_utc, chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T01:42:11Z").unwrap().into());
@@ -601,10 +607,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.timestamp(), dt.as_chrono().timestamp());
     /// ```
     #[inline]
@@ -616,10 +622,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_core::chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.timestamp_millis(), dt.as_chrono().timestamp_millis());
     /// ```
     #[inline]
