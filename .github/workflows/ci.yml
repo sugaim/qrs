@@ -34,5 +34,5 @@ jobs:
     - run: |
         cargo llvm-cov --no-report nextest
         cargo llvm-cov --no-report --doc
-        cargo llvm-cov report --doctests --lcov --output-path lcov.info --ignore-filename-regex scripts/*
+        cargo llvm-cov report --doctests --lcov --output-path lcov.info --ignore-filename-regex "(scripts/*|qrs_core_derive/*)"
     - uses: codecov/codecov-action@v3
