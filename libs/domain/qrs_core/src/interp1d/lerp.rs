@@ -1,12 +1,12 @@
-use std::ops::{Div, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use num::{One, Zero};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    func1d::{Func1dDer1, Func1dDer2},
-    num::{RelPos, Vector},
+    func1d::{Func1dDer1, Func1dDer2, Func1dIntegrable},
+    num::{FloatBased, RelPos, Vector},
 };
 
 use super::{DestructibleInterp1d, Interp1d, Interp1dBuilder, _knots::Knots};
@@ -31,6 +31,7 @@ use super::{DestructibleInterp1d, Interp1d, Interp1dBuilder, _knots::Knots};
 /// assert_eq!(interp.interp(&1.0), 1.0);
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[schemars(description = "1-dimensional linear interpolation")]
 pub struct Lerp1d<G, V> {
     #[serde(bound(
         serialize = "G: Serialize + PartialOrd, V: Serialize",
@@ -127,6 +128,61 @@ where
 
     fn der2(&self, _: &G) -> Self::Der2 {
         Zero::zero()
+    }
+}
+
+impl<G: RelPos, V: Vector<<G as RelPos>::Output>, O> Func1dIntegrable<G> for Lerp1d<G, V>
+where
+    G: Clone + Sub<G>,
+    V: Mul<<G as Sub>::Output, Output = O>,
+    O: Add<Output = O> + Neg<Output = O>,
+{
+    type Integrated = <V as Mul<<G as Sub>::Output>>::Output;
+
+    fn integrate(&self, from: &G, to: &G) -> Self::Integrated {
+        if to < from {
+            return -self.integrate(to, from);
+        }
+        let lidx = self.knots.interval_index_of(from);
+        let ridx = self.knots.interval_index_of(to);
+
+        let one = <<G as RelPos>::Output as One>::one();
+        let half = <<G as RelPos>::Output as FloatBased>::nearest_base_float_of(0.5);
+
+        if lidx == ridx {
+            let (gl, vl) = self.knots.force_get(lidx);
+            let (gr, vr) = self.knots.force_get(ridx + 1);
+            let wf = from.relpos_between(gl, gr);
+            let wt = to.relpos_between(gl, gr);
+            let yf = vl.clone() * &(one.clone() - &wf) + vr.clone() * &wf;
+            let yt = vl.clone() * &(one.clone() - &wt) + vr.clone() * &wt;
+            let mid = (yf + &yt) * &half.into();
+            return mid * (to.clone() - from.clone());
+        }
+        let left_contrib = {
+            let (gl, vl) = self.knots.force_get(lidx);
+            let (gr, vr) = self.knots.force_get(lidx + 1);
+            let w = from.relpos_between(gl, gr);
+            let y = vl.clone() * &(one.clone() - &w) + vr.clone() * &w;
+            let mid = (y + vr) * &half.into();
+            mid * (gr.clone() - from.clone())
+        };
+        let right_contrib = {
+            let (gl, vl) = self.knots.force_get(ridx);
+            let (gr, vr) = self.knots.force_get(ridx + 1);
+            let w = to.relpos_between(gl, gr);
+            let y = vl.clone() * &(one.clone() - &w) + vr.clone() * &w;
+            let mid = (y + vl) * &half.into();
+            mid * (to.clone() - gl.clone())
+        };
+        let mut res = left_contrib + right_contrib;
+        for i in lidx + 1..ridx {
+            let (gl, vl) = self.knots.force_get(i);
+            let (gr, vr) = self.knots.force_get(i + 1);
+            let mid = (vl.clone() + vr.clone()) * &half.into();
+            res = res + mid * (gr.clone() - gl.clone());
+        }
+        res
     }
 }
 
@@ -404,6 +460,87 @@ mod tests {
         assert_abs_diff_eq!(der0, lerp.eval(&x), epsilon = eps);
         assert_abs_diff_eq!(der1, lerp.der1(&x), epsilon = eps);
         assert_abs_diff_eq!(der2, lerp.der2(&x), epsilon = eps);
+    }
+
+    #[test]
+    fn test_integrate() {
+        let grids: Vec<f64> = vec![0., 1., 2.];
+        let values: Vec<f64> = vec![0., 3., 2.];
+
+        let lerp = Lerp1d::new(grids, values).unwrap();
+        let eps = 1e-15;
+
+        let from = -2.;
+        let to = -1.;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, -4.5, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = -2.;
+        let to = 0.;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, -6., epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = 0.;
+        let to = 0.5;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, 0.375, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = -2.;
+        let to = 0.5;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, -5.625, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = 0.;
+        let to = 1.;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, 1.5, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = 1.5;
+        let to = 2.;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, 1.125, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = 2.;
+        let to = 3.;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, 1.5, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = 3.;
+        let to = 4.;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, 0.5, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
+
+        let from = 1.5;
+        let to = 3.0;
+        let integral = lerp.integrate(&from, &to);
+        assert_abs_diff_eq!(integral, 2.625, epsilon = eps);
+        assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
+        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
     }
 
     #[test]

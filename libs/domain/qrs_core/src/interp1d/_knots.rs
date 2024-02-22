@@ -1,5 +1,4 @@
 use anyhow::ensure;
-use chrono::NaiveDate;
 use schemars::{
     schema::{Schema, SchemaObject},
     JsonSchema,
@@ -54,7 +53,7 @@ where
     V: JsonSchema,
 {
     fn schema_name() -> String {
-        format!("Knots_{}_{}", G::schema_name(), V::schema_name())
+        format!("Knots_for_{}_and_{}", G::schema_name(), V::schema_name())
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         format!(
@@ -67,14 +66,6 @@ where
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut schema = SchemaObject::default();
         schema.metadata().description = Some("Knots for 1-dimensional interpolation".to_string());
-        schema.metadata().title = Some(Self::schema_name());
-        schema.metadata().id = Some(Self::schema_id().into_owned());
-        schema.metadata().examples = vec![serde_json::json!([
-            [NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(), 0.05],
-            [NaiveDate::from_ymd_opt(2021, 1, 7).unwrap(), 0.1],
-            [NaiveDate::from_ymd_opt(2021, 2, 1).unwrap(), 0.05],
-        ])];
-        schema.metadata().deprecated = false;
 
         let array = schema.array();
         array.min_items = Some(2);
@@ -167,6 +158,7 @@ impl<G: PartialOrd, V> Knots<G, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
 
     #[test]
     fn test_serialize() {

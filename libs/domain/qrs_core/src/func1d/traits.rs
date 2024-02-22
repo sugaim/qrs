@@ -27,3 +27,10 @@ pub trait Func1dDer2<X>: Func1dDer1<X> {
         (der0, der1, self.der2(x))
     }
 }
+
+/// Trait for 1-dimensional integrable function.
+pub trait Func1dIntegrable<X>: Func1d<X> {
+    type Integrated;
+
+    fn integrate(&self, from: &X, to: &X) -> Self::Integrated;
+}

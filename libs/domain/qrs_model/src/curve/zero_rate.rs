@@ -1,6 +1,8 @@
+use std::ops::Mul;
+
 use qrs_core::{
-    chrono::{DateTime, Rate},
-    func1d::{Func1d, Func1dDer1},
+    chrono::{DateTime, Duration, Rate},
+    func1d::Func1dDer1,
     num::Real,
 };
 use schemars::JsonSchema;
@@ -11,7 +13,7 @@ use super::YieldCurve;
 // -----------------------------------------------------------------------------
 // ZeroRateCurve
 //
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ZeroRateCurve<F> {
     /// Zero rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.
     pub zero_rate: F,
@@ -23,12 +25,12 @@ pub struct ZeroRateCurve<F> {
 //
 // methods
 //
-impl<F> YieldCurve for ZeroRateCurve<F>
+impl<F, V: Real> YieldCurve for ZeroRateCurve<F>
 where
-    F: Func1dDer1<DateTime, Der1 = Rate<<F as Func1d<DateTime>>::Output>>,
-    <F as Func1d<DateTime>>::Output: Real,
+    F: Func1dDer1<DateTime, Output = Rate<V>>,
+    F::Der1: Mul<Duration, Output = Rate<V>>,
 {
-    type Value = <F as Func1d<DateTime>>::Output;
+    type Value = V;
     type Error = anyhow::Error;
 
     fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value> {
@@ -43,10 +45,10 @@ where
             //   = (z(t) - z(f)) / (t - f) * (t - b) + z(f)
             //   -> z'(f) * (f - b) + z(f) as t -> f
             let (zf, zp) = self.zero_rate.der01(from);
-            return Rate::with_annual(zf + &(zp * (from - self.base_date)));
+            return zf + &(zp * (from - self.base_date));
         }
-        let zf = Rate::with_annual(self.zero_rate.eval(from));
-        let zt = Rate::with_annual(self.zero_rate.eval(to));
+        let zf = self.zero_rate.eval(from);
+        let zt = self.zero_rate.eval(to);
 
         let durf = from - self.base_date;
         let durt = to - self.base_date;
@@ -61,6 +63,7 @@ where
 mod tests {
     use super::YieldCurve;
     use approx::assert_abs_diff_eq;
+    use qrs_core::chrono::Rate;
 
     #[test]
     fn test_forward_rate() {
@@ -76,7 +79,11 @@ mod tests {
                 dt_builder.with_ymd(2021, 1, 11).unwrap().build(),
                 dt_builder.with_ymd(2021, 1, 16).unwrap().build(),
             ],
-            vec![0.05f64, 0.03f64, 0.02f64],
+            vec![
+                Rate::with_annual(0.05f64),
+                Rate::with_annual(0.03f64),
+                Rate::with_annual(0.02f64),
+            ],
         )
         .unwrap();
         let curve = super::ZeroRateCurve {

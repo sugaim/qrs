@@ -16,3 +16,4 @@ serde_json = { workspace = true }
 
 # internal
 qrs_core = { workspace = true }
+qrs_model = { workspace = true }

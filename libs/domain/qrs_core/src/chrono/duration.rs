@@ -7,6 +7,7 @@ use std::{
 use anyhow::{anyhow, bail, ensure};
 use num::Zero;
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
 
 use super::Rate;
@@ -102,6 +103,36 @@ impl<'de> Deserialize<'de> for Duration {
     {
         let s = String::deserialize(deserializer)?;
         s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl JsonSchema for Duration {
+    fn schema_name() -> String {
+        "Duration".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "qrs_core::chrono::Duration".into()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let mut res = schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            ..Default::default()
+        };
+        res.metadata().description = Some(
+            "Duration in ISO 8601 format(month and year are not available to avoid ambiguity)"
+                .to_string(),
+        );
+        res.metadata().examples = vec![
+            serde_json::json!("PT1S"),
+            serde_json::json!("PT1M"),
+            serde_json::json!("PT1H"),
+            serde_json::json!("P1D"),
+            serde_json::json!("P1W"),
+            serde_json::json!("P1DT1H1M1S"),
+        ];
+        res.into()
     }
 }
 

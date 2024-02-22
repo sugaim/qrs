@@ -1,6 +1,10 @@
 use std::{collections::HashMap, path::Path, str::FromStr};
 
 use log::info;
+use qrs_core::{
+    chrono::{DateTime, Rate},
+    interp1d::Lerp1d,
+};
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     JsonSchema,
@@ -44,11 +48,19 @@ fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
             Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono_tz::Tz>>>::default() as _,
             Box::<SchemaItem<qrs_core::chrono::DateTime>>::default() as _,
             Box::<SchemaItem<qrs_core::chrono::TimeZone>>::default() as _,
+            Box::<SchemaItem<qrs_core::chrono::Duration>>::default() as _,
         ],
     );
     map.insert(
         "qrs_core/func1d",
         vec![Box::<SchemaItem<qrs_core::func1d::SemiContinuity>>::default() as _],
+    );
+    map.insert(
+        "qrs_model/curve",
+        vec![
+            Box::<SchemaItem<qrs_model::curve::ZeroRateCurve<Lerp1d<DateTime, Rate<f64>>>>>::default()
+                as _,
+        ],
     );
     map
 }

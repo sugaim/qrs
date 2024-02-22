@@ -1,4 +1,6 @@
 mod composite;
+mod flat;
+mod forward_rate;
 mod yield_curve;
 mod zero_rate;
 
