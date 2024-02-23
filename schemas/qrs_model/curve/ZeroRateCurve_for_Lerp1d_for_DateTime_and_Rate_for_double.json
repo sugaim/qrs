@@ -73,6 +73,7 @@
     "Knots_for_DateTime_and_Rate_for_double": {
       "description": "Knots for 1-dimensional interpolation",
       "items": {
+        "description": "A pair of grid and value",
         "type": "array",
         "items": [
           {

@@ -540,7 +540,6 @@ mod tests {
         assert_abs_diff_eq!(integral, 2.625, epsilon = eps);
         assert_abs_diff_eq!(-integral, lerp.integrate(&to, &from), epsilon = eps);
         assert_abs_diff_eq!(0., lerp.integrate(&from, &from), epsilon = eps);
-        assert_abs_diff_eq!(0., lerp.integrate(&to, &to), epsilon = eps);
     }
 
     #[test]

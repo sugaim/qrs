@@ -70,7 +70,13 @@ where
         let array = schema.array();
         array.min_items = Some(2);
         array.additional_items = Some(Box::new(Schema::Bool(false)));
-        array.items = Some(<(G, V)>::json_schema(gen).into());
+        array.items = {
+            let mut item = <(G, V) as JsonSchema>::json_schema(gen);
+            if let Schema::Object(ref mut obj) = item {
+                obj.metadata().description = Some("A pair of grid and value".to_string());
+            }
+            Some(item.into())
+        };
         schema.into()
     }
 }

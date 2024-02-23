@@ -631,6 +631,8 @@ mod tests {
             inpath.push(format!("chermite.CatmullRom.{}.in.json", name));
             let mut outpath = test_data_dir.clone();
             outpath.push(format!("chermite.CatmullRom.{}.out.json", name));
+            let mut serialized = test_data_dir.clone();
+            serialized.push(format!("chermite.CatmullRom.{}.serialized.json", name));
 
             let input: Input =
                 serde_json::from_reader(std::fs::File::open(inpath).unwrap()).unwrap();
@@ -640,6 +642,13 @@ mod tests {
             let mut slopes = Vec::new();
             sch.calc_slope(&mut slopes, &input.xs, &input.ys).unwrap();
             let interp = CHermite1d::new(input.xs, input.ys, sch).unwrap();
+
+            let serialized: serde_json::Value =
+                serde_json::from_reader(std::fs::File::open(serialized).unwrap()).unwrap();
+            let deserialized: CHermite1d<f64, f64, CatmullRomScheme> =
+                CHermite1d::deserialize(&serialized).unwrap();
+            assert_eq!(deserialized, interp);
+            assert_eq!(serialized, serde_json::to_value(deserialized).unwrap());
 
             for (x, y, der1, der2) in expected.evalated {
                 let tested = interp.interp(&x);
