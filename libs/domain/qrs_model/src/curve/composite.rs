@@ -22,7 +22,6 @@ pub struct Component<C> {
 //
 impl<C: YieldCurve> YieldCurve for Component<C> {
     type Value = C::Value;
-    type Error = C::Error;
 
     fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         Ok(self.curve.forward_rate(from, to)?
@@ -43,7 +42,6 @@ pub struct CompositeCurve<C> {
 //
 impl<C: YieldCurve> YieldCurve for CompositeCurve<C> {
     type Value = C::Value;
-    type Error = C::Error;
 
     fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         let mut sum = Rate::zero();

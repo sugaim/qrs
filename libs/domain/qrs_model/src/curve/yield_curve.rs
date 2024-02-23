@@ -10,7 +10,6 @@ use qrs_core::{
 //
 pub trait YieldCurve {
     type Value: Real;
-    type Error;
 
     /// Calculate the forward rate.
     ///
@@ -39,14 +38,21 @@ pub trait YieldCurve {
 
 impl<C: YieldCurve> YieldCurve for Arc<C> {
     type Value = C::Value;
-    type Error = C::Error;
 
     #[inline]
-    fn forward_rate(
-        &self,
-        from: &DateTime,
-        to: &DateTime,
-    ) -> Result<Rate<Self::Value>, anyhow::Error> {
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         self.as_ref().forward_rate(from, to)
     }
+}
+
+// -----------------------------------------------------------------------------
+// YieldCurveAdjust
+//
+pub trait YieldCurveAdjust<C: YieldCurve> {
+    fn adjusted_forward_rate(
+        &self,
+        curve: &C,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Rate<C::Value>>;
 }

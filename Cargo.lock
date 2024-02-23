@@ -802,6 +802,7 @@ dependencies = [
  "anyhow",
  "approx",
  "chrono",
+ "derivative",
  "itertools",
  "num",
  "qrs_core",

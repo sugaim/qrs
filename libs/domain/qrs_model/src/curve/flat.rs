@@ -39,7 +39,6 @@ where
 //
 impl<V: Real> YieldCurve for FlatCurve<V> {
     type Value = V;
-    type Error = anyhow::Error;
 
     fn forward_rate(&self, _from: &DateTime, _to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         Ok(self.rate.clone())

@@ -29,7 +29,6 @@ where
     F::Output: Real,
 {
     type Value = V;
-    type Error = anyhow::Error;
 
     fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         if to < from {

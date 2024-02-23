@@ -31,7 +31,6 @@ where
     F::Der1: Mul<Duration, Output = Rate<V>>,
 {
     type Value = V;
-    type Error = anyhow::Error;
 
     fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         if to < from {

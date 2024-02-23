@@ -1,12 +1,12 @@
-use std::ops::{Div, Sub};
+use std::ops::{Div, Mul, Sub};
 
 use num::Zero;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    func1d::{Func1dDer1, Func1dDer2, SemiContinuity},
-    num::{RelPos, Vector},
+    func1d::{Func1dDer1, Func1dDer2, Func1dIntegrable, SemiContinuity},
+    num::{Arithmetic, RelPos, Scalar, Vector},
 };
 
 use super::{DestructibleInterp1d, Interp1d, Interp1dBuilder, _knots::Knots};
@@ -109,10 +109,7 @@ impl<G, V> PwConst1d<G, V> {
     }
 }
 
-impl<G: RelPos, V: Vector<G::Output>> Interp1d for PwConst1d<G, V>
-where
-    G::Output: Into<f64>,
-{
+impl<G: RelPos, V: Vector<G::Output>> Interp1d for PwConst1d<G, V> {
     type Grid = G;
     type Value = V;
 
@@ -121,10 +118,12 @@ where
         let (gl, vl) = self.knots.force_get(idx);
         let (gr, vr) = self.knots.force_get(idx + 1);
 
-        let w: f64 = x.relpos_between(gl, gr).into();
-        if w < self.partition_ratio {
+        let sep = <G::Output as Scalar>::nearest_value_of(self.partition_ratio);
+
+        let w = x.relpos_between(gl, gr);
+        if w < sep {
             vl.clone()
-        } else if self.partition_ratio < w {
+        } else if sep < w {
             vr.clone()
         } else {
             match self.continuity {
@@ -138,7 +137,6 @@ where
 impl<G: RelPos, V: Vector<<G as RelPos>::Output>> Func1dDer1<G> for PwConst1d<G, V>
 where
     G: Clone + Sub<G>,
-    <G as RelPos>::Output: Into<f64>,
     V: Div<<G as Sub>::Output>,
     <V as Div<<G as Sub>::Output>>::Output: Zero,
 {
@@ -153,7 +151,6 @@ impl<G: RelPos, V: Vector<<G as RelPos>::Output>> Func1dDer2<G> for PwConst1d<G,
 where
     G: Clone + Sub<G>,
     V: Div<<G as Sub>::Output>,
-    <G as RelPos>::Output: Into<f64>,
     <V as Div<<G as Sub>::Output>>::Output: Div<<G as Sub>::Output>,
     <V as Div<<G as Sub>::Output>>::Output: Zero,
     <<V as Div<<G as Sub>::Output>>::Output as Div<<G as Sub>::Output>>::Output: Zero,
@@ -164,6 +161,80 @@ where
         Zero::zero()
     }
 }
+
+// impl<G: RelPos, V: Vector<<G as RelPos>::Output>> Func1dIntegrable<G> for PwConst1d<G, V>
+// where
+//     G: Clone + Sub,
+//     V: Mul<<G as Sub>::Output>,
+//     <V as Mul<<G as Sub>::Output>>::Output: Arithmetic,
+// {
+//     type Integrated = <V as Mul<<G as Sub>::Output>>::Output;
+
+//     fn integrate(&self, from: &G, to: &G) -> Self::Integrated {
+//         if to < from {
+//             return -self.integrate(to, from);
+//         }
+//         let lidx = self.knots.interval_index_of(from);
+//         let ridx = self.knots.interval_index_of(to);
+//         let w = <<G as RelPos>::Output as Scalar>::nearest_value_of(self.partition_ratio);
+
+//         if lidx == ridx {
+//             let (gl, vl) = self.knots.force_get(lidx);
+//             let (gr, vr) = self.knots.force_get(ridx + 1);
+//             let wl = {
+//                 let raw = from.relpos_between(gl, gr);
+//                 if w <= raw {
+//                     Zero::zero()
+//                 } else {
+//                     // normalized length between from and partition point
+//                     -(raw - &w)
+//                 }
+//             };
+//             let wr = {
+//                 let raw = to.relpos_between(gl, gr);
+//                 if raw <= w {
+//                     Zero::zero()
+//                 } else {
+//                     // normalized length between partition point and to
+//                     raw - &w
+//                 }
+//             };
+//             // vl * (partition_point - from) + (vr * (to - partition_point))
+//             //  = vl * (gr - gl) * (partition_ratio - from.relpos(gl, gr)) + vr * (gr - gl) * (to.relpos(gl, gr) - partition_ratio)
+//             //  = (vl * (partition_ratio - from.relpos(gl, gr)) + vr * (to.relpos(gl, gr) - partition_ratio)) * (gr - gl)
+//             return (vl.clone() * &wl + &(vr.clone() * &wr)) * (gr.clone() - gl.clone());
+//         }
+//         let left_contrib = {
+//             let (gl, vl) = self.knots.force_get(lidx);
+//             let (gr, vr) = self.knots.force_get(lidx + 1);
+//             let wf = {
+//                 let raw = from.relpos_between(gl, gr);
+//                 if w <= raw {
+//                     Zero::zero()
+//                 } else {
+//                     // normalized length between from and partition point
+//                     -(raw - &w)
+//                 }
+//             };
+//         };
+//         let right_contrib = {
+//             let (gl, vl) = self.knots.force_get(ridx);
+//             let (gr, vr) = self.knots.force_get(ridx + 1);
+//             let w = to.relpos_between(gl, gr);
+//             let y = vl.clone() * &(one.clone() - &w) + vr.clone() * &w;
+//             let mid = (y + vl) * &half.into();
+//             mid * (to.clone() - gl.clone())
+//         };
+//         let mut res = left_contrib + right_contrib;
+//         for i in lidx + 1..ridx {
+//             let (gl, vl) = self.knots.force_get(i);
+//             let (gr, vr) = self.knots.force_get(i + 1);
+//             let mid = (vl.clone() + vr.clone()) * &half.into();
+//             res = res + mid * (gr.clone() - gl.clone());
+//         }
+//         res
+//     }
+// }
 
 // -----------------------------------------------------------------------------
 // PwConst1dBuilder
