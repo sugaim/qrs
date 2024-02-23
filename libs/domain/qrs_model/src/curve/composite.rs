@@ -24,8 +24,9 @@ impl<C: YieldCurve> YieldCurve for Component<C> {
     type Value = C::Value;
     type Error = C::Error;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value> {
-        self.curve.forward_rate(from, to) * &<C::Value as Scalar>::nearest_value_of(self.weight)
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
+        Ok(self.curve.forward_rate(from, to)?
+            * &<C::Value as Scalar>::nearest_value_of(self.weight))
     }
 }
 
@@ -44,12 +45,12 @@ impl<C: YieldCurve> YieldCurve for CompositeCurve<C> {
     type Value = C::Value;
     type Error = C::Error;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value> {
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         let mut sum = Rate::zero();
         for c in &self.components {
-            let r = c.forward_rate(from, to);
+            let r = c.forward_rate(from, to)?;
             sum += r;
         }
-        sum
+        Ok(sum)
     }
 }

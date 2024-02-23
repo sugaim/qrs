@@ -18,7 +18,7 @@ pub trait YieldCurve {
     /// forward rate meant by this method is a average of instant forward rate over the period.
     ///
     /// When `from` is equal to `to`, the instant forward rate is returned.
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value>;
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>>;
 
     /// Calculate the discount factor.
     ///
@@ -30,10 +30,10 @@ pub trait YieldCurve {
     /// `discount` method should not make rate zero before `today`.
     /// If you want to do so, `forward_rate` should return zero rate before `today`.
     #[inline]
-    fn discount(&self, from: &DateTime, to: &DateTime) -> Self::Value {
-        let rate = self.forward_rate(from, to);
+    fn discount(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Self::Value> {
+        let rate = self.forward_rate(from, to)?;
         let exponent = -rate * (to - from);
-        exponent.exp()
+        Ok(exponent.exp())
     }
 }
 
@@ -42,7 +42,11 @@ impl<C: YieldCurve> YieldCurve for Arc<C> {
     type Error = C::Error;
 
     #[inline]
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value> {
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> Result<Rate<Self::Value>, anyhow::Error> {
         self.as_ref().forward_rate(from, to)
     }
 }

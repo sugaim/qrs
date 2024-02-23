@@ -31,14 +31,14 @@ where
     type Value = V;
     type Error = anyhow::Error;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value> {
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         if to < from {
             return self.forward_rate(to, from);
         }
         if from == to {
-            return self.inst_fwd.eval(from);
+            return Ok(self.inst_fwd.eval(from));
         }
         let exponent = self.inst_fwd.integrate(from, to);
-        Rate::new(exponent, to - from)
+        Ok(Rate::new(exponent, to - from))
     }
 }

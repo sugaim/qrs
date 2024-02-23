@@ -50,10 +50,7 @@ pub struct Rate<V>(_Rate<V>);
 // display, serde
 //
 
-impl<V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Rate<V>
-where
-    V::BaseFloat: Serialize,
-{
+impl<V: FloatBased + Vector<V::BaseFloat> + Serialize> Serialize for Rate<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

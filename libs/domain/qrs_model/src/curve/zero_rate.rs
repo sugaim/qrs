@@ -33,7 +33,7 @@ where
     type Value = V;
     type Error = anyhow::Error;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> Rate<Self::Value> {
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
         if to < from {
             return self.forward_rate(to, from);
         }
@@ -45,7 +45,7 @@ where
             //   = (z(t) - z(f)) / (t - f) * (t - b) + z(f)
             //   -> z'(f) * (f - b) + z(f) as t -> f
             let (zf, zp) = self.zero_rate.der01(from);
-            return zf + &(zp * (from - self.base_date));
+            return Ok(zf + &(zp * (from - self.base_date)));
         }
         let zf = self.zero_rate.eval(from);
         let zt = self.zero_rate.eval(to);
@@ -54,7 +54,7 @@ where
         let durt = to - self.base_date;
         let dur = to - from;
 
-        Rate::new(zt * durt - &(zf * durf), dur)
+        Ok(Rate::new(zt * durt - &(zf * durf), dur))
     }
 }
 
@@ -93,31 +93,31 @@ mod tests {
 
         let from = dt_builder.with_ymd(2021, 1, 1).unwrap().build();
         let to = dt_builder.with_ymd(2021, 1, 6).unwrap().build();
-        let fwd = curve.forward_rate(&from, &to);
+        let fwd = curve.forward_rate(&from, &to).unwrap();
         assert_abs_diff_eq!(fwd.to_annual_change(), 0.05, epsilon = 1e-10);
-        assert_eq!(fwd, curve.forward_rate(&to, &from));
+        assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
         let from = dt_builder.with_ymd(2021, 1, 6).unwrap().build();
         let to = dt_builder.with_ymd(2021, 1, 11).unwrap().build();
-        let fwd = curve.forward_rate(&from, &to);
+        let fwd = curve.forward_rate(&from, &to).unwrap();
         assert_abs_diff_eq!(fwd.to_annual_change(), 0.01, epsilon = 1e-10);
-        assert_eq!(fwd, curve.forward_rate(&to, &from));
+        assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
         let from = dt_builder.with_ymd(2021, 1, 11).unwrap().build();
         let to = dt_builder.with_ymd(2021, 1, 16).unwrap().build();
-        let fwd = curve.forward_rate(&from, &to);
+        let fwd = curve.forward_rate(&from, &to).unwrap();
         assert_abs_diff_eq!(fwd.to_annual_change(), 0.0, epsilon = 1e-10);
-        assert_eq!(fwd, curve.forward_rate(&to, &from));
+        assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
         let from = dt_builder.with_ymd(2021, 1, 6).unwrap().build();
         let to = dt_builder.with_ymd(2021, 1, 16).unwrap().build();
-        let fwd = curve.forward_rate(&from, &to);
+        let fwd = curve.forward_rate(&from, &to).unwrap();
         assert_abs_diff_eq!(fwd.to_annual_change(), 0.005, epsilon = 1e-10);
-        assert_eq!(fwd, curve.forward_rate(&to, &from));
+        assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
         let from = dt_builder.with_ymd(2021, 1, 13).unwrap().build();
         let to = dt_builder.with_ymd(2021, 1, 13).unwrap().build();
-        let fwd = curve.forward_rate(&from, &to);
+        let fwd = curve.forward_rate(&from, &to).unwrap();
         assert_abs_diff_eq!(
             fwd.to_annual_change(),
             0.026 + (-0.002) * 12.0, // 0.026 = z(13d), -0.002 = z'(13d), 12.0 = (13d - 1d)

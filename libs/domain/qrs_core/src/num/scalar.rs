@@ -93,6 +93,7 @@ impl FloatBased for f64 {
 pub trait Scalar:
     Arithmetic
     + FloatBased
+    + PartialEq
     + Vector<Self::BaseFloat>
     + From<Self::BaseFloat>
     + Exp<Output = Self>
@@ -106,6 +107,7 @@ pub trait Scalar:
 impl<T> Scalar for T where
     T: Arithmetic
         + FloatBased
+        + PartialEq
         + Vector<Self::BaseFloat>
         + From<Self::BaseFloat>
         + Exp<Output = Self>
@@ -116,6 +118,6 @@ impl<T> Scalar for T where
 /// Trait for real numbers.
 /// We consider a type `T` as a real number if it is a scalar on a 1-dim line.
 /// Hence, this trait requires total ordering in addition to scalar requirements.
-pub trait Real: Scalar + PartialEq + PartialOrd {}
+pub trait Real: Scalar + PartialOrd {}
 
-impl<T> Real for T where T: Scalar + PartialEq + PartialOrd {}
+impl<T> Real for T where T: Scalar + PartialOrd {}
