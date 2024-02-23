@@ -102,7 +102,7 @@ impl<G: PartialOrd, V> Knots<G, V> {
 //
 // methods
 //
-impl<G: PartialOrd, V> Knots<G, V> {
+impl<G, V> Knots<G, V> {
     #[inline]
     pub fn grids(&self) -> &[G] {
         &self.gs
@@ -119,7 +119,10 @@ impl<G: PartialOrd, V> Knots<G, V> {
     }
 
     #[inline]
-    pub fn force_get(&self, idx: usize) -> (&G, &V) {
+    pub fn force_get(&self, idx: usize) -> (&G, &V)
+    where
+        G: PartialOrd,
+    {
         (&self.gs[idx], &self.vs[idx])
     }
 
@@ -150,7 +153,10 @@ impl<G: PartialOrd, V> Knots<G, V> {
     /// assert_eq!(knots.interval_index_of(&25), 1);
     /// ```
     ///
-    pub fn interval_index_of(&self, x: &G) -> usize {
+    pub fn interval_index_of(&self, x: &G) -> usize
+    where
+        G: PartialOrd,
+    {
         debug_assert!(2 <= self.gs.len(), "ctor must guarantee at least two knots");
         let idx = self.gs[0..self.gs.len() - 1].partition_point(|g| g <= x);
         if idx == 0 {

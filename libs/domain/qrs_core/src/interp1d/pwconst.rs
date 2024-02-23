@@ -102,17 +102,19 @@ impl<G: PartialOrd, V> PwConst1d<G, V> {
 //
 // methods
 //
+impl<G, V> PwConst1d<G, V> {
+    #[inline]
+    pub fn knots(&self) -> (&[G], &[V]) {
+        (self.knots.grids(), self.knots.values())
+    }
+}
+
 impl<G: RelPos, V: Vector<G::Output>> Interp1d for PwConst1d<G, V>
 where
     G::Output: Into<f64>,
 {
     type Grid = G;
     type Value = V;
-
-    #[inline]
-    fn knots(&self) -> (&[G], &[V]) {
-        (self.knots.grids(), self.knots.values())
-    }
 
     fn interp(&self, x: &G) -> V {
         let idx = self.knots.interval_index_of(x);

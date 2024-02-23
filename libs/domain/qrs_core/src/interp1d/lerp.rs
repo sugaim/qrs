@@ -59,14 +59,16 @@ impl<G: PartialOrd, V> Lerp1d<G, V> {
 //
 // methods
 //
+impl<G, V> Lerp1d<G, V> {
+    #[inline]
+    pub fn knots(&self) -> (&[G], &[V]) {
+        (self.knots.grids(), self.knots.values())
+    }
+}
+
 impl<G: RelPos, V: Vector<G::Output>> Interp1d for Lerp1d<G, V> {
     type Grid = G;
     type Value = V;
-
-    #[inline]
-    fn knots(&self) -> (&[G], &[V]) {
-        (self.knots.grids(), self.knots.values())
-    }
 
     fn interp(&self, x: &G) -> V {
         let idx = self.knots.interval_index_of(x);

@@ -33,7 +33,7 @@ struct CubicCoeff<V> {
 // -----------------------------------------------------------------------------
 // CHermite1d
 //
-#[derive(Debug, Derivative, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Derivative, Serialize, JsonSchema)]
 #[derivative(PartialEq)]
 pub struct CHermite1d<G, V, S> {
     #[serde(bound(
@@ -42,11 +42,37 @@ pub struct CHermite1d<G, V, S> {
     ))]
     knots: Knots<G, V>,
     #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
     coeffs: Vec<CubicCoeff<V>>,
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     slope_buf: LazyTypedVecBuffer,
     scheme: S,
+}
+
+//
+// display, serde
+//
+impl<'de, G, V, S> Deserialize<'de> for CHermite1d<G, V, S>
+where
+    G: Clone + PartialOrd + Sub + RelPos + Deserialize<'de>,
+    V: Vector<<G as RelPos>::Output> + Deserialize<'de>,
+    S: CHermiteScheme<G, V> + Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<CHermite1d<G, V, S>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Data<G: PartialOrd, V, S> {
+            knots: Knots<G, V>,
+            scheme: S,
+        }
+
+        let Data { knots, scheme } = Data::deserialize(deserializer)?;
+        let (gs, vs) = knots.destruct();
+        CHermite1d::new(gs, vs, scheme).map_err(serde::de::Error::custom)
+    }
 }
 
 //
@@ -125,6 +151,13 @@ where
 //
 // methods
 //
+impl<G, V, S> CHermite1d<G, V, S> {
+    #[inline]
+    pub fn knots(&self) -> (&[G], &[V]) {
+        (self.knots.grids(), self.knots.values())
+    }
+}
+
 impl<G, V, S> Interp1d for CHermite1d<G, V, S>
 where
     G: RelPos,
@@ -132,11 +165,6 @@ where
 {
     type Grid = G;
     type Value = V;
-
-    #[inline]
-    fn knots(&self) -> (&[Self::Grid], &[Self::Value]) {
-        (&self.knots.grids(), &self.knots.values())
-    }
 
     fn interp(&self, x: &Self::Grid) -> Self::Value {
         let idx = self.knots.interval_index_of(x);

@@ -1,4 +1,10 @@
+use std::sync::{Arc, Mutex};
+
 use crate::func1d::Func1d;
+
+// -----------------------------------------------------------------------------
+// Interp1d
+//
 
 /// Trait for 1-dimensional interpolation.
 ///
@@ -26,14 +32,6 @@ pub trait Interp1d {
     type Grid: PartialOrd;
     type Value;
 
-    /// Get the knots of the interpolation.
-    ///
-    /// Implementations must guarantee that the following conditions are satisfied:
-    /// - `knots.0.len() == knots.1.len()`
-    /// - `knots.0` is sorted in ascending order
-    /// - `knots.0` has no duplicated elements
-    fn knots(&self) -> (&[Self::Grid], &[Self::Value]);
-
     /// Interpolate the value at the given point.
     fn interp(&self, x: &Self::Grid) -> Self::Value;
 }
@@ -45,6 +43,30 @@ impl<F: Interp1d> Func1d<F::Grid> for F {
         self.interp(x)
     }
 }
+
+impl<F: Interp1d> Interp1d for Arc<F> {
+    type Grid = F::Grid;
+    type Value = F::Value;
+
+    #[inline]
+    fn interp(&self, x: &Self::Grid) -> Self::Value {
+        self.as_ref().interp(x)
+    }
+}
+
+impl<F: Interp1d> Interp1d for Arc<Mutex<F>> {
+    type Grid = F::Grid;
+    type Value = F::Value;
+
+    #[inline]
+    fn interp(&self, x: &Self::Grid) -> Self::Value {
+        self.lock().unwrap().interp(x)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Interp1dBuilder
+//
 
 /// Trait for building 1-dimensional interpolation.
 ///
@@ -69,6 +91,10 @@ pub trait Interp1dBuilder<G, V> {
 
     fn build(self, grids: Vec<G>, values: Vec<V>) -> Result<Self::Output, Self::Err>;
 }
+
+// -----------------------------------------------------------------------------
+// DestructibleInterp1d
+//
 
 /// Trait for destructible 1-dimensional interpolation.
 ///
