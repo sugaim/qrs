@@ -10,7 +10,7 @@ use rust_decimal::Decimal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
 
-use super::Rate;
+use super::Velocity;
 
 // -----------------------------------------------------------------------------
 // Duration
@@ -765,19 +765,19 @@ define_datetime_self_assign!(SubAssign, sub_assign);
 macro_rules! define_div_to_velocity {
     ($t:ty) => {
         impl std::ops::Div<Duration> for $t {
-            type Output = Rate<$t>;
+            type Output = Velocity<$t>;
 
             #[inline]
             fn div(self, rhs: Duration) -> Self::Output {
-                Rate::new(self, rhs)
+                Velocity::new(self, rhs)
             }
         }
         impl std::ops::Div<&Duration> for $t {
-            type Output = Rate<$t>;
+            type Output = Velocity<$t>;
 
             #[inline]
             fn div(self, rhs: &Duration) -> Self::Output {
-                Rate::new(self, *rhs)
+                Velocity::new(self, *rhs)
             }
         }
     };
@@ -1160,23 +1160,23 @@ mod tests {
     #[test]
     fn test_velocity() {
         let tested = 1.0 / Duration::with_secs(1);
-        let expected = Rate::new(1.0, Duration::with_secs(1));
+        let expected = Velocity::new(1.0, Duration::with_secs(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / &Duration::with_secs(1);
-        let expected = Rate::new(1.0, Duration::with_secs(1));
+        let expected = Velocity::new(1.0, Duration::with_secs(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / Duration::with_mins(1);
-        let expected = Rate::new(1.0, Duration::with_mins(1));
+        let expected = Velocity::new(1.0, Duration::with_mins(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / &Duration::with_mins(1);
-        let expected = Rate::new(1.0, Duration::with_mins(1));
+        let expected = Velocity::new(1.0, Duration::with_mins(1));
         assert_eq!(tested, expected);
 
         let tested = 1.0 / Duration::with_days(1);
-        let expected = Rate::new(1.0, Duration::with_days(1));
+        let expected = Velocity::new(1.0, Duration::with_days(1));
         assert_eq!(tested, expected);
     }
 }

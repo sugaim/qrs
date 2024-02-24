@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::Path, str::FromStr};
 
 use log::info;
 use qrs_core::{
-    chrono::{DateTime, Rate},
+    chrono::{DateTime, Velocity},
     interp1d::Lerp1d,
 };
 use schemars::{
@@ -58,7 +58,7 @@ fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
     map.insert(
         "qrs_model/curve",
         vec![
-            Box::<SchemaItem<qrs_model::curve::ZeroRateCurve<Lerp1d<DateTime, Rate<f64>>>>>::default()
+            Box::<SchemaItem<qrs_model::curve::ZeroRateCurve<Lerp1d<DateTime, Velocity<f64>>>>>::default()
                 as _,
         ],
     );

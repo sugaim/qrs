@@ -1,5 +1,5 @@
 use derivative::Derivative;
-use qrs_core::chrono::{DateTime, Rate};
+use qrs_core::chrono::{DateTime, Velocity};
 use qrs_core::num::{FloatBased, Scalar, Vector};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 #[derivative(PartialEq(bound = "V: PartialOrd + FloatBased + Vector<V::BaseFloat>"))]
 pub struct Bump<V> {
     /// Bump size.
-    pub delta: Rate<V>,
+    pub delta: Velocity<V>,
 
     /// Start datetime of the bump. If it is not set, the bump is applied from the start of the curve.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -77,7 +77,7 @@ impl<C: YieldCurve> YieldCurveAdjust<C> for Bump<C::Value> {
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<Rate<<C as YieldCurve>::Value>> {
+    ) -> anyhow::Result<Velocity<<C as YieldCurve>::Value>> {
         match from.cmp(to) {
             std::cmp::Ordering::Equal => return curve.forward_rate(from, to),
             std::cmp::Ordering::Greater => return self.adjusted_forward_rate(curve, to, from),
@@ -114,7 +114,7 @@ mod tests {
     use std::str::FromStr;
 
     use approx::assert_abs_diff_eq;
-    use qrs_core::chrono::{DateTime, Rate};
+    use qrs_core::chrono::{DateTime, Velocity};
 
     use crate::curve::FlatCurve;
 
@@ -124,10 +124,10 @@ mod tests {
     fn test_adjusted_forward_rate() {
         // parallel bump
         let curve = FlatCurve {
-            rate: Rate::with_annual(0.01),
+            rate: Velocity::with_annual(0.01),
         };
         let bump = Bump {
-            delta: Rate::with_annual(0.01),
+            delta: Velocity::with_annual(0.01),
             from: None,
             to: None,
         };
@@ -138,10 +138,10 @@ mod tests {
 
         // grid bump
         let curve = FlatCurve {
-            rate: Rate::with_annual(0.01),
+            rate: Velocity::with_annual(0.01),
         };
         let bump = Bump {
-            delta: Rate::with_annual(0.01),
+            delta: Velocity::with_annual(0.01),
             from: Some(DateTime::from_str("2020-01-02T00:00:00Z").unwrap()),
             to: Some(DateTime::from_str("2020-01-04T00:00:00Z").unwrap()),
         };

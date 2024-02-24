@@ -1,5 +1,5 @@
 use qrs_core::{
-    chrono::{DateTime, Rate},
+    chrono::{DateTime, Velocity},
     func1d::Func1dIntegrable,
     num::Real,
 };
@@ -25,12 +25,16 @@ pub struct InstFwdCurve<F> {
 //
 impl<F, V: Real> YieldCurve for InstFwdCurve<F>
 where
-    F: Func1dIntegrable<DateTime, Output = Rate<V>, Integrated = V>,
+    F: Func1dIntegrable<DateTime, Output = Velocity<V>, Integrated = V>,
     F::Output: Real,
 {
     type Value = V;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Velocity<Self::Value>> {
         if to < from {
             return self.forward_rate(to, from);
         }
@@ -38,6 +42,6 @@ where
             return Ok(self.inst_fwd.eval(from));
         }
         let exponent = self.inst_fwd.integrate(from, to);
-        Ok(Rate::new(exponent, to - from))
+        Ok(Velocity::new(exponent, to - from))
     }
 }

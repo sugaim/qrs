@@ -3,7 +3,7 @@
 //
 
 use qrs_core::{
-    chrono::{DateTime, Rate},
+    chrono::{DateTime, Velocity},
     num::Real,
 };
 use schemars::JsonSchema;
@@ -18,7 +18,7 @@ use super::YieldCurve;
     deserialize = "V: qrs_core::num::FloatBased + qrs_core::num::Vector<V::BaseFloat> + Deserialize<'de>"
 ))]
 pub struct FlatCurve<V> {
-    pub rate: Rate<V>,
+    pub rate: Velocity<V>,
 }
 
 //
@@ -26,7 +26,7 @@ pub struct FlatCurve<V> {
 //
 impl<V> PartialEq for FlatCurve<V>
 where
-    Rate<V>: PartialEq,
+    Velocity<V>: PartialEq,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -40,7 +40,11 @@ where
 impl<V: Real> YieldCurve for FlatCurve<V> {
     type Value = V;
 
-    fn forward_rate(&self, _from: &DateTime, _to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
+    fn forward_rate(
+        &self,
+        _from: &DateTime,
+        _to: &DateTime,
+    ) -> anyhow::Result<Velocity<Self::Value>> {
         Ok(self.rate.clone())
     }
 }
@@ -65,7 +69,7 @@ mod tests {
                 chrono::FixedOffset::east_opt(9 * 3600).unwrap(),
             ));
         let curve = FlatCurve {
-            rate: Rate::with_annual(0.05),
+            rate: Velocity::with_annual(0.05),
         };
         let dates = vec![
             dt_builder.with_ymd(2021, 1, 1).unwrap().build(),
@@ -84,7 +88,7 @@ mod tests {
         ];
         for (from, to) in iproduct!(dates.iter(), dates.iter()) {
             let rate = curve.forward_rate(from, to).unwrap();
-            assert_eq!(rate, Rate::with_annual(0.05));
+            assert_eq!(rate, Velocity::with_annual(0.05));
         }
     }
 
@@ -97,7 +101,7 @@ mod tests {
                 chrono::FixedOffset::east_opt(9 * 3600).unwrap(),
             ));
         let curve = FlatCurve {
-            rate: Rate::with_annual(0.05),
+            rate: Velocity::with_annual(0.05),
         };
         let dates = vec![
             dt_builder.with_ymd(2021, 1, 1).unwrap().build(),

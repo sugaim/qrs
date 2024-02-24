@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use qrs_core::{
-    chrono::{DateTime, Rate},
+    chrono::{DateTime, Velocity},
     num::{Exp, Real},
 };
 
@@ -17,7 +17,8 @@ pub trait YieldCurve {
     /// forward rate meant by this method is a average of instant forward rate over the period.
     ///
     /// When `from` is equal to `to`, the instant forward rate is returned.
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>>;
+    fn forward_rate(&self, from: &DateTime, to: &DateTime)
+        -> anyhow::Result<Velocity<Self::Value>>;
 
     /// Calculate the discount factor.
     ///
@@ -40,7 +41,11 @@ impl<C: YieldCurve> YieldCurve for Arc<C> {
     type Value = C::Value;
 
     #[inline]
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Velocity<Self::Value>> {
         self.as_ref().forward_rate(from, to)
     }
 }
@@ -54,5 +59,5 @@ pub trait YieldCurveAdjust<C: YieldCurve> {
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<Rate<C::Value>>;
+    ) -> anyhow::Result<Velocity<C::Value>>;
 }

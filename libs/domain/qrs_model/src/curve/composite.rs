@@ -1,6 +1,6 @@
 use num::Zero;
 use qrs_core::{
-    chrono::{DateTime, Rate},
+    chrono::{DateTime, Velocity},
     num::Scalar,
 };
 use schemars::JsonSchema;
@@ -23,7 +23,11 @@ pub struct Component<C> {
 impl<C: YieldCurve> YieldCurve for Component<C> {
     type Value = C::Value;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Velocity<Self::Value>> {
         Ok(self.curve.forward_rate(from, to)?
             * &<C::Value as Scalar>::nearest_value_of(self.weight))
     }
@@ -43,8 +47,12 @@ pub struct CompositeCurve<C> {
 impl<C: YieldCurve> YieldCurve for CompositeCurve<C> {
     type Value = C::Value;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
-        let mut sum = Rate::zero();
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Velocity<Self::Value>> {
+        let mut sum = Velocity::zero();
         for c in &self.components {
             let r = c.forward_rate(from, to)?;
             sum += r;

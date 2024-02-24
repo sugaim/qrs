@@ -13,5 +13,5 @@ pub use calendar_sym::{CalendarSymVariant, CalendarSymbol};
 pub use datetime::{DateTime, GenericDateTime};
 pub use datetime_builder::{DateTimeBuilder, DateToDateTime};
 pub use duration::Duration;
-pub use rate::Rate;
+pub use rate::Velocity;
 pub use timezone::TimeZone;

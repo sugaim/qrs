@@ -1,5 +1,5 @@
 use qrs_core::{
-    chrono::{DateTime, Rate},
+    chrono::{DateTime, Velocity},
     num::Real,
 };
 use schemars::JsonSchema;
@@ -37,7 +37,7 @@ where
         &self,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<qrs_core::chrono::Rate<V>> {
+    ) -> anyhow::Result<qrs_core::chrono::Velocity<V>> {
         if to < from {
             return self.forward_rate(to, from);
         }
@@ -51,6 +51,6 @@ where
         let short = self.short.forward_rate(from, &self.sep)?;
         let long = self.long.forward_rate(&self.sep, to)?;
         let exponent = short * (self.sep - from) + long * (to - self.sep);
-        Ok(Rate::new(exponent, to - from))
+        Ok(Velocity::new(exponent, to - from))
     }
 }

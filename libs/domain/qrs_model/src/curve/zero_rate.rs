@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use qrs_core::{
-    chrono::{DateTime, Duration, Rate},
+    chrono::{DateTime, Duration, Velocity},
     func1d::Func1dDer1,
     num::Real,
 };
@@ -27,12 +27,16 @@ pub struct ZeroRateCurve<F> {
 //
 impl<F, V: Real> YieldCurve for ZeroRateCurve<F>
 where
-    F: Func1dDer1<DateTime, Output = Rate<V>>,
-    F::Der1: Mul<Duration, Output = Rate<V>>,
+    F: Func1dDer1<DateTime, Output = Velocity<V>>,
+    F::Der1: Mul<Duration, Output = Velocity<V>>,
 {
     type Value = V;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Rate<Self::Value>> {
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Velocity<Self::Value>> {
         if to < from {
             return self.forward_rate(to, from);
         }
@@ -53,7 +57,7 @@ where
         let durt = to - self.base_date;
         let dur = to - from;
 
-        Ok(Rate::new(zt * durt - &(zf * durf), dur))
+        Ok(Velocity::new(zt * durt - &(zf * durf), dur))
     }
 }
 
@@ -62,7 +66,7 @@ where
 mod tests {
     use super::YieldCurve;
     use approx::assert_abs_diff_eq;
-    use qrs_core::chrono::Rate;
+    use qrs_core::chrono::Velocity;
 
     #[test]
     fn test_forward_rate() {
@@ -79,9 +83,9 @@ mod tests {
                 dt_builder.with_ymd(2021, 1, 16).unwrap().build(),
             ],
             vec![
-                Rate::with_annual(0.05f64),
-                Rate::with_annual(0.03f64),
-                Rate::with_annual(0.02f64),
+                Velocity::with_annual(0.05f64),
+                Velocity::with_annual(0.03f64),
+                Velocity::with_annual(0.02f64),
             ],
         )
         .unwrap();

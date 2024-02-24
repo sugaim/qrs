@@ -1,4 +1,4 @@
-use qrs_core::chrono::{DateTime, Duration, Rate};
+use qrs_core::chrono::{DateTime, Duration, Velocity};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -47,7 +47,7 @@ impl<C: YieldCurve> YieldCurveAdjust<C> for Shift {
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<Rate<<C as YieldCurve>::Value>> {
+    ) -> anyhow::Result<Velocity<<C as YieldCurve>::Value>> {
         let from = *from - self.dt;
         let to = *to - self.dt;
         curve.forward_rate(&from, &to)
