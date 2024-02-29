@@ -36,3 +36,31 @@ jobs:
         cargo llvm-cov --no-report --doc --all-features --workspace
         cargo llvm-cov report --doctests --lcov --output-path lcov.info --ignore-filename-regex "(scripts/*|qrs_core_derive/*)"
     - uses: codecov/codecov-action@v3
+
+  gen_doc:
+    runs-on: ubuntu-latest
+    needs: [ci, coverage]
+    
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run doc
+      run: cargo doc --no-deps --workspace --all-features
+    - name: Deploy
+      uses: actions/upload-pages-artifact@v1
+      with:
+        path: target/doc
+        
+  deploy_doc:
+     needs: gen_doc
+     permissions:
+       pages: write
+       id-token: write
+     environment:
+       name: github-pages
+       url: ${{ steps.deployment.outputs.page_url }}
+     runs-on: ubuntu-latest
+     steps:
+       - name: Deploy to GitHub Pages
+         id: deployment
+         uses: actions/deploy-pages@v1
+         
