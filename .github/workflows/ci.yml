@@ -37,21 +37,22 @@ jobs:
         cargo llvm-cov report --doctests --lcov --output-path lcov.info --ignore-filename-regex "(scripts/*|qrs_core_derive/*)"
     - uses: codecov/codecov-action@v3
 
-  gen_doc:
+  doc-gen:
     runs-on: ubuntu-latest
     needs: [ci, coverage]
-    
+    env:
+      RUSTDOCFLAGS: --enable-index-page -Zunstable-options    
     steps:
-    - uses: actions/checkout@v3
-    - name: Run doc
-      run: cargo doc --no-deps --workspace --all-features
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@nightly
+    - run: cargo +nightly doc --no-deps --workspace --all-features
     - name: Deploy
       uses: actions/upload-pages-artifact@v1
       with:
         path: target/doc
         
-  deploy_doc:
-     needs: gen_doc
+  doc-deploy:
+     needs: doc-gen
      permissions:
        pages: write
        id-token: write
