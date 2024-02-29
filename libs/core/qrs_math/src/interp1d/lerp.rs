@@ -17,12 +17,12 @@ use crate::num::{FloatBased, One, RelPos, Vector, Zero};
 ///
 /// # Example
 /// ```
-/// use qrs_core::interp1d::Interp1d;
+/// use qrs_math::interp1d::Interp1d;
 ///
 /// let grids = vec![0.0, 1.0, 2.0];
 /// let values = vec![0.0, 1.0, 0.0];
 ///
-/// let interp = qrs_core::interp1d::Lerp1d::new(grids, values).unwrap();
+/// let interp = qrs_math::interp1d::Lerp1d::new(grids, values).unwrap();
 ///
 /// assert_eq!(interp.interp(&-0.5), -0.5);
 /// assert_eq!(interp.interp(&0.5), 0.5);

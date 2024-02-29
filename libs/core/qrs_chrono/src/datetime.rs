@@ -261,7 +261,7 @@ where
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::DateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -521,7 +521,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -538,7 +538,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -553,7 +553,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -568,7 +568,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -583,7 +583,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -604,7 +604,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -621,7 +621,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -636,7 +636,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::GenericDateTime;
+    /// use qrs_chrono::GenericDateTime;
     /// use std::str::FromStr;
     ///
     /// let dt = GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
@@ -760,7 +760,7 @@ mod tests {
                 .into();
         assert_eq!(format!("{:?}", dt), "2021-01-01T05:42:11EST");
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let dt: DateTime = dt
@@ -802,7 +802,7 @@ mod tests {
 
         assert_eq!(dt.to_string(), "2021-01-01 05:42:11 EST");
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let dt: DateTime = dt
@@ -882,7 +882,7 @@ mod tests {
             GenericDateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[]");
         assert!(dt.is_err());
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let expected: GenericDateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
@@ -952,7 +952,7 @@ mod tests {
             r#""2021-01-01T05:42:11-05:00[America/New_York]""#
         );
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let dt: DateTime = dt
@@ -1005,7 +1005,7 @@ mod tests {
                 .into();
         assert_eq!(deserialized, expected);
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let serialized = r#""2021-01-01T10:42:11+09:00""#;
         let deserialized: DateTime = serde_json::from_str(serialized).unwrap();
         let expected: GenericDateTime<_> =
@@ -1049,7 +1049,7 @@ mod tests {
             .with_timezone(&chrono_tz::Tz::America__New_York);
         assert_eq!(chrono_dt, expected);
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt = DateTime::new(
             chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
             chrono::FixedOffset::east_opt(9 * 3600).unwrap().into(),
@@ -1177,7 +1177,7 @@ mod tests {
         assert_eq!(dt2 - &dt1, dt2 - dt1);
         assert_eq!(&dt2 - dt1, dt2 - dt1);
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt1 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let dt2 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
         assert_eq!(dt1 - dt2, Duration::zero());
@@ -1473,7 +1473,7 @@ mod tests {
             );
         }
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let chrono_dts = vec![
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
@@ -1610,7 +1610,7 @@ mod tests {
             );
         }
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let chrono_dts = vec![
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
@@ -1697,7 +1697,7 @@ mod tests {
 
         assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
 
-        // qrs_core::chrono::TimeZone
+        // qrs_chrono::TimeZone
         let dt1 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
         let dt2 = DateTime::from_str("2021-01-06T10:42:12+09:00").unwrap();
         let dt3 = DateTime::from_str("2021-01-11T10:42:13+09:00").unwrap();

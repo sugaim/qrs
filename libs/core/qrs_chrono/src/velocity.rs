@@ -261,9 +261,9 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
-    /// let vel = qrs_core::chrono::Rate::new(10.0, Duration::with_secs(1));
+    /// let vel = qrs_chrono::Velocity::new(10.0, Duration::with_secs(1));
     ///
     /// assert_eq!(vel.to_change(Duration::with_mins(1)), 600.0);
     /// ```
@@ -295,13 +295,13 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_core::chrono::Duration;
-    /// use num::Zero;
+    /// use qrs_chrono::Duration;
+    /// use qrs_math::num::Zero;
     ///
-    /// let vel = qrs_core::chrono::Rate::new(10.0, Duration::with_secs(1));
+    /// let vel = qrs_chrono::Velocity::new(10.0, Duration::with_secs(1));
     /// assert!(!vel.is_diverged());
     ///
-    /// let vel = qrs_core::chrono::Rate::new(10.0, Duration::zero());
+    /// let vel = qrs_chrono::Velocity::new(10.0, Duration::zero());
     /// assert!(vel.is_diverged());
     /// ```
     #[inline]

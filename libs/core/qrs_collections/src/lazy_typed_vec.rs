@@ -144,7 +144,7 @@ impl LazyTypedVecBuffer {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::collection::LazyTypedVecBuffer;
+    /// use qrs_collections::LazyTypedVecBuffer;
     ///
     /// // reuse allocated memory(no allocation is performed in `try_restore` method)
     /// let buffer = LazyTypedVecBuffer::reuse(vec![1u64, 2u64, 3u64]);

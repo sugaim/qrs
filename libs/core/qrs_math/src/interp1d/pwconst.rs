@@ -18,14 +18,14 @@ use crate::num::{RelPos, Scalar, Vector, Zero};
 ///
 /// # Example
 /// ```
-/// use qrs_core::interp1d::Interp1d;
-/// use qrs_core::func1d::SemiContinuity;
+/// use qrs_math::interp1d::Interp1d;
+/// use qrs_math::func1d::SemiContinuity;
 ///
 /// let grids = vec![0.0, 1.0, 2.0];
 /// let values = vec![0.0, 1.0, 0.0];
 /// let cont = SemiContinuity::LeftContinuous;
 /// let partition_ratio = 0.5;
-/// let interp = qrs_core::interp1d::PwConst1d::new(grids, values, cont, partition_ratio).unwrap();
+/// let interp = qrs_math::interp1d::PwConst1d::new(grids, values, cont, partition_ratio).unwrap();
 ///
 /// assert_eq!(interp.interp(&0.0), 0.0);
 /// assert_eq!(interp.interp(&0.5), 0.0);

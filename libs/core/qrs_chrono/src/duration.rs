@@ -350,7 +350,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_days(count as i64);
@@ -367,7 +367,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_weeks(count as i64);
@@ -384,7 +384,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_hours(count as i64);
@@ -401,7 +401,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_mins(count as i64);
@@ -418,7 +418,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_secs(count as i64);
@@ -435,7 +435,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_millsecs(count as i64);
@@ -452,7 +452,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_microsecs(count as i64);
@@ -469,7 +469,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
     ///    let qrs_core_obj = Duration::with_nanosecs(count as i64);
@@ -491,7 +491,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -509,7 +509,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -527,7 +527,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -544,7 +544,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -561,7 +561,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -578,7 +578,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -595,7 +595,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -612,7 +612,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);
@@ -629,7 +629,7 @@ impl Duration {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Duration;
+    /// use qrs_chrono::Duration;
     ///
     /// for count in [i64::MIN, -42, -1, 0, 1, 42, i64::MAX] {
     ///     let chrono_obj = chrono::Duration::nanoseconds(count);

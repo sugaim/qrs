@@ -9,7 +9,7 @@ use super::{Exp, Log, Vector};
 ///
 /// # Example
 /// ```
-/// use qrs_core::num::Arithmetic;
+/// use qrs_math::num::Arithmetic;
 /// use static_assertions::assert_impl_all;
 ///
 /// // integer types
@@ -84,7 +84,7 @@ impl FloatBased for f64 {
 ///
 /// # Example
 /// ```
-/// use qrs_core::num::Scalar;
+/// use qrs_math::num::Scalar;
 /// use static_assertions::assert_impl_all;
 ///
 /// assert_impl_all!(f32: Scalar);

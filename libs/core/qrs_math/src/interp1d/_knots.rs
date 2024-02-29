@@ -145,7 +145,7 @@ impl<G, V> Knots<G, V> {
     ///
     /// # Examples
     /// ```ignore
-    /// use qrs_core::interp1d::lerp::Knots;
+    /// use qrs_math::interp1d::lerp::Knots;
     ///
     /// let knots = Knots::new(vec![0, 10, 20], vec![0, 1, 2]).unwrap();
     ///

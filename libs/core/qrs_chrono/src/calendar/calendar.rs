@@ -318,7 +318,7 @@ impl Calendar {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Calendar;
+    /// use qrs_chrono::calendar::Calendar;
     /// use chrono::NaiveDate;
     ///
     /// let cal = Calendar::builder()
@@ -359,7 +359,7 @@ impl Calendar {
     ///
     /// # Example
     /// ```
-    /// use qrs_core::chrono::Calendar;
+    /// use qrs_chrono::calendar::Calendar;
     /// use chrono::NaiveDate;
     ///
     /// let cal = Calendar::builder()

@@ -22,36 +22,38 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// ```
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
-/// use qrs_core::chrono::{DateTime, Rate};
+/// use qrs_chrono::DateTime;
+/// use qrs_finance::rate::{RateAct365f, Rate};
 ///
-/// use qrs_model::curve::{Bump, FlatCurve, YieldCurveAdjust};
+/// use qrs_modelcore::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
-/// let curve = FlatCurve { rate: Rate::with_annual(0.01) };
-/// let bump = Bump { delta: Rate::with_annual(0.01), from: None, to: None };
+/// let curve = FlatCurve { rate: RateAct365f::from_rate(0.01) };
+/// let bump = Bump { delta: RateAct365f::from_rate(0.01), from: None, to: None };
 /// let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
 /// let to = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
 /// let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-/// assert_abs_diff_eq!(res.to_annual_change(), 0.02, epsilon = 1e-10);
+/// assert_abs_diff_eq!(res.value(), 0.02, epsilon = 1e-10);
 /// ```
 ///
 /// # Example: Grid bump
 /// ```
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
-/// use qrs_core::chrono::{DateTime, Rate};
+/// use qrs_chrono::DateTime;
+/// use qrs_finance::rate::{RateAct365f, Rate};
 ///
-/// use qrs_model::curve::{Bump, FlatCurve, YieldCurveAdjust};
+/// use qrs_modelcore::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
-/// let curve = FlatCurve { rate: Rate::with_annual(0.01) };
+/// let curve = FlatCurve { rate: RateAct365f::from_rate(0.01) };
 /// let bump = Bump {
-///     delta: Rate::with_annual(0.01),
+///     delta: RateAct365f::from_rate(0.01),
 ///     from: Some(DateTime::from_str("2020-01-02T00:00:00Z").unwrap()),
 ///     to: Some(DateTime::from_str("2020-01-04T00:00:00Z").unwrap())
 /// };
 /// let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
 /// let to = DateTime::from_str("2020-01-05T00:00:00Z").unwrap();
 /// let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-/// assert_abs_diff_eq!(res.to_annual_change(), 0.015, epsilon = 1e-10);
+/// assert_abs_diff_eq!(res.value(), 0.015, epsilon = 1e-10);
 /// ```
 #[derive(Debug, Clone, Derivative)]
 #[cfg_attr(

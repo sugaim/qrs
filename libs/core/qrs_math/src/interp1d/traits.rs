@@ -10,8 +10,8 @@ use crate::func1d::Func1d;
 ///
 /// # Example
 /// ```
-/// use qrs_core::interp1d::Interp1d;
-/// use qrs_core::interp1d::Lerp1d;
+/// use qrs_math::interp1d::Interp1d;
+/// use qrs_math::interp1d::Lerp1d;
 ///
 /// let grids = vec![0.0, 1.0, 2.0];
 /// let values = vec![0.0, 1.0, 0.0];
@@ -73,9 +73,9 @@ impl<F: Interp1d> Interp1d for Arc<Mutex<F>> {
 ///
 /// # Example
 /// ```
-/// use qrs_core::interp1d::Interp1d;
-/// use qrs_core::interp1d::Interp1dBuilder;
-/// use qrs_core::interp1d::Lerp1dBuilder;;
+/// use qrs_math::interp1d::Interp1d;
+/// use qrs_math::interp1d::Interp1dBuilder;
+/// use qrs_math::interp1d::Lerp1dBuilder;;
 ///
 /// let grids = vec![0.0f64, 1.0f64, 2.0f64];
 /// let values = vec![0.0f64, 1.0f64, 0.0f64];
@@ -106,10 +106,10 @@ pub trait Interp1dBuilder<G, V> {
 ///
 /// # Example
 /// ```
-/// use qrs_core::interp1d::Interp1d;
-/// use qrs_core::interp1d::Interp1dBuilder;
-/// use qrs_core::interp1d::DestructibleInterp1d;
-/// use qrs_core::interp1d::Lerp1d;
+/// use qrs_math::interp1d::Interp1d;
+/// use qrs_math::interp1d::Interp1dBuilder;
+/// use qrs_math::interp1d::DestructibleInterp1d;
+/// use qrs_math::interp1d::Lerp1d;
 ///
 /// let grids = vec![0.0f64, 1.0f64, 2.0f64];
 /// let values = vec![0.0f64, 1.0f64, 0.0f64];
