@@ -7,9 +7,19 @@ exclude = ["scripts/**"]
 [workspace]
 resolver = "2"
 members = [
-    "libs/domain/qrs_core",
-    "libs/domain/qrs_core/qrs_core_derive",
-    "libs/domain/qrs_model",
+    # core
+    "libs/core/qrs_chrono",
+    "libs/core/qrs_collections",
+    "libs/core/qrs_datasrc",
+    "libs/core/qrs_datasrc/qrs_datasrc_derive",
+    "libs/core/qrs_finance",
+    "libs/core/qrs_math",
+
+    # pricing
+    "libs/pricing/qrs_modelcore",
+    # "libs/domain/qrs_model",
+
+    # others
     "scripts/qrs_scripts",
 ]
 
@@ -21,32 +31,34 @@ chrono = { version = "0.4.33", features = ["serde"] }
 chrono-tz = { version = "0.8.5", features = ["serde"] }
 derivative = { version = "2.2.0" }
 dyn-clone = { version = "1.0.16" }
-either = { version = "1.9.0" }
 env_logger = { version = "0.11.1" }
 itertools = { version = "0.12.1" }
 log = { version = "0.4.20" }
-num = { version = "0.4.1" }
+lru = { version = "0.12.3" }
 maplit = { version = "1.0.2" }
-moka = { version = "0.12.5", features = ["sync"] }
+num = { version = "0.4.1" }
+peg = { version = "0.8.2" }
+proc-macro2 = { version = "1.0.78" }
+proc-macro-error = { version = "1.0.4" }
+quote = { version = "1.0.35" }
 rstest = { version = "0.18.2" }
 rstest_reuse = { version = "0.6.0" }
 rust_decimal = { version = "1.34.2" }
-peg = { version = "0.8.2" }
-proc-macro2 = { version = "1.0.78" }
-schemars = { version = "0.8.16", features = ["chrono", "uuid1"] }
+schemars = { version = "0.8.16", features = ["chrono", "uuid1", "either"] }
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 static_assertions = { version = "1.1.0" }
-syn = { version = "2.0.48", features = [
-    "full",
-    "extra-traits",
-    "visit-mut",
-    "visit",
-] }
+syn = { version = "2.0.48", features = ["full"] }
 thiserror = { version = "1.0.56" }
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
-quote = { version = "1.0.35" }
 
 # internal
-qrs_core = { path = "libs/domain/qrs_core" }
-qrs_model = { path = "libs/domain/qrs_model" }
+## core
+qrs_chrono = { path = "libs/core/qrs_chrono" }
+qrs_collections = { path = "libs/core/qrs_collections" }
+qrs_datasrc = { path = "libs/core/qrs_datasrc" }
+qrs_finance = { path = "libs/core/qrs_finance" }
+qrs_math = { path = "libs/core/qrs_math" }
+
+## pricing
+qrs_modelcore = { path = "libs/pricing/qrs_modelcore" }

@@ -1,0 +1,16 @@
+[package]
+name = "qrs_finance"
+version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[features]
+serde = ["dep:serde", "dep:schemars", "qrs_chrono/serde", "qrs_math/serde"]
+
+[dependencies]
+serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+
+# internal
+qrs_chrono = { workspace = true }
+qrs_math = { workspace = true }

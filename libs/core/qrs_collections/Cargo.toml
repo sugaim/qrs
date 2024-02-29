@@ -1,0 +1,10 @@
+[package]
+name = "qrs_collections"
+version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+rstest = { workspace = true }

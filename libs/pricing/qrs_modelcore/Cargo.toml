@@ -1,0 +1,29 @@
+[package]
+name = "qrs_modelcore"
+version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[features]
+serde = [
+  "dep:serde",
+  "dep:schemars",
+  "qrs_chrono/serde",
+  "qrs_finance/serde",
+  "qrs_math/serde",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+derivative = { workspace = true }
+serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+
+# internal
+qrs_chrono = { workspace = true }
+qrs_finance = { workspace = true }
+qrs_math = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+itertools = { workspace = true }

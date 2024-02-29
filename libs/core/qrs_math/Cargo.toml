@@ -1,0 +1,27 @@
+[package]
+name = "qrs_math"
+version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "dep:schemars"]
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true, optional = true }
+derivative = { workspace = true }
+itertools = { workspace = true }
+num = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+
+# internal
+qrs_collections = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

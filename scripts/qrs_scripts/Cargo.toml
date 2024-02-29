@@ -15,5 +15,6 @@ schemars = { workspace = true }
 serde_json = { workspace = true }
 
 # internal
-qrs_core = { workspace = true }
-qrs_model = { workspace = true }
+qrs_chrono = { workspace = true, features = ["serde"] }
+qrs_math = { workspace = true, features = ["serde"] }
+qrs_modelcore = { workspace = true, features = ["serde"] }

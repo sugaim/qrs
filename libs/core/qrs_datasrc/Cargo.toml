@@ -1,0 +1,24 @@
+[package]
+name = "qrs_datasrc"
+version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[features]
+default = ["qrs_datasrc_derive"]
+serde = ["dep:serde", "dep:schemars"]
+
+[dependencies]
+anyhow = { workspace = true }
+derivative = { workspace = true }
+maplit = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+uuid = { workspace = true }
+
+# internal
+qrs_datasrc_derive = { path = "qrs_datasrc_derive", optional = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+rstest_reuse = { workspace = true }

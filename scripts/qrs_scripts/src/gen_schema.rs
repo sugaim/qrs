@@ -1,10 +1,9 @@
 use std::{collections::HashMap, path::Path, str::FromStr};
 
 use log::info;
-use qrs_core::{
-    chrono::{DateTime, Velocity},
-    interp1d::Lerp1d,
-};
+use qrs_chrono::{DateTime, Velocity};
+use qrs_math::interp1d::Lerp1d;
+
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     JsonSchema,
@@ -38,27 +37,31 @@ impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
 fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
     let mut map: HashMap<_, Vec<Box<dyn ISchemaItem>>> = HashMap::new();
     map.insert(
-        "qrs_core/chrono",
+        "core/qrs_chrono/calendar",
         vec![
-            Box::<SchemaItem<qrs_core::chrono::Calendar>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::CalendarSymbol>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono::FixedOffset>>>::default()
-                as _,
-            Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono::Utc>>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::GenericDateTime<chrono_tz::Tz>>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::DateTime>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::TimeZone>>::default() as _,
-            Box::<SchemaItem<qrs_core::chrono::Duration>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::calendar::Calendar>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::calendar::CalendarSymbol>>::default() as _,
         ],
     );
     map.insert(
-        "qrs_core/func1d",
-        vec![Box::<SchemaItem<qrs_core::func1d::SemiContinuity>>::default() as _],
+        "core/qrs_chrono",
+        vec![
+            Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono::FixedOffset>>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono::Utc>>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono_tz::Tz>>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::DateTime>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::TimeZone>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::Duration>>::default() as _,
+        ],
     );
     map.insert(
-        "qrs_model/curve",
+        "core/qrs_math/func1d",
+        vec![Box::<SchemaItem<qrs_math::func1d::SemiContinuity>>::default() as _],
+    );
+    map.insert(
+        "pricing/qrs_modelcore/curve",
         vec![
-            Box::<SchemaItem<qrs_model::curve::ZeroRateCurve<Lerp1d<DateTime, Velocity<f64>>>>>::default()
+            Box::<SchemaItem<qrs_modelcore::curve::ZeroRateCurve<Lerp1d<DateTime, Velocity<f64>>>>>::default()
                 as _,
         ],
     );
