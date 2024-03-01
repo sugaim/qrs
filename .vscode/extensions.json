@@ -11,5 +11,6 @@
         "ms-python.debugpy",
         "rust-lang.rust-analyzer",
         "redhat.vscode-yaml",
+        "JScearcy.rust-doc-viewer",
     ]
 }

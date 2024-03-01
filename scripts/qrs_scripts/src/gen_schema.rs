@@ -43,7 +43,7 @@ fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
             Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono::Utc>>>::default() as _,
             Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono_tz::Tz>>>::default() as _,
             Box::<SchemaItem<qrs_chrono::DateTime>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::TimeZone>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::Tz>>::default() as _,
             Box::<SchemaItem<qrs_chrono::Duration>>::default() as _,
         ],
     );

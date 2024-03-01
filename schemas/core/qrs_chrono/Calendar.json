@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Calendar",
+  "description": "Calendar data",
   "type": "object",
   "required": [
     "extra_business_days",
@@ -24,6 +25,11 @@
         "type": "string",
         "format": "date"
       }
+    },
+    "treat_weekend_as_business_day": {
+      "description": "Flag to treat weekend as business day",
+      "default": false,
+      "type": "boolean"
     },
     "valid_from": {
       "description": "The valid period of the calendar. include `valid_from`.",

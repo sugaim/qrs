@@ -1,10 +1,6 @@
 use qrs_chrono::DateTime;
-use qrs_finance::rate::RateAct365f;
+use qrs_finance::daycount::{Act365f, RateAct365f, RateDayCount};
 use qrs_math::num::Real;
-#[cfg(feature = "serde")]
-use schemars::JsonSchema;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use super::YieldCurve;
 
@@ -14,7 +10,10 @@ use super::YieldCurve;
 
 /// A curve which has the different behavior between short/long term.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize, JsonSchema))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
+)]
 pub struct JointCurve<S, L> {
     #[cfg_attr(feature = "serde", serde(rename = "short_term_curve"))]
     pub short: S,
@@ -49,6 +48,8 @@ where
         let short = self.short.forward_rate(from, &self.sep)?;
         let long = self.long.forward_rate(&self.sep, to)?;
         let exponent = short * (self.sep - from) + long * (to - self.sep);
-        Ok(RateAct365f::from_ratio(exponent, to - from).expect("zero-division does not occur"))
+        Ok(Act365f
+            .ratio_to_rate(exponent, from, to)
+            .expect("zero-division does not occur"))
     }
 }

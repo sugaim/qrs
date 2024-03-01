@@ -48,6 +48,7 @@ schemars = { version = "0.8.16", features = ["chrono", "uuid1", "either"] }
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 static_assertions = { version = "1.1.0" }
+strum = { version = "0.26.1", features = ["derive"] }
 syn = { version = "2.0.48", features = ["full"] }
 thiserror = { version = "1.0.56" }
 uuid = { version = "1.7.0", features = ["v4", "serde"] }

@@ -1,5 +1,5 @@
 use qrs_chrono::{DateTime, Duration, Velocity};
-use qrs_finance::rate::RateAct365f;
+use qrs_finance::daycount::{Act365f, RateAct365f, RateDayCount};
 use qrs_math::{func1d::Func1dDer1, num::Real};
 
 use super::YieldCurve;
@@ -36,9 +36,11 @@ where
         }
         if from == to {
             let rate = self.logdf.der1(from).to_change(Duration::with_days(365));
-            return Ok(RateAct365f::from_rate(rate));
+            return Ok(Act365f.to_rate(rate));
         }
         let log_df = self.logdf.eval(from) - &self.logdf.eval(to);
-        Ok(RateAct365f::from_ratio(log_df, to - from).expect("zero-division does not occur"))
+        Ok(Act365f
+            .ratio_to_rate(log_df, from, to)
+            .expect("zero-division does not occur"))
     }
 }

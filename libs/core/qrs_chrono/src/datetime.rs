@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use chrono::{format::DelayedFormat, TimeZone};
+use chrono::{format::DelayedFormat, LocalResult, NaiveDate, NaiveTime, TimeZone};
 
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
@@ -17,7 +17,7 @@ use qrs_math::num::RelPos;
 // -----------------------------------------------------------------------------
 // DateTime
 //
-pub type DateTime = GenericDateTime<super::TimeZone>;
+pub type DateTime = GenericDateTime<super::Tz>;
 
 // -----------------------------------------------------------------------------
 // GenericDateTime
@@ -184,21 +184,21 @@ impl JsonSchema for GenericDateTime<chrono_tz::Tz> {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GenericDateTime<super::TimeZone> {
+impl Serialize for GenericDateTime<super::Tz> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         match self.internal.timezone() {
-            super::TimeZone::FixedOffset(tz) => self.with_timezone(&tz).serialize(serializer),
-            super::TimeZone::Iana(tz) => self.with_timezone(&tz).serialize(serializer),
+            super::Tz::FixedOffset(tz) => self.with_timezone(&tz).serialize(serializer),
+            super::Tz::Iana(tz) => self.with_timezone(&tz).serialize(serializer),
         }
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GenericDateTime<super::TimeZone> {
+impl<'de> Deserialize<'de> for GenericDateTime<super::Tz> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -219,7 +219,7 @@ impl<'de> Deserialize<'de> for GenericDateTime<super::TimeZone> {
 }
 
 #[cfg(feature = "serde")]
-impl JsonSchema for GenericDateTime<super::TimeZone> {
+impl JsonSchema for GenericDateTime<super::Tz> {
     fn schema_name() -> String {
         "DateTime".to_string()
     }
@@ -394,15 +394,15 @@ impl FromStr for GenericDateTime<chrono_tz::Tz> {
     }
 }
 
-impl FromStr for GenericDateTime<super::TimeZone> {
+impl FromStr for GenericDateTime<super::Tz> {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(dt) = GenericDateTime::<chrono_tz::Tz>::from_str(s) {
-            return Ok(dt.with_timezone(&super::TimeZone::Iana(dt.internal.timezone())));
+            return Ok(dt.with_timezone(&super::Tz::Iana(dt.internal.timezone())));
         }
         if let Ok(dt) = GenericDateTime::<chrono::FixedOffset>::from_str(s) {
-            return Ok(dt.with_timezone(&super::TimeZone::FixedOffset(*dt.internal.offset())));
+            return Ok(dt.with_timezone(&super::Tz::FixedOffset(*dt.internal.offset())));
         }
         Err(anyhow!(
             "Failed to parse datetime from string. Expected format is
@@ -725,13 +725,393 @@ where
     }
 }
 
+// -----------------------------------------------------------------------------
+// DateTimeBuildError
+//
+#[derive(Debug, thiserror::Error, Clone)]
+pub enum DateTimeBuildError {
+    #[error("Invalid date: ymd=({}, {}, {})", .year, .month, .day)]
+    Date { year: i32, month: u32, day: u32 },
+    #[error("Invalid time: hms.f=({}, {}, {}, {})", .hour, .minute, .second, .nanosecond)]
+    Time {
+        hour: u32,
+        minute: u32,
+        second: u32,
+        nanosecond: u32,
+    },
+    #[error("Invalid fixed offset: offset_sec={}", .offset_sec)]
+    FixedOffset { offset_sec: i32 },
+    #[error("Parse error: {}", .0)]
+    Tz(String),
+    #[error("Specified timepoint does not exist, e.g., due to daylight saving time transition")]
+    NotExist,
+    #[error("Specified timepoint is ambiguous, e.g., due to daylight saving time transition")]
+    Ambiguous,
+}
+
+// -----------------------------------------------------------------------------
+// DateTimeBuilder
+//
+
+/// A builder for creating a `qrs_chrono::DateTime`.
+///
+/// # Example
+/// ```
+/// use qrs_chrono::DateTimeBuilder;
+///
+/// let datetime = DateTimeBuilder::new()
+///     .with_ymd(2021, 1, 1)
+///     .with_hms(10, 42, 11)
+///     .with_fixed_offset(9 * 3600)
+///     .build()
+///     .unwrap();
+///
+/// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DateTimeBuilder<D = (), T = (), Tz = ()> {
+    date: D,
+    time: T,
+    timezone: Tz,
+}
+
+pub type DateToDateTime<Tz> = DateTimeBuilder<NaiveDate, (), Tz>;
+
+//
+// construction
+//
+impl Default for DateTimeBuilder {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            date: (),
+            time: (),
+            timezone: (),
+        }
+    }
+}
+
+impl DateTimeBuilder {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+//
+// setters
+//
+impl<D, Tz> DateTimeBuilder<D, (), Tz> {
+    /// Set time to the builder.
+    /// Available types are implementations of [chrono::Timelike].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_time(&chrono::NaiveTime::from_hms_opt(10, 42, 11).unwrap())
+    ///     .with_fixed_offset(9 * 3600)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn with_time<T>(
+        self,
+        time: &T,
+    ) -> DateTimeBuilder<D, Result<chrono::NaiveTime, DateTimeBuildError>, Tz>
+    where
+        T: chrono::Timelike,
+    {
+        DateTimeBuilder {
+            date: self.date,
+            time: NaiveTime::from_hms_nano_opt(
+                time.hour(),
+                time.minute(),
+                time.second(),
+                time.nanosecond(),
+            )
+            .ok_or_else(|| DateTimeBuildError::Time {
+                hour: time.hour(),
+                minute: time.minute(),
+                second: time.second(),
+                nanosecond: time.nanosecond(),
+            }),
+            timezone: self.timezone,
+        }
+    }
+
+    /// Set time to the builder.
+    /// Invalid time is captured when build is called.
+    /// Details for invalid time is described in [chrono::NaiveTime::from_hms_opt].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_hms(10, 42, 11)
+    ///     .with_fixed_offset(9 * 3600)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn with_hms(
+        self,
+        hour: u32,
+        minute: u32,
+        second: u32,
+    ) -> DateTimeBuilder<D, Result<chrono::NaiveTime, DateTimeBuildError>, Tz> {
+        DateTimeBuilder {
+            date: self.date,
+            time: NaiveTime::from_hms_opt(hour, minute, second).ok_or({
+                DateTimeBuildError::Time {
+                    hour,
+                    minute,
+                    second,
+                    nanosecond: 0,
+                }
+            }),
+            timezone: self.timezone,
+        }
+    }
+}
+impl<T, Tz> DateTimeBuilder<(), T, Tz> {
+    /// Set date to the builder.
+    /// Available types are implementations of [chrono::Datelike].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_date(&chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap())
+    ///     .with_hms(10, 42, 11)
+    ///     .with_utc()
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+00:00");
+    /// ```
+    #[inline]
+    pub fn with_date<D>(
+        self,
+        date: &D,
+    ) -> DateTimeBuilder<Result<chrono::NaiveDate, DateTimeBuildError>, T, Tz>
+    where
+        D: chrono::Datelike,
+    {
+        DateTimeBuilder {
+            date: NaiveDate::from_ymd_opt(date.year(), date.month(), date.day()).ok_or_else(|| {
+                DateTimeBuildError::Date {
+                    year: date.year(),
+                    month: date.month(),
+                    day: date.day(),
+                }
+            }),
+            time: self.time,
+            timezone: self.timezone,
+        }
+    }
+
+    /// Set date to the builder.
+    /// Invalid date is captured when build is called.
+    /// Details for invalid date is described in [chrono::NaiveDate::from_ymd_opt].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_hms(10, 42, 11)
+    ///     .with_fixed_offset(9 * 3600)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn with_ymd(
+        self,
+        year: i32,
+        month: u32,
+        day: u32,
+    ) -> DateTimeBuilder<Result<chrono::NaiveDate, DateTimeBuildError>, T, Tz> {
+        DateTimeBuilder {
+            date: NaiveDate::from_ymd_opt(year, month, day).ok_or(DateTimeBuildError::Date {
+                year,
+                month,
+                day,
+            }),
+            time: self.time,
+            timezone: self.timezone,
+        }
+    }
+}
+impl<D, T> DateTimeBuilder<D, T, ()> {
+    /// Set timezone to the builder.
+    /// Available types are implementations of [chrono::TimeZone].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_hms(10, 42, 11)
+    ///     .with_timezone(chrono::FixedOffset::east_opt(9 * 3600).unwrap())
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn with_timezone<Tz: TimeZone>(
+        self,
+        timezone: Tz,
+    ) -> DateTimeBuilder<D, T, Result<Tz, DateTimeBuildError>> {
+        DateTimeBuilder {
+            date: self.date,
+            time: self.time,
+            timezone: Ok(timezone),
+        }
+    }
+
+    /// Set fixed offset timezone to the builder.
+    /// We use east offset rather than west one as argument because the offset is positive.
+    ///
+    /// Invalid offset is captured when build is called.
+    /// Details for invalid offset is described in [chrono::FixedOffset::east_opt].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_hms(10, 42, 11)
+    ///     .with_fixed_offset(9 * 3600)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn with_fixed_offset(
+        self,
+        secs: i32,
+    ) -> DateTimeBuilder<D, T, Result<chrono::FixedOffset, DateTimeBuildError>> {
+        DateTimeBuilder {
+            date: self.date,
+            time: self.time,
+            timezone: chrono::FixedOffset::east_opt(secs)
+                .ok_or(DateTimeBuildError::FixedOffset { offset_sec: secs }),
+        }
+    }
+
+    /// Set UTC timezone to the builder.
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_hms(10, 42, 11)
+    ///     .with_utc()
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+00:00");
+    /// ```
+    #[inline]
+    pub fn with_utc(self) -> DateTimeBuilder<D, T, Result<chrono::Utc, DateTimeBuildError>> {
+        self.with_timezone(chrono::Utc)
+    }
+
+    /// Set timezone from string to [`crate::Tz`]
+    ///
+    /// Available timezone strings are IANA timezone names and fixed offset strings.
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///    .with_ymd(2021, 1, 1)
+    ///    .with_hms(10, 42, 11)
+    ///    .with_parsed_timezone("Asia/Tokyo")
+    ///    .build()
+    ///    .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn with_parsed_timezone(
+        self,
+        tz: &str,
+    ) -> DateTimeBuilder<D, T, Result<crate::Tz, DateTimeBuildError>> {
+        DateTimeBuilder {
+            date: self.date,
+            time: self.time,
+            timezone: crate::Tz::from_str(tz).map_err(|e| DateTimeBuildError::Tz(e.to_string())),
+        }
+    }
+}
+
+//
+// build
+//
+impl<Tz: TimeZone>
+    DateTimeBuilder<
+        Result<NaiveDate, DateTimeBuildError>,
+        Result<NaiveTime, DateTimeBuildError>,
+        Result<Tz, DateTimeBuildError>,
+    >
+{
+    /// Build a `DateTime` from the builder with stored date, time and timezone.
+    /// This methos is available only after setting date, time and timezone.
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::DateTimeBuilder;
+    ///
+    /// let datetime = DateTimeBuilder::new()
+    ///     .with_ymd(2021, 1, 1)
+    ///     .with_hms(10, 42, 11)
+    ///     .with_timezone(chrono::FixedOffset::east_opt(9 * 3600).unwrap())
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
+    /// ```
+    #[inline]
+    pub fn build(self) -> Result<GenericDateTime<Tz>, DateTimeBuildError> {
+        let res = self
+            .timezone?
+            .from_local_datetime(&self.date?.and_time(self.time?));
+        match res {
+            LocalResult::Single(dt) => Ok(dt.into()),
+            LocalResult::None => Err(DateTimeBuildError::NotExist),
+            LocalResult::Ambiguous(_, _) => Err(DateTimeBuildError::Ambiguous),
+        }
+    }
+}
+
 // =============================================================================
 #[cfg(test)]
 mod tests {
     use chrono::{Datelike, Timelike};
     use qrs_math::num::Zero;
 
-    use crate::TimeZone;
+    use crate::Tz;
 
     use super::super::Duration;
     use super::*;
@@ -763,15 +1143,13 @@ mod tests {
         // qrs_chrono::TimeZone
         let dt =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let dt: DateTime = dt
-            .with_timezone(&TimeZone::FixedOffset(dt.timezone()))
-            .into();
+        let dt: DateTime = dt.with_timezone(&Tz::FixedOffset(dt.timezone())).into();
         assert_eq!(format!("{:?}", dt), "2021-01-01T10:42:11+09:00");
 
         let dt = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
             .with_timezone(&chrono_tz::Tz::America__New_York);
-        let dt: DateTime = dt.with_timezone(&TimeZone::Iana(dt.timezone())).into();
+        let dt: DateTime = dt.with_timezone(&Tz::Iana(dt.timezone())).into();
         assert_eq!(format!("{:?}", dt), "2021-01-01T05:42:11EST");
     }
 
@@ -805,15 +1183,13 @@ mod tests {
         // qrs_chrono::TimeZone
         let dt =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let dt: DateTime = dt
-            .with_timezone(&TimeZone::FixedOffset(dt.timezone()))
-            .into();
+        let dt: DateTime = dt.with_timezone(&Tz::FixedOffset(dt.timezone())).into();
         assert_eq!(dt.to_string(), "2021-01-01 10:42:11 +09:00");
 
         let dt = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
             .with_timezone(&chrono_tz::Tz::America__New_York);
-        let dt: DateTime = dt.with_timezone(&TimeZone::Iana(dt.timezone())).into();
+        let dt: DateTime = dt.with_timezone(&Tz::Iana(dt.timezone())).into();
         assert_eq!(dt.to_string(), "2021-01-01 05:42:11 EST");
     }
 
@@ -955,16 +1331,14 @@ mod tests {
         // qrs_chrono::TimeZone
         let dt =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let dt: DateTime = dt
-            .with_timezone(&TimeZone::FixedOffset(dt.timezone()))
-            .into();
+        let dt: DateTime = dt.with_timezone(&Tz::FixedOffset(dt.timezone())).into();
         let serialized = serde_json::to_string(&dt).unwrap();
         assert_eq!(serialized, r#""2021-01-01T10:42:11+09:00""#);
 
         let dt = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
             .unwrap()
             .with_timezone(&chrono_tz::Tz::America__New_York);
-        let dt: DateTime = dt.with_timezone(&TimeZone::Iana(dt.timezone())).into();
+        let dt: DateTime = dt.with_timezone(&Tz::Iana(dt.timezone())).into();
         let serialized = serde_json::to_string(&dt).unwrap();
         assert_eq!(
             serialized,
@@ -1477,13 +1851,13 @@ mod tests {
         let chrono_dts = vec![
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
-                .with_timezone(&crate::TimeZone::fixed_offset(9 * 3600).unwrap()),
+                .with_timezone(&crate::Tz::fixed_offset(9 * 3600).unwrap()),
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-04-01T10:42:11+09:00")
                 .unwrap()
-                .with_timezone(&crate::TimeZone::fixed_offset(-5 * 3600).unwrap()),
+                .with_timezone(&crate::Tz::fixed_offset(-5 * 3600).unwrap()),
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-12-31T10:42:11+09:00")
                 .unwrap()
-                .with_timezone(&crate::TimeZone::iana("America/New_York").unwrap()),
+                .with_timezone(&crate::Tz::iana("America/New_York").unwrap()),
         ];
         for chrono_dt in chrono_dts {
             let dt: DateTime = chrono_dt.into();
@@ -1614,13 +1988,13 @@ mod tests {
         let chrono_dts = vec![
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
-                .with_timezone(&crate::TimeZone::fixed_offset(9 * 3600).unwrap()),
+                .with_timezone(&crate::Tz::fixed_offset(9 * 3600).unwrap()),
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-04-01T10:42:11+09:00")
                 .unwrap()
-                .with_timezone(&crate::TimeZone::fixed_offset(-5 * 3600).unwrap()),
+                .with_timezone(&crate::Tz::fixed_offset(-5 * 3600).unwrap()),
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-12-31T10:42:11+09:00")
                 .unwrap()
-                .with_timezone(&crate::TimeZone::iana("America/New_York").unwrap()),
+                .with_timezone(&crate::Tz::iana("America/New_York").unwrap()),
         ];
         for chrono_dt in chrono_dts {
             let dt: DateTime = chrono_dt.into();

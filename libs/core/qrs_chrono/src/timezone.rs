@@ -10,15 +10,15 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // -----------------------------------------------------------------------------
-// TimeZoneOffset
+// TzOffset
 //
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct TimeZoneOffset(_TimeZoneOffset);
+pub struct TzOffset(_TimeZoneOffset);
 
 //
 // display, serde
 //
-impl Debug for TimeZoneOffset {
+impl Debug for TzOffset {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
@@ -28,7 +28,7 @@ impl Debug for TimeZoneOffset {
     }
 }
 
-impl Display for TimeZoneOffset {
+impl Display for TzOffset {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
@@ -41,7 +41,7 @@ impl Display for TimeZoneOffset {
 //
 // methods
 //
-impl chrono::Offset for TimeZoneOffset {
+impl chrono::Offset for TzOffset {
     #[inline]
     fn fix(&self) -> chrono::FixedOffset {
         match self.0 {
@@ -61,7 +61,7 @@ enum _TimeZoneOffset {
 // Timezone
 //
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TimeZone {
+pub enum Tz {
     FixedOffset(chrono::FixedOffset),
     Iana(chrono_tz::Tz),
 }
@@ -69,28 +69,28 @@ pub enum TimeZone {
 //
 // display, serde
 //
-impl Debug for TimeZone {
+impl Debug for Tz {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TimeZone::FixedOffset(offset) => Debug::fmt(offset, f),
-            TimeZone::Iana(tz) => Debug::fmt(tz, f),
+            Tz::FixedOffset(offset) => Debug::fmt(offset, f),
+            Tz::Iana(tz) => Debug::fmt(tz, f),
         }
     }
 }
 
-impl Display for TimeZone {
+impl Display for Tz {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TimeZone::FixedOffset(offset) => write!(f, "{}", offset),
-            TimeZone::Iana(tz) => write!(f, "{}", tz),
+            Tz::FixedOffset(offset) => write!(f, "{}", offset),
+            Tz::Iana(tz) => write!(f, "{}", tz),
         }
     }
 }
 
 #[cfg(feature = "serde")]
-impl JsonSchema for TimeZone {
+impl JsonSchema for Tz {
     fn schema_name() -> String {
         "TimeZone".to_string()
     }
@@ -121,41 +121,41 @@ impl JsonSchema for TimeZone {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for TimeZone {
+impl Serialize for Tz {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         match self {
-            TimeZone::FixedOffset(offset) => serializer.serialize_str(&offset.to_string()),
-            TimeZone::Iana(tz) => tz.serialize(serializer),
+            Tz::FixedOffset(offset) => serializer.serialize_str(&offset.to_string()),
+            Tz::Iana(tz) => tz.serialize(serializer),
         }
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for TimeZone {
-    fn deserialize<D>(deserializer: D) -> Result<TimeZone, D::Error>
+impl<'de> Deserialize<'de> for Tz {
+    fn deserialize<D>(deserializer: D) -> Result<Tz, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        TimeZone::from_str(&s).map_err(serde::de::Error::custom)
+        Tz::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
-impl FromStr for TimeZone {
+impl FromStr for Tz {
     type Err = anyhow::Error;
 
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let non_iana_reason = match chrono_tz::Tz::from_str(s) {
-            Ok(tz) => return Ok(TimeZone::Iana(tz)),
+            Ok(tz) => return Ok(Tz::Iana(tz)),
             Err(e) => e,
         };
         let non_fixed_offset_reason = match _parse_fixed_offset(s) {
-            Ok(offset) => return Ok(TimeZone::FixedOffset(offset)),
+            Ok(offset) => return Ok(Tz::FixedOffset(offset)),
             Err(e) => e,
         };
         Err(anyhow!(
@@ -232,68 +232,68 @@ fn _parse_fixed_offset(s: &str) -> Result<chrono::FixedOffset, anyhow::Error> {
 //
 // construction
 //
-impl Default for TimeZone {
+impl Default for Tz {
     #[inline]
     fn default() -> Self {
-        TimeZone::FixedOffset(chrono::FixedOffset::east_opt(0).unwrap())
+        Tz::FixedOffset(chrono::FixedOffset::east_opt(0).unwrap())
     }
 }
 
-impl From<chrono::FixedOffset> for TimeZone {
+impl From<chrono::FixedOffset> for Tz {
     #[inline]
     fn from(offset: chrono::FixedOffset) -> Self {
-        TimeZone::FixedOffset(offset)
+        Tz::FixedOffset(offset)
     }
 }
 
-impl From<chrono_tz::Tz> for TimeZone {
+impl From<chrono_tz::Tz> for Tz {
     #[inline]
     fn from(tz: chrono_tz::Tz) -> Self {
-        TimeZone::Iana(tz)
+        Tz::Iana(tz)
     }
 }
 
-impl TimeZone {
+impl Tz {
     /// Create a new `TimeZone` from a fixed offset in seconds(positive is east, negative is west).
     ///
     /// # Example
     /// ```
-    /// use qrs_chrono::TimeZone;
+    /// use qrs_chrono::Tz;
     ///
-    /// let tky_tz = TimeZone::fixed_offset(9 * 3600).unwrap();
+    /// let tky_tz = Tz::fixed_offset(9 * 3600).unwrap();
     /// assert_eq!(tky_tz.to_string(), "+09:00");
     /// ```
     #[inline]
     pub fn fixed_offset(sec: i32) -> Option<Self> {
-        chrono::FixedOffset::east_opt(sec).map(TimeZone::FixedOffset)
+        chrono::FixedOffset::east_opt(sec).map(Tz::FixedOffset)
     }
 
     /// Create a new `TimeZone` from an IANA timezone identifier.
     ///
     /// # Example
     /// ```
-    /// use qrs_chrono::TimeZone;
+    /// use qrs_chrono::Tz;
     ///
-    /// let tky_tz = TimeZone::iana("Asia/Tokyo").unwrap();
+    /// let tky_tz = Tz::iana("Asia/Tokyo").unwrap();
     /// assert_eq!(tky_tz.to_string(), "Asia/Tokyo");
     /// ```
     #[inline]
     pub fn iana(s: &str) -> Option<Self> {
-        chrono_tz::Tz::from_str(s).ok().map(TimeZone::Iana)
+        chrono_tz::Tz::from_str(s).ok().map(Tz::Iana)
     }
 }
 
 //
 // methods
 //
-impl chrono::TimeZone for TimeZone {
-    type Offset = TimeZoneOffset;
+impl chrono::TimeZone for Tz {
+    type Offset = TzOffset;
 
     #[inline]
     fn from_offset(offset: &Self::Offset) -> Self {
         match offset.0 {
-            _TimeZoneOffset::FixedOffset(offset) => TimeZone::FixedOffset(offset),
-            _TimeZoneOffset::Iana(offset) => TimeZone::Iana(chrono_tz::Tz::from_offset(&offset)),
+            _TimeZoneOffset::FixedOffset(offset) => Tz::FixedOffset(offset),
+            _TimeZoneOffset::Iana(offset) => Tz::Iana(chrono_tz::Tz::from_offset(&offset)),
         }
     }
 
@@ -303,12 +303,12 @@ impl chrono::TimeZone for TimeZone {
         local: &chrono::prelude::NaiveDate,
     ) -> chrono::LocalResult<Self::Offset> {
         match self {
-            TimeZone::FixedOffset(offset) => offset
+            Tz::FixedOffset(offset) => offset
                 .offset_from_local_date(local)
-                .map(|offset| TimeZoneOffset(_TimeZoneOffset::FixedOffset(offset))),
-            TimeZone::Iana(tz) => tz
+                .map(|offset| TzOffset(_TimeZoneOffset::FixedOffset(offset))),
+            Tz::Iana(tz) => tz
                 .offset_from_local_date(local)
-                .map(|offset| TimeZoneOffset(_TimeZoneOffset::Iana(offset))),
+                .map(|offset| TzOffset(_TimeZoneOffset::Iana(offset))),
         }
     }
 
@@ -318,36 +318,32 @@ impl chrono::TimeZone for TimeZone {
         local: &chrono::prelude::NaiveDateTime,
     ) -> chrono::LocalResult<Self::Offset> {
         match self {
-            TimeZone::FixedOffset(offset) => offset
+            Tz::FixedOffset(offset) => offset
                 .offset_from_local_datetime(local)
-                .map(|offset| TimeZoneOffset(_TimeZoneOffset::FixedOffset(offset))),
-            TimeZone::Iana(tz) => tz
+                .map(|offset| TzOffset(_TimeZoneOffset::FixedOffset(offset))),
+            Tz::Iana(tz) => tz
                 .offset_from_local_datetime(local)
-                .map(|offset| TimeZoneOffset(_TimeZoneOffset::Iana(offset))),
+                .map(|offset| TzOffset(_TimeZoneOffset::Iana(offset))),
         }
     }
 
     #[inline]
     fn offset_from_utc_date(&self, utc: &chrono::prelude::NaiveDate) -> Self::Offset {
         match self {
-            TimeZone::FixedOffset(offset) => TimeZoneOffset(_TimeZoneOffset::FixedOffset(
+            Tz::FixedOffset(offset) => TzOffset(_TimeZoneOffset::FixedOffset(
                 offset.offset_from_utc_date(utc),
             )),
-            TimeZone::Iana(tz) => {
-                TimeZoneOffset(_TimeZoneOffset::Iana(tz.offset_from_utc_date(utc)))
-            }
+            Tz::Iana(tz) => TzOffset(_TimeZoneOffset::Iana(tz.offset_from_utc_date(utc))),
         }
     }
 
     #[inline]
     fn offset_from_utc_datetime(&self, utc: &chrono::prelude::NaiveDateTime) -> Self::Offset {
         match self {
-            TimeZone::FixedOffset(offset) => TimeZoneOffset(_TimeZoneOffset::FixedOffset(
+            Tz::FixedOffset(offset) => TzOffset(_TimeZoneOffset::FixedOffset(
                 offset.offset_from_utc_datetime(utc),
             )),
-            TimeZone::Iana(tz) => {
-                TimeZoneOffset(_TimeZoneOffset::Iana(tz.offset_from_utc_datetime(utc)))
-            }
+            Tz::Iana(tz) => TzOffset(_TimeZoneOffset::Iana(tz.offset_from_utc_datetime(utc))),
         }
     }
 }
@@ -361,31 +357,27 @@ mod tests {
     fn test_display() {
         use super::*;
         assert_eq!(
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600).unwrap()).to_string(),
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600).unwrap()).to_string(),
             "+09:00"
         );
         assert_eq!(
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60).unwrap())
-                .to_string(),
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60).unwrap()).to_string(),
             "+09:30"
         );
         assert_eq!(
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60 + 15).unwrap())
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60 + 15).unwrap())
                 .to_string(),
             "+09:30:15"
         );
         assert_eq!(
-            TimeZone::Iana(chrono_tz::Tz::Asia__Tokyo).to_string(),
+            Tz::Iana(chrono_tz::Tz::Asia__Tokyo).to_string(),
             "Asia/Tokyo"
         );
         assert_eq!(
-            TimeZone::Iana(chrono_tz::Tz::America__New_York).to_string(),
+            Tz::Iana(chrono_tz::Tz::America__New_York).to_string(),
             "America/New_York"
         );
-        assert_eq!(
-            TimeZone::Iana(chrono_tz::Tz::Etc__UTC).to_string(),
-            "Etc/UTC"
-        );
+        assert_eq!(Tz::Iana(chrono_tz::Tz::Etc__UTC).to_string(), "Etc/UTC");
     }
 
     #[cfg(feature = "serde")]
@@ -393,36 +385,36 @@ mod tests {
     fn test_serialize() {
         use serde_json::json;
         assert_eq!(
-            serde_json::to_value(TimeZone::FixedOffset(
+            serde_json::to_value(Tz::FixedOffset(
                 chrono::FixedOffset::east_opt(9 * 3600).unwrap()
             ))
             .unwrap(),
             json!("+09:00")
         );
         assert_eq!(
-            serde_json::to_value(TimeZone::FixedOffset(
+            serde_json::to_value(Tz::FixedOffset(
                 chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60).unwrap()
             ))
             .unwrap(),
             json!("+09:30")
         );
         assert_eq!(
-            serde_json::to_value(TimeZone::FixedOffset(
+            serde_json::to_value(Tz::FixedOffset(
                 chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60 + 15).unwrap()
             ))
             .unwrap(),
             json!("+09:30:15")
         );
         assert_eq!(
-            serde_json::to_value(TimeZone::Iana(chrono_tz::Tz::Asia__Tokyo)).unwrap(),
+            serde_json::to_value(Tz::Iana(chrono_tz::Tz::Asia__Tokyo)).unwrap(),
             json!("Asia/Tokyo")
         );
         assert_eq!(
-            serde_json::to_value(TimeZone::Iana(chrono_tz::Tz::America__New_York)).unwrap(),
+            serde_json::to_value(Tz::Iana(chrono_tz::Tz::America__New_York)).unwrap(),
             json!("America/New_York")
         );
         assert_eq!(
-            serde_json::to_value(TimeZone::Iana(chrono_tz::Tz::Etc__UTC)).unwrap(),
+            serde_json::to_value(Tz::Iana(chrono_tz::Tz::Etc__UTC)).unwrap(),
             json!("Etc/UTC")
         );
     }
@@ -432,40 +424,40 @@ mod tests {
     fn test_deserialize() {
         use serde_json::json;
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("+09:00")).unwrap(),
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600).unwrap())
+            serde_json::from_value::<Tz>(json!("+09:00")).unwrap(),
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600).unwrap())
         );
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("+09:30")).unwrap(),
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60).unwrap())
+            serde_json::from_value::<Tz>(json!("+09:30")).unwrap(),
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60).unwrap())
         );
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("+09:30:15")).unwrap(),
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60 + 15).unwrap())
+            serde_json::from_value::<Tz>(json!("+09:30:15")).unwrap(),
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60 + 15).unwrap())
         );
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("-09:30")).unwrap(),
-            TimeZone::FixedOffset(chrono::FixedOffset::east_opt(-(9 * 3600 + 30 * 60)).unwrap())
+            serde_json::from_value::<Tz>(json!("-09:30")).unwrap(),
+            Tz::FixedOffset(chrono::FixedOffset::east_opt(-(9 * 3600 + 30 * 60)).unwrap())
         );
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("Asia/Tokyo")).unwrap(),
-            TimeZone::Iana(chrono_tz::Tz::Asia__Tokyo)
+            serde_json::from_value::<Tz>(json!("Asia/Tokyo")).unwrap(),
+            Tz::Iana(chrono_tz::Tz::Asia__Tokyo)
         );
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("America/New_York")).unwrap(),
-            TimeZone::Iana(chrono_tz::Tz::America__New_York)
+            serde_json::from_value::<Tz>(json!("America/New_York")).unwrap(),
+            Tz::Iana(chrono_tz::Tz::America__New_York)
         );
         assert_eq!(
-            serde_json::from_value::<TimeZone>(json!("Etc/UTC")).unwrap(),
-            TimeZone::Iana(chrono_tz::Tz::Etc__UTC)
+            serde_json::from_value::<Tz>(json!("Etc/UTC")).unwrap(),
+            Tz::Iana(chrono_tz::Tz::Etc__UTC)
         );
 
         // error
-        assert!(serde_json::from_value::<TimeZone>(json!("+09:")).is_err());
-        assert!(serde_json::from_value::<TimeZone>(json!("+09:30:")).is_err());
-        assert!(serde_json::from_value::<TimeZone>(json!("+09:30:15:00")).is_err());
-        assert!(serde_json::from_value::<TimeZone>(json!("+09:30:15:00")).is_err());
-        assert!(serde_json::from_value::<TimeZone>(json!("")).is_err());
+        assert!(serde_json::from_value::<Tz>(json!("+09:")).is_err());
+        assert!(serde_json::from_value::<Tz>(json!("+09:30:")).is_err());
+        assert!(serde_json::from_value::<Tz>(json!("+09:30:15:00")).is_err());
+        assert!(serde_json::from_value::<Tz>(json!("+09:30:15:00")).is_err());
+        assert!(serde_json::from_value::<Tz>(json!("")).is_err());
     }
 
     #[test]
@@ -474,7 +466,7 @@ mod tests {
 
         // FixedOffset
         let internal = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
-        let tz = super::TimeZone::FixedOffset(internal);
+        let tz = super::Tz::FixedOffset(internal);
         let naive =
             NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
         let with_tz = tz.from_utc_datetime(&naive);
@@ -483,7 +475,7 @@ mod tests {
 
         // Iana
         let internal = chrono_tz::Tz::Asia__Tokyo;
-        let tz = super::TimeZone::Iana(internal);
+        let tz = super::Tz::Iana(internal);
         let naive =
             NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
         let with_tz = tz.from_utc_datetime(&naive);
@@ -498,7 +490,7 @@ mod tests {
 
         // FixedOffset
         let internal = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
-        let tz = super::TimeZone::FixedOffset(internal);
+        let tz = super::Tz::FixedOffset(internal);
         let naive = NaiveDate::parse_from_str("2021-01-01", "%Y-%m-%d").unwrap();
         let with_tz = tz.from_utc_date(&naive);
         let with_internal = internal.from_utc_date(&naive);
@@ -506,7 +498,7 @@ mod tests {
 
         // Iana
         let internal = chrono_tz::Tz::Asia__Tokyo;
-        let tz = super::TimeZone::Iana(internal);
+        let tz = super::Tz::Iana(internal);
         let naive = NaiveDate::parse_from_str("2021-01-01", "%Y-%m-%d").unwrap();
         let with_tz = tz.from_utc_date(&naive);
         let with_internal = internal.from_utc_date(&naive);
@@ -519,26 +511,26 @@ mod tests {
 
         // FixedOffset
         let internal = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
-        let tz = super::TimeZone::FixedOffset(internal);
+        let tz = super::Tz::FixedOffset(internal);
         let naive =
             NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
         let with_tz = tz.offset_from_utc_datetime(&naive);
         let with_internal = internal.offset_from_utc_datetime(&naive);
         assert_eq!(
             with_tz,
-            TimeZoneOffset(super::_TimeZoneOffset::FixedOffset(with_internal))
+            TzOffset(super::_TimeZoneOffset::FixedOffset(with_internal))
         );
 
         // Iana
         let internal = chrono_tz::Tz::Asia__Tokyo;
-        let tz = super::TimeZone::Iana(internal);
+        let tz = super::Tz::Iana(internal);
         let naive =
             NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
         let with_tz = tz.offset_from_utc_datetime(&naive);
         let with_internal = internal.offset_from_utc_datetime(&naive);
         assert_eq!(
             with_tz,
-            TimeZoneOffset(super::_TimeZoneOffset::Iana(with_internal))
+            TzOffset(super::_TimeZoneOffset::Iana(with_internal))
         );
     }
 
@@ -548,24 +540,24 @@ mod tests {
 
         // FixedOffset
         let internal = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
-        let tz = super::TimeZone::FixedOffset(internal);
+        let tz = super::Tz::FixedOffset(internal);
         let naive = NaiveDate::parse_from_str("2021-01-01", "%Y-%m-%d").unwrap();
         let with_tz = tz.offset_from_utc_date(&naive);
         let with_internal = internal.offset_from_utc_date(&naive);
         assert_eq!(
             with_tz,
-            TimeZoneOffset(super::_TimeZoneOffset::FixedOffset(with_internal))
+            TzOffset(super::_TimeZoneOffset::FixedOffset(with_internal))
         );
 
         // Iana
         let internal = chrono_tz::Tz::Asia__Tokyo;
-        let tz = super::TimeZone::Iana(internal);
+        let tz = super::Tz::Iana(internal);
         let naive = NaiveDate::parse_from_str("2021-01-01", "%Y-%m-%d").unwrap();
         let with_tz = tz.offset_from_utc_date(&naive);
         let with_internal = internal.offset_from_utc_date(&naive);
         assert_eq!(
             with_tz,
-            TimeZoneOffset(super::_TimeZoneOffset::Iana(with_internal))
+            TzOffset(super::_TimeZoneOffset::Iana(with_internal))
         );
     }
 
@@ -575,23 +567,23 @@ mod tests {
 
         // FixedOffset
         let internal = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::FixedOffset(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::FixedOffset(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal);
 
         // more cases
         let internal = chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60).unwrap();
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::FixedOffset(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::FixedOffset(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal);
 
         let internal = chrono::FixedOffset::east_opt(9 * 3600 + 30 * 60 + 15).unwrap();
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::FixedOffset(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::FixedOffset(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal);
 
         let internal = chrono::FixedOffset::east_opt(-(9 * 3600 + 30 * 60)).unwrap();
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::FixedOffset(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::FixedOffset(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal);
 
@@ -599,21 +591,21 @@ mod tests {
         let internal = chrono_tz::Tz::Asia__Tokyo.offset_from_utc_datetime(
             &NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
         );
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::Iana(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::Iana(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal.fix());
 
         let internal = chrono_tz::Tz::America__New_York.offset_from_utc_datetime(
             &NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
         );
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::Iana(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::Iana(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal.fix());
 
         let internal = chrono_tz::Tz::Etc__UTC.offset_from_utc_datetime(
             &NaiveDateTime::parse_from_str("2021-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
         );
-        let tz = super::TimeZoneOffset(super::_TimeZoneOffset::Iana(internal));
+        let tz = super::TzOffset(super::_TimeZoneOffset::Iana(internal));
         let fixed = tz.fix();
         assert_eq!(fixed, internal.fix());
     }

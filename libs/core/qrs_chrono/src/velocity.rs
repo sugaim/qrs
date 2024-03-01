@@ -39,7 +39,7 @@ fn _dur_to_num_units<T: FloatBased>(dur: Duration) -> T::BaseFloat {
 // Velocity
 //
 
-/// A Rate, which is a change per given duration.
+/// Change per given duration.
 #[derive(Debug, Clone, Copy)]
 pub struct Velocity<V>(_Velocity<V>);
 

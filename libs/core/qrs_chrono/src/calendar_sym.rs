@@ -16,12 +16,13 @@ use serde::Serialize;
 /// A variant of calendar symbol.
 ///
 /// We forcus on holidays rather than business days.
-/// Hence, we use `AnyClosed` and `AllClosed` to represent combined calendars.
-/// - `Single`: An atom of calendar symbol.
-/// - `AnyClosed`: A union of calendar symbols. A day is a holiday if a day is a holiday in any of the symbols.
-/// - `AllClosed`: An intersection of calendar symbols. A day is a holiday if a day is a holiday in all of the symbols.
+/// Hence, we use [`CalendarSymVariant::AnyClosed`] and [`CalendarSymVariant::AllClosed`]
+/// to represent combined calendars.
+/// - [`CalendarSymVariant::Single`]: An atom of calendar symbol.
+/// - [`CalendarSymVariant::AnyClosed`]: A union of calendar symbols. A day is a holiday if a day is a holiday in any of the symbols.
+/// - [`CalendarSymVariant::AllClosed`]: An intersection of calendar symbols. A day is a holiday if a day is a holiday in all of the symbols.
 ///
-/// Roughly speaking, `AnyClosed` is a logical OR and `AllClosed` is a logical AND.
+/// Roughly speaking, [`CalendarSymVariant::AnyClosed`] is a logical OR and [`CalendarSymVariant::AllClosed`] is a logical AND.
 ///
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CalendarSymVariant {
@@ -44,22 +45,23 @@ impl From<CalendarSymbol> for CalendarSymVariant {
 //
 
 /// A symbol for a calendar.
-/// We need some validation for calendar symbols.
-/// This is reason why both of `CalendarSymbol` and `CalendarSymVariant` are implemented,
-/// although `CalendarSymVariant` seems enough and useful.
 ///
-/// Please use `CalendarSymbol` in your code,
-/// but use `CalendarSymVariant` when you need to access the variant directly.
+/// We need some validation for calendar symbols.
+/// This is reason why both of [`CalendarSymbol`] and [`CalendarSymVariant`] are implemented,
+/// although [`CalendarSymVariant`] seems enough and useful.
+///
+/// Please use [`CalendarSymbol`] in your code,
+/// but use [`CalendarSymVariant`] when you need to access the variant directly.
 ///
 /// # Variants
-/// - `Single`: An atom of calendar symbol.
-/// - `AnyClosed`: A union of calendar symbols. A day is a holiday if a day is a holiday in any of the symbols.
-/// - `AllClosed`: An intersection of calendar symbols. A day is a holiday if a day is a holiday in all of the symbols.
+/// - [`CalendarSymVariant::Single`]: An atom of calendar symbol.
+/// - [`CalendarSymVariant::AnyClosed`]: A union of calendar symbols. A day is a holiday if a day is a holiday in any of the symbols.
+/// - [`CalendarSymVariant::AllClosed`]: An intersection of calendar symbols. A day is a holiday if a day is a holiday in all of the symbols.
 ///
 /// # String representation
-/// - `Single`: Just use the symbol.
-/// - `AnyClosed`: Use `|` to separate symbols. e.g. `TK|NY|LN`.
-/// - `AllClosed`: Use `&` to separate symbols. e.g. `TK&NY&LN`.
+/// - [`CalendarSymVariant::Single`]: Just use the symbol.
+/// - [`CalendarSymVariant::AnyClosed`]: Use `|` to separate symbols. e.g. `TK|NY|LN`.
+/// - [`CalendarSymVariant::AllClosed`]: Use `&` to separate symbols. e.g. `TK&NY&LN`.
 ///
 /// Precedence of operators is `|` > `&`.
 /// If you need to control the precedence, please use parentheses, e.g. `(TK|NY)&(LN|TK)`.
@@ -216,8 +218,8 @@ impl TryFrom<CalendarSymVariant> for CalendarSymbol {
 }
 
 impl CalendarSymbol {
-    /// Create a new `CalendarSymbol` from a string for a single calendar.
-    /// Available symbols are alphabets, integers and underscore.
+    /// Create a new [`CalendarSymbol`] from a string for a single calendar.
+    /// Available characters are alphabets, integers and underscore.
     ///
     /// # Errors
     /// - If the given string is empty.
@@ -248,7 +250,7 @@ impl CalendarSymbol {
         }
     }
 
-    /// Create a new `CalendarSymbol` for a any_closed calendar.
+    /// Create a new [`CalendarSymbol`] from multiple symbols with any-closed strategy.
     ///
     /// # Errors
     /// - If the given iterator is empty.
@@ -277,7 +279,7 @@ impl CalendarSymbol {
         }
     }
 
-    /// Create a new `CalendarSymbol` for a all_closed calendar.
+    /// Create a new [`CalendarSymbol`] from multiple symbols with all-closed strategy.
     ///
     /// # Errors
     /// - If the given iterator is empty.
@@ -311,10 +313,13 @@ impl CalendarSymbol {
 // methods
 //
 impl CalendarSymbol {
+    /// Get the variant of the calendar symbol to access the variant directly.
     #[inline]
     pub fn dispatch(&self) -> &CalendarSymVariant {
         &self.0
     }
+
+    /// Take the variant of the calendar symbol to access the variant directly.
     #[inline]
     pub fn take_dispatch(self) -> CalendarSymVariant {
         self.0
@@ -332,18 +337,18 @@ impl CalendarSymbol {
     ///
     /// let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
     /// let mut set = HashSet::new();
-    /// sym.leaves(&mut set);
+    /// sym.collect_leaves(&mut set);
     /// assert_eq!(set, ["TK", "NY", "LN"].into_iter().map(ToOwned::to_owned).collect::<HashSet<_>>());
     /// ```
     #[inline]
-    pub fn leaves(&self, set: &mut HashSet<String>) {
+    pub fn collect_leaves(&self, set: &mut HashSet<String>) {
         match &self.0 {
             CalendarSymVariant::Single(s) => {
                 set.insert(s.clone());
             }
             CalendarSymVariant::AnyClosed(c) | CalendarSymVariant::AllClosed(c) => {
                 for sym in c {
-                    sym.leaves(set);
+                    sym.collect_leaves(set);
                 }
             }
         }
@@ -813,7 +818,7 @@ mod tests {
     fn test_leaves() {
         let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
         let mut set = HashSet::new();
-        sym.leaves(&mut set);
+        sym.collect_leaves(&mut set);
         assert_eq!(set.len(), 3);
         assert!(set.contains("TK"));
         assert!(set.contains("NY"));

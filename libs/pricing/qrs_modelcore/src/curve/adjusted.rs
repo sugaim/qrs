@@ -1,4 +1,4 @@
-use qrs_finance::rate::RateAct365f;
+use qrs_finance::daycount::RateAct365f;
 
 use super::{YieldCurve, YieldCurveAdjust};
 

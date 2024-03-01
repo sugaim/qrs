@@ -126,7 +126,7 @@ impl<S: TakeSnapshot<Key = str, Output = Calendar>> TakeSnapshot for CalendarSrc
     {
         let mut names = HashSet::new();
         for key in it {
-            key.leaves(&mut names);
+            key.collect_leaves(&mut names);
         }
         self.src
             .take_snapshot(names.iter().map(|s| s.as_str()))

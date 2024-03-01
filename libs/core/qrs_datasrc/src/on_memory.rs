@@ -258,7 +258,7 @@ impl<K, V> OnMemorySrc<K, V> {
         self.data.get(key)
     }
 
-    /// Insert a new data and send [`Change::Update`]. See also [`HashMap::insert`].
+    /// Insert a new data and send status change. See also [`HashMap::insert`].
     #[inline]
     pub fn insert(&mut self, key: K, value: V) -> Option<V>
     where
@@ -269,7 +269,7 @@ impl<K, V> OnMemorySrc<K, V> {
         res
     }
 
-    /// Remove a data and send [`Change::Remove`]. See also [`HashMap::remove`].
+    /// Remove a data and send status change. See also [`HashMap::remove`].
     /// If the data source does not contain the key, this method does nothing.
     #[inline]
     pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
@@ -283,7 +283,7 @@ impl<K, V> OnMemorySrc<K, V> {
         })
     }
 
-    /// Remove a data and send [`Change::Remove`]. See also [`HashMap::remove_entry`].
+    /// Remove a data and send status change. See also [`HashMap::remove_entry`].
     /// If the data source does not contain the key, this method does nothing.
     #[inline]
     pub fn remove_entry<Q>(&mut self, key: &Q) -> Option<(K, V)>
@@ -297,7 +297,7 @@ impl<K, V> OnMemorySrc<K, V> {
         })
     }
 
-    /// Clear all data and send [`Change::Clear`]. See also [`HashMap::clear`].
+    /// Clear all data and send status change. See also [`HashMap::clear`].
     /// If the data source is already empty, this method does nothing.
     #[inline]
     pub fn clear(&mut self) {
@@ -307,7 +307,7 @@ impl<K, V> OnMemorySrc<K, V> {
         }
     }
 
-    /// Retain only the elements specified by the predicate and send [`Change::Remove`].
+    /// Retain only the elements specified by the predicate and send status change.
     /// See also [`HashMap::retain`].
     /// If the data source is already empty or nothing is removed, this method does nothing.
     #[inline]
@@ -537,7 +537,7 @@ impl<K1, K2, V> OnMemorySrc2Args<K1, K2, V> {
         self.data.get(key1).and_then(|m| m.get(key2))
     }
 
-    /// Insert a new data and send [`Change::Update`]. See also [`HashMap::insert`].
+    /// Insert a new data and send status change. See also [`HashMap::insert`].
     pub fn insert(&mut self, key1: K1, key2: K2, value: V) -> Option<V>
     where
         K1: Eq + Hash,
@@ -548,7 +548,7 @@ impl<K1, K2, V> OnMemorySrc2Args<K1, K2, V> {
         res
     }
 
-    /// Remove a data and send [`Change::Remove`]. See also [`HashMap::remove`].
+    /// Remove a data and send status change. See also [`HashMap::remove`].
     /// If the data source does not contain the key, this method does nothing.
     pub fn remove<Q1, Q2>(&mut self, q1: &Q1, q2: &Q2) -> Option<V>
     where
@@ -566,7 +566,7 @@ impl<K1, K2, V> OnMemorySrc2Args<K1, K2, V> {
         })
     }
 
-    /// Remove a data and send [`Change::Remove`]. See also [`HashMap::remove_entry`].
+    /// Remove a data and send status change. See also [`HashMap::remove_entry`].
     /// If the data source does not contain the key, this method does nothing.
     pub fn remove_entry<Q1, Q2>(&mut self, key1: &Q1, key2: &Q2) -> Option<(K1, K2, V)>
     where
@@ -593,7 +593,7 @@ impl<K1, K2, V> OnMemorySrc2Args<K1, K2, V> {
         }
     }
 
-    /// Clear all data and send [`Change::Clear`]. See also [`HashMap::clear`].
+    /// Clear all data and send status change. See also [`HashMap::clear`].
     /// If the data source is already empty
     #[inline]
     pub fn clear(&mut self) {
@@ -603,7 +603,7 @@ impl<K1, K2, V> OnMemorySrc2Args<K1, K2, V> {
         }
     }
 
-    /// Retain only the elements specified by the predicate and send [`Change::Remove`].
+    /// Retain only the elements specified by the predicate and send status change.
     /// See also [`HashMap::retain`].
     /// If the data source is already empty or nothing is removed, this method does nothing.
     #[inline]
@@ -876,7 +876,7 @@ impl<K1, K2, K3, V> OnMemorySrc3Args<K1, K2, K3, V> {
             .and_then(|m2| m2.get(key3))
     }
 
-    /// Insert a new data and send [`Change::Update`]. See also [`HashMap::insert`].
+    /// Insert a new data and send status change. See also [`HashMap::insert`].
     #[inline]
     pub fn insert(&mut self, key1: K1, key2: K2, key3: K3, value: V) -> Option<V>
     where
@@ -895,7 +895,7 @@ impl<K1, K2, K3, V> OnMemorySrc3Args<K1, K2, K3, V> {
         res
     }
 
-    /// Remove a data and send [`Change::Remove`]. See also [`HashMap::remove`].
+    /// Remove a data and send status change. See also [`HashMap::remove`].
     /// If the data source does not contain the key, this method does nothing.
     pub fn remove<Q1, Q2, Q3>(&mut self, q1: &Q1, q2: &Q2, q3: &Q3) -> Option<V>
     where
@@ -918,7 +918,7 @@ impl<K1, K2, K3, V> OnMemorySrc3Args<K1, K2, K3, V> {
         })
     }
 
-    /// Remove a data and send [`Change::Remove`]. See also [`HashMap::remove_entry`].
+    /// Remove a data and send status change. See also [`HashMap::remove_entry`].
     /// If the data source does not contain the key, this method does nothing.
     pub fn remove_entry<Q1, Q2, Q3>(
         &mut self,
@@ -965,7 +965,7 @@ impl<K1, K2, K3, V> OnMemorySrc3Args<K1, K2, K3, V> {
         }
     }
 
-    /// Clear all data and send [`Change::Clear`]. See also [`HashMap::clear`].
+    /// Clear all data and send status change. See also [`HashMap::clear`].
     /// If the data source is already empty
     #[inline]
     pub fn clear(&mut self) {
@@ -975,7 +975,7 @@ impl<K1, K2, K3, V> OnMemorySrc3Args<K1, K2, K3, V> {
         }
     }
 
-    /// Retain only the elements specified by the predicate and send [`Change::Remove`].
+    /// Retain only the elements specified by the predicate and send status change.
     /// See also [`HashMap::retain`].
     /// If the data source is already empty or nothing is removed, this method does nothing.
     pub fn retain<F>(&mut self, mut f: F)

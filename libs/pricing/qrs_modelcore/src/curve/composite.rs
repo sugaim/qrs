@@ -1,5 +1,5 @@
 use qrs_chrono::DateTime;
-use qrs_finance::rate::RateAct365f;
+use qrs_finance::daycount::RateAct365f;
 use qrs_math::num::{FloatBased, Zero};
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;

@@ -1,7 +1,7 @@
 use derivative::Derivative;
 
 use qrs_chrono::DateTime;
-use qrs_finance::rate::RateAct365f;
+use qrs_finance::daycount::RateAct365f;
 use qrs_math::num::FloatBased;
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
@@ -23,7 +23,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
 /// use qrs_chrono::DateTime;
-/// use qrs_finance::rate::{RateAct365f, Rate};
+/// use qrs_finance::daycount::{RateAct365f, Rate};
 ///
 /// use qrs_modelcore::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
@@ -32,7 +32,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
 /// let to = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
 /// let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-/// assert_abs_diff_eq!(res.value(), 0.02, epsilon = 1e-10);
+/// assert_abs_diff_eq!(res.into_value(), 0.02, epsilon = 1e-10);
 /// ```
 ///
 /// # Example: Grid bump
@@ -40,7 +40,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
 /// use qrs_chrono::DateTime;
-/// use qrs_finance::rate::{RateAct365f, Rate};
+/// use qrs_finance::daycount::{RateAct365f, Rate};
 ///
 /// use qrs_modelcore::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
@@ -53,7 +53,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
 /// let to = DateTime::from_str("2020-01-05T00:00:00Z").unwrap();
 /// let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-/// assert_abs_diff_eq!(res.value(), 0.015, epsilon = 1e-10);
+/// assert_abs_diff_eq!(res.into_value(), 0.015, epsilon = 1e-10);
 /// ```
 #[derive(Debug, Clone, Derivative)]
 #[cfg_attr(
@@ -132,7 +132,7 @@ mod tests {
     use std::str::FromStr;
 
     use approx::assert_abs_diff_eq;
-    use qrs_finance::rate::Rate;
+    use qrs_finance::daycount::Rate;
 
     use crate::curve::FlatCurve;
 
@@ -152,7 +152,7 @@ mod tests {
         let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.02, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.02, epsilon = 1e-10);
 
         // grid bump
         let curve = FlatCurve {
@@ -167,36 +167,36 @@ mod tests {
         let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.010, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.010, epsilon = 1e-10);
 
         let from = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-03T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.02, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.02, epsilon = 1e-10);
 
         let from = DateTime::from_str("2020-01-03T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-04T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.020, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.020, epsilon = 1e-10);
 
         let from = DateTime::from_str("2020-01-04T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-05T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.010, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.010, epsilon = 1e-10);
 
         let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-05T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.015, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.015, epsilon = 1e-10);
 
         let from = DateTime::from_str("2020-01-03T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-05T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.015, epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.015, epsilon = 1e-10);
 
         let from = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
         let to = DateTime::from_str("2020-01-05T00:00:00Z").unwrap();
         let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
-        assert_abs_diff_eq!(res.value(), 0.01 + 0.02 / 3., epsilon = 1e-10);
+        assert_abs_diff_eq!(res.into_value(), 0.01 + 0.02 / 3., epsilon = 1e-10);
     }
 }

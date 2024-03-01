@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use qrs_chrono::{DateTime, Duration};
-use qrs_finance::rate::{Rate, RateAct365f};
+use qrs_finance::daycount::{Act365f, Rate, RateAct365f, RateDayCount};
 use qrs_math::{func1d::Func1dDer1, num::Real};
 
 use super::YieldCurve;
@@ -53,11 +53,13 @@ where
         let zf = self.zero_rate.eval(from);
         let zt = self.zero_rate.eval(to);
 
-        let ef = zf.ratio_between(&self.base_date, from);
-        let et = zt.ratio_between(&self.base_date, to);
+        let ef = zf.into_ratio_between(&self.base_date, from);
+        let et = zt.into_ratio_between(&self.base_date, to);
 
         // (zt * t - zf * f) / (t - f)
-        Ok(RateAct365f::from_ratio(et - &ef, to - from).expect("zero-division does not occur"))
+        Ok(Act365f
+            .ratio_to_rate(et - &ef, from, to)
+            .expect("zero-division does not occur"))
     }
 }
 
@@ -71,14 +73,13 @@ mod tests {
     #[test]
     fn test_forward_rate() {
         let dt_builder = qrs_chrono::DateTimeBuilder::new()
-            .with_timezone(qrs_chrono::TimeZone::fixed_offset(0).unwrap())
-            .with_hms(0, 0, 0)
-            .unwrap();
+            .with_timezone(qrs_chrono::Tz::fixed_offset(0).unwrap())
+            .with_hms(0, 0, 0);
         let zero_rate = qrs_math::interp1d::Lerp1d::new(
             vec![
-                dt_builder.with_ymd(2021, 1, 6).unwrap().build(),
-                dt_builder.with_ymd(2021, 1, 11).unwrap().build(),
-                dt_builder.with_ymd(2021, 1, 16).unwrap().build(),
+                dt_builder.clone().with_ymd(2021, 1, 6).build().unwrap(),
+                dt_builder.clone().with_ymd(2021, 1, 11).build().unwrap(),
+                dt_builder.clone().with_ymd(2021, 1, 16).build().unwrap(),
             ],
             vec![
                 RateAct365f::from_rate(0.05f64),
@@ -89,38 +90,38 @@ mod tests {
         .unwrap();
         let curve = super::ZeroRateCurve {
             zero_rate,
-            base_date: dt_builder.with_ymd(2021, 1, 1).unwrap().build(),
+            base_date: dt_builder.clone().with_ymd(2021, 1, 1).build().unwrap(),
         };
 
-        let from = dt_builder.with_ymd(2021, 1, 1).unwrap().build();
-        let to = dt_builder.with_ymd(2021, 1, 6).unwrap().build();
+        let from = dt_builder.clone().with_ymd(2021, 1, 1).build().unwrap();
+        let to = dt_builder.clone().with_ymd(2021, 1, 6).build().unwrap();
         let fwd = curve.forward_rate(&from, &to).unwrap();
-        assert_abs_diff_eq!(fwd.value(), 0.05, epsilon = 1e-10);
+        assert_abs_diff_eq!(fwd.into_value(), 0.05, epsilon = 1e-10);
         assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
-        let from = dt_builder.with_ymd(2021, 1, 6).unwrap().build();
-        let to = dt_builder.with_ymd(2021, 1, 11).unwrap().build();
+        let from = dt_builder.clone().with_ymd(2021, 1, 6).build().unwrap();
+        let to = dt_builder.clone().with_ymd(2021, 1, 11).build().unwrap();
         let fwd = curve.forward_rate(&from, &to).unwrap();
-        assert_abs_diff_eq!(fwd.value(), 0.01, epsilon = 1e-10);
+        assert_abs_diff_eq!(fwd.into_value(), 0.01, epsilon = 1e-10);
         assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
-        let from = dt_builder.with_ymd(2021, 1, 11).unwrap().build();
-        let to = dt_builder.with_ymd(2021, 1, 16).unwrap().build();
+        let from = dt_builder.clone().with_ymd(2021, 1, 11).build().unwrap();
+        let to = dt_builder.clone().with_ymd(2021, 1, 16).build().unwrap();
         let fwd = curve.forward_rate(&from, &to).unwrap();
-        assert_abs_diff_eq!(fwd.value(), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(fwd.into_value(), 0.0, epsilon = 1e-10);
         assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
-        let from = dt_builder.with_ymd(2021, 1, 6).unwrap().build();
-        let to = dt_builder.with_ymd(2021, 1, 16).unwrap().build();
+        let from = dt_builder.clone().with_ymd(2021, 1, 6).build().unwrap();
+        let to = dt_builder.clone().with_ymd(2021, 1, 16).build().unwrap();
         let fwd = curve.forward_rate(&from, &to).unwrap();
-        assert_abs_diff_eq!(fwd.value(), 0.005, epsilon = 1e-10);
+        assert_abs_diff_eq!(fwd.into_value(), 0.005, epsilon = 1e-10);
         assert_eq!(fwd, curve.forward_rate(&to, &from).unwrap());
 
-        let from = dt_builder.with_ymd(2021, 1, 13).unwrap().build();
-        let to = dt_builder.with_ymd(2021, 1, 13).unwrap().build();
+        let from = dt_builder.clone().with_ymd(2021, 1, 13).build().unwrap();
+        let to = dt_builder.clone().with_ymd(2021, 1, 13).build().unwrap();
         let fwd = curve.forward_rate(&from, &to).unwrap();
         assert_abs_diff_eq!(
-            fwd.value(),
+            fwd.into_value(),
             0.026 + (-0.002) * 12.0, // 0.026 = z(13d), -0.002 = z'(13d), 12.0 = (13d - 1d)
             epsilon = 1e-10
         );
