@@ -259,7 +259,7 @@ where
     /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt: DateTime = "2021-01-01T10:42:11+09:00".parse().unwrap();
     /// assert_eq!(format!("{}", dt.format("%Y-%m-%d %H:%M:%S %:z")), "2021-01-01 10:42:11 +09:00");
     /// assert_eq!(format!("{}", dt.format("%Y%m%dT%H%M%S%z")), "20210101T104211+0900")
     /// ```
