@@ -3,13 +3,14 @@
 use rstest_reuse;
 
 mod builder;
-pub mod calendar;
+mod calendar;
 mod datetime;
 mod duration;
 mod timezone;
 mod velocity;
 
 pub use builder::{DateTimeBuilder, DateToDateTime};
+pub use calendar::{Calendar, CalendarBuilder, CalendarSrc, CalendarSymVariant, CalendarSymbol};
 pub use datetime::{DateTime, GenericDateTime};
 pub use duration::Duration;
 pub use timezone::{TimeZone, TimeZoneOffset};

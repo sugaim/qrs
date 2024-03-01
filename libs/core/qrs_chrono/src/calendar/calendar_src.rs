@@ -4,47 +4,17 @@
 
 use std::{
     collections::HashSet,
-    num::NonZeroUsize,
-    sync::{Arc, Mutex, Weak},
+    sync::{Mutex, Weak},
 };
 
-use lru::LruCache;
 use qrs_datasrc::{
     ext::{DebugTree, TakeSnapshot},
-    DataSrc, Observer, StateId, Subject,
+    CacheSize, DataSrc, Observer, PassThroughNode, Subject,
 };
 
 use super::CalendarSymVariant;
 
 use super::{Calendar, CalendarSymbol};
-
-// -----------------------------------------------------------------------------
-// _Node
-//
-#[derive(Debug)]
-struct _Node {
-    cache: LruCache<StateId, LruCache<CalendarSymbol, Calendar>>,
-    state_shift: StateId,
-    state: StateId,
-    obs: Vec<Weak<Mutex<dyn Observer>>>,
-}
-
-//
-// methods
-//
-impl Observer for _Node {
-    #[inline]
-    fn receive(&mut self, new_state: &StateId) {
-        self.state = new_state ^ self.state_shift;
-        self.obs.retain(|o| {
-            let Some(o) = o.upgrade() else {
-                return false;
-            };
-            o.lock().unwrap().receive(&self.state);
-            true
-        });
-    }
-}
 
 // -----------------------------------------------------------------------------
 // CalendarSrc
@@ -54,11 +24,10 @@ impl Observer for _Node {
 #[derive(Debug, DebugTree)]
 #[debug_tree(desc_field = "desc")]
 pub struct CalendarSrc<S> {
-    cal_cache: NonZeroUsize,
+    node: PassThroughNode<CalendarSymbol, Calendar>,
     desc: String,
     #[debug_tree(subtree)]
     src: S,
-    node: Arc<Mutex<_Node>>,
 }
 
 //
@@ -68,22 +37,15 @@ impl<S: DataSrc<Key = str, Output = Calendar>> CalendarSrc<S> {
     /// Create a new `CalendarSrc`
     ///
     /// - `src`: the source of calendar data
-    /// - `state_cache_cap`: the capacity of the source state cache.
-    /// - `cal_cache_cap`: the capacity of the source data cache.
+    /// - `cache_size`: the size of the cache. If `None`, the cache is disabled.
     ///
-    pub fn new(mut src: S, state_cache_cap: NonZeroUsize, cal_cache_cap: NonZeroUsize) -> Self {
-        let node = Arc::new(Mutex::new(_Node {
-            cache: LruCache::new(state_cache_cap),
-            state_shift: StateId::gen(),
-            state: StateId::gen(),
-            obs: Vec::new(),
-        }));
-        src.reg_observer(Arc::downgrade(&node) as _);
+    pub fn new(mut src: S, cache_size: Option<CacheSize>) -> Self {
+        let (node, mut detectors) = PassThroughNode::new(1, cache_size);
+        src.reg_observer(detectors.pop().unwrap());
         Self {
-            cal_cache: cal_cache_cap,
+            node,
             desc: "calendar source".to_owned(),
             src,
-            node,
         }
     }
 }
@@ -102,11 +64,7 @@ impl<S> CalendarSrc<S> {
 impl<S: Clone + DataSrc<Key = str, Output = Calendar>> Clone for CalendarSrc<S> {
     #[inline]
     fn clone(&self) -> Self {
-        Self::new(
-            self.src.clone(),
-            self.node.lock().unwrap().cache.cap(),
-            self.cal_cache,
-        )
+        Self::new(self.src.clone(), self.node.cache_size()).with_desc(self.desc.clone())
     }
 }
 
@@ -116,57 +74,12 @@ impl<S: Clone + DataSrc<Key = str, Output = Calendar>> Clone for CalendarSrc<S> 
 impl<S> Subject for CalendarSrc<S> {
     #[inline]
     fn reg_observer(&mut self, observer: Weak<Mutex<dyn Observer>>) {
-        self.node.lock().unwrap().obs.push(observer);
+        self.node.reg_observer(observer);
     }
 
     #[inline]
     fn rm_observer(&mut self, observer: &Weak<Mutex<dyn Observer>>) {
-        self.node
-            .lock()
-            .unwrap()
-            .obs
-            .retain(|o| !o.ptr_eq(observer) && o.upgrade().is_some());
-    }
-}
-
-impl<S: DataSrc<Key = str, Output = Calendar>> CalendarSrc<S> {
-    fn req_impl(&self, state: &StateId, key: &CalendarSymbol) -> Result<Calendar, S::Err> {
-        if let Some(calendar) = self
-            .node
-            .lock()
-            .unwrap()
-            .cache
-            .get_mut(state)
-            .and_then(|m| m.get(key))
-            .cloned()
-        {
-            return Ok(calendar);
-        }
-
-        use CalendarSymVariant::*;
-        let cal = match key.dispatch() {
-            Single(s) => self.src.req(s)?,
-            AllClosed(syms) | AnyClosed(syms) => {
-                let cals: Vec<Calendar> = syms
-                    .iter()
-                    .map(|sym| self.req_impl(state, sym))
-                    .collect::<Result<_, _>>()?;
-                match key.dispatch() {
-                    AllClosed(_) => Calendar::of_all_closed(cals.iter()),
-                    AnyClosed(_) => Calendar::of_any_closed(cals.iter()),
-                    _ => unreachable!(),
-                }
-            }
-        };
-        let mut node = self.node.lock().unwrap();
-        if let Some(m) = node.cache.get_mut(state) {
-            m.put(key.clone(), cal.clone());
-        } else {
-            let mut m = LruCache::new(self.cal_cache);
-            m.put(key.clone(), cal.clone());
-            node.cache.put(*state, m);
-        }
-        Ok(cal)
+        self.node.rm_observer(observer);
     }
 }
 
@@ -176,8 +89,29 @@ impl<S: DataSrc<Key = str, Output = Calendar>> DataSrc for CalendarSrc<S> {
     type Err = S::Err;
 
     fn req(&self, key: &CalendarSymbol) -> Result<Self::Output, Self::Err> {
-        let state = self.node.lock().unwrap().state;
-        self.req_impl(&state, key)
+        if let Some(calendar) = self.node.get_from_cache(key) {
+            return Ok(calendar);
+        }
+
+        use CalendarSymVariant::*;
+        let cal = match key.dispatch() {
+            Single(s) => self.src.req(s)?,
+            AllClosed(syms) | AnyClosed(syms) => {
+                let cals: Vec<Calendar> = syms
+                    .iter()
+                    .map(|sym| self.req(sym))
+                    .collect::<Result<_, _>>()?;
+                match key.dispatch() {
+                    AllClosed(_) => Calendar::of_all_closed(cals.iter()),
+                    AnyClosed(_) => Calendar::of_any_closed(cals.iter()),
+                    _ => unreachable!(),
+                }
+            }
+        };
+        if self.node.is_caching() {
+            self.node.push_to_cache(key.clone(), cal.clone());
+        }
+        Ok(cal)
     }
 }
 
@@ -197,12 +131,7 @@ impl<S: TakeSnapshot<Key = str, Output = Calendar>> TakeSnapshot for CalendarSrc
         self.src
             .take_snapshot(names.iter().map(|s| s.as_str()))
             .map(|snapshot| {
-                CalendarSrc::new(
-                    snapshot,
-                    self.node.lock().unwrap().cache.cap(),
-                    self.cal_cache,
-                )
-                .with_desc(&self.desc)
+                CalendarSrc::new(snapshot, self.node.cache_size()).with_desc(&self.desc)
             })
     }
 }
@@ -211,6 +140,7 @@ impl<S: TakeSnapshot<Key = str, Output = Calendar>> TakeSnapshot for CalendarSrc
 #[cfg(test)]
 mod tests {
     use std::{
+        num::NonZeroUsize,
         str::FromStr,
         sync::{Arc, Mutex},
     };
@@ -308,8 +238,10 @@ mod tests {
 
         let src = super::CalendarSrc::new(
             single_src,
-            NonZeroUsize::new(2).unwrap(),
-            NonZeroUsize::new(64).unwrap(),
+            Some(CacheSize {
+                state: NonZeroUsize::new(2).unwrap(),
+                value: NonZeroUsize::new(64).unwrap(),
+            }),
         );
 
         // single - ok
@@ -354,8 +286,10 @@ mod tests {
         let single_src = Arc::new(Mutex::new(single_src));
         let mut src = super::CalendarSrc::new(
             single_src.clone(),
-            NonZeroUsize::new(2).unwrap(),
-            NonZeroUsize::new(64).unwrap(),
+            Some(CacheSize {
+                state: NonZeroUsize::new(2).unwrap(),
+                value: NonZeroUsize::new(64).unwrap(),
+            }),
         );
         let record = Arc::new(Mutex::new(Vec::new()));
         let _1 = {
@@ -367,7 +301,7 @@ mod tests {
 
         let orig = src.req(&"NYK|TKY".try_into().unwrap()).unwrap();
 
-        let state = src.node.lock().unwrap().state;
+        let state = src.node.state();
         single_src.lock().unwrap().0.insert(
             "NYK".to_owned(),
             Calendar::builder()
@@ -380,12 +314,9 @@ mod tests {
                 .build()
                 .unwrap(),
         );
-        assert_ne!(state, src.node.lock().unwrap().state);
+        assert_ne!(state, src.node.state());
         assert_eq!(record.lock().unwrap().len(), 1);
-        assert_eq!(
-            src.node.lock().unwrap().state,
-            *record.lock().unwrap().last().unwrap()
-        );
+        assert_eq!(src.node.state(), *record.lock().unwrap().last().unwrap());
 
         let updated = src.req(&"NYK|TKY".try_into().unwrap()).unwrap();
         assert_ne!(orig, updated);

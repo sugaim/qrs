@@ -30,16 +30,13 @@ struct CubicCoeff<V> {
 // CHermite1d
 //
 #[derive(Debug, Derivative)]
-#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, JsonSchema),
+    serde(bound(serialize = "G: PartialOrd + Serialize, V: Serialize, S: Serialize",))
+)]
 #[derivative(PartialEq)]
 pub struct CHermite1d<G, V, S> {
-    #[cfg_attr(
-        feature = "serde",
-        serde(bound(
-            serialize = "G: PartialOrd + Serialize, V: Serialize",
-            deserialize = "G: PartialOrd + Deserialize<'de>, V: Deserialize<'de>"
-        ))
-    )]
     knots: Knots<G, V>,
 
     #[cfg_attr(feature = "serde", serde(skip))]

@@ -1,10 +1,6 @@
 use qrs_chrono::DateTime;
 use qrs_finance::rate::RateAct365f;
 use qrs_math::{func1d::Func1dIntegrable, num::Real};
-#[cfg(feature = "serde")]
-use schemars::JsonSchema;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use super::YieldCurve;
 
@@ -14,7 +10,10 @@ use super::YieldCurve;
 
 /// A curve based on instant forward rates.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize, JsonSchema))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
+)]
 pub struct InstFwdCurve<F> {
     /// Forward rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.
     #[cfg_attr(feature = "serde", serde(rename = "instant_forward_rate"))]

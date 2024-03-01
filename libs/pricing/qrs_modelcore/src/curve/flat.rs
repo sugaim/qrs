@@ -5,10 +5,6 @@
 use qrs_chrono::DateTime;
 use qrs_finance::rate::RateAct365f;
 use qrs_math::num::Real;
-#[cfg(feature = "serde")]
-use schemars::JsonSchema;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use super::YieldCurve;
 
@@ -16,10 +12,10 @@ use super::YieldCurve;
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(
     feature = "serde",
-    derive(Serialize, Deserialize, JsonSchema),
+    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
     serde(bound(
-        serialize = "V: qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat> + Serialize",
-        deserialize = "V: qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat> + Deserialize<'de>"
+        serialize = "V: qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat> + serde::Serialize",
+        deserialize = "V: qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat> + serde::Deserialize<'de>"
     ))
 )]
 pub struct FlatCurve<V> {

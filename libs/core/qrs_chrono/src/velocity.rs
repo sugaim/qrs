@@ -161,16 +161,6 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
             Some(Self::new(chg, dur))
         }
     }
-
-    /// Create a new Rate with annual(365 days) duration
-    ///
-    /// Note that this assumes a year is 365 days.
-    /// In financial context, this means that ACT/365 fixed convention
-    /// is assumed when this rate is used to get the change.
-    #[inline]
-    pub fn with_annual(chg: V) -> Self {
-        Self::new(chg, Duration::with_secs(60 * 60 * 24 * 365))
-    }
 }
 
 impl<V: FloatBased + Vector<V::BaseFloat>> Zero for Velocity<V> {
@@ -283,12 +273,6 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Velocity<V> {
                 chg * &mult
             }
         }
-    }
-
-    /// Get the change per a year(365 days).
-    #[inline]
-    pub fn to_annual_change(self) -> V {
-        self.to_change(Duration::with_secs(60 * 60 * 24 * 365))
     }
 
     /// Check that zero-division occurred.

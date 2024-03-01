@@ -11,6 +11,7 @@ serde = ["dep:serde", "dep:schemars"]
 [dependencies]
 anyhow = { workspace = true }
 derivative = { workspace = true }
+lru = { workspace = true }
 maplit = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

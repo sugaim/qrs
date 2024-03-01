@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 use super::YieldCurve;
 
 // -----------------------------------------------------------------------------
-// Component
+// WeightedCurve
 //
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize, JsonSchema))]
-pub struct Component<C> {
+pub struct WeightedCurve<C> {
     pub weight: f64,
     pub curve: C,
 }
@@ -21,7 +21,7 @@ pub struct Component<C> {
 //
 // methods
 //
-impl<C: YieldCurve> YieldCurve for Component<C> {
+impl<C: YieldCurve> YieldCurve for WeightedCurve<C> {
     type Value = C::Value;
 
     fn forward_rate(
@@ -40,7 +40,7 @@ impl<C: YieldCurve> YieldCurve for Component<C> {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize, JsonSchema))]
 pub struct CompositeCurve<C> {
-    pub components: Vec<Component<C>>,
+    pub components: Vec<WeightedCurve<C>>,
 }
 
 //

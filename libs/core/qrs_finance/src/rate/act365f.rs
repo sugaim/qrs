@@ -156,7 +156,10 @@ impl<V: Arithmetic> SubAssign<&Self> for RateAct365f<V> {
     }
 }
 
-impl<K: Arithmetic, V: Vector<K>> Mul<&K> for RateAct365f<V> {
+impl<K, V: FloatBased + Vector<V::BaseFloat>> Mul<&K> for RateAct365f<V>
+where
+    V: for<'a> Mul<&'a K, Output = V>,
+{
     type Output = RateAct365f<V>;
 
     #[inline]
@@ -165,14 +168,20 @@ impl<K: Arithmetic, V: Vector<K>> Mul<&K> for RateAct365f<V> {
     }
 }
 
-impl<K: Arithmetic, V: Vector<K>> MulAssign<&K> for RateAct365f<V> {
+impl<K, V: FloatBased + Vector<V::BaseFloat>> MulAssign<&K> for RateAct365f<V>
+where
+    V: for<'a> MulAssign<&'a K>,
+{
     #[inline]
     fn mul_assign(&mut self, rhs: &K) {
         self.0 *= rhs;
     }
 }
 
-impl<K: Arithmetic, V: Vector<K>> Div<&K> for RateAct365f<V> {
+impl<K, V: FloatBased + Vector<V::BaseFloat>> Div<&K> for RateAct365f<V>
+where
+    V: for<'a> Div<&'a K, Output = V>,
+{
     type Output = RateAct365f<V>;
 
     #[inline]
@@ -181,7 +190,10 @@ impl<K: Arithmetic, V: Vector<K>> Div<&K> for RateAct365f<V> {
     }
 }
 
-impl<K: Arithmetic, V: Vector<K>> DivAssign<&K> for RateAct365f<V> {
+impl<K, V: FloatBased + Vector<V::BaseFloat>> DivAssign<&K> for RateAct365f<V>
+where
+    V: for<'a> DivAssign<&'a K>,
+{
     #[inline]
     fn div_assign(&mut self, rhs: &K) {
         self.0 /= rhs;

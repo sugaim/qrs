@@ -1,17 +1,11 @@
-#[cfg(feature = "serde")]
-use schemars::JsonSchema;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 // -----------------------------------------------------------------------------
 // FiniteDiffMethod
 //
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(Serialize, Deserialize),
+    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
     serde(rename_all = "snake_case"),
-    derive(JsonSchema),
     schemars(description = "Finite difference method")
 )]
 pub enum FiniteDiffMethod {

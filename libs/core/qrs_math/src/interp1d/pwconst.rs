@@ -1,14 +1,14 @@
-use std::ops::{Div, Sub};
+use std::ops::{Div, Mul, Sub};
 
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::func1d::{Func1dDer1, Func1dDer2, SemiContinuity};
+use crate::func1d::{Func1dDer1, Func1dDer2, Func1dIntegrable, SemiContinuity};
 use crate::interp1d::_knots::Knots;
 use crate::interp1d::{DestructibleInterp1d, Interp1d, Interp1dBuilder};
-use crate::num::{RelPos, Scalar, Vector, Zero};
+use crate::num::{Arithmetic, PartialOrdMinMax, RelPos, Scalar, Vector, Zero};
 
 // -----------------------------------------------------------------------------
 // PwConst1d
@@ -166,79 +166,68 @@ where
     }
 }
 
-// impl<G: RelPos, V: Vector<<G as RelPos>::Output>> Func1dIntegrable<G> for PwConst1d<G, V>
-// where
-//     G: Clone + Sub,
-//     V: Mul<<G as Sub>::Output>,
-//     <V as Mul<<G as Sub>::Output>>::Output: Arithmetic,
-// {
-//     type Integrated = <V as Mul<<G as Sub>::Output>>::Output;
+impl<G: RelPos, V: Vector<<G as RelPos>::Output>> Func1dIntegrable<G> for PwConst1d<G, V>
+where
+    G: Clone + Sub,
+    V: Mul<<G as Sub>::Output>,
+    <V as Mul<<G as Sub>::Output>>::Output: Arithmetic,
+{
+    type Integrated = <V as Mul<<G as Sub>::Output>>::Output;
 
-//     fn integrate(&self, from: &G, to: &G) -> Self::Integrated {
-//         if to < from {
-//             return -self.integrate(to, from);
-//         }
-//         let lidx = self.knots.interval_index_of(from);
-//         let ridx = self.knots.interval_index_of(to);
-//         let w = <<G as RelPos>::Output as Scalar>::nearest_value_of(self.partition_ratio);
+    fn integrate(&self, from: &G, to: &G) -> Self::Integrated {
+        if to < from {
+            return -self.integrate(to, from);
+        }
+        let lidx = self.knots.interval_index_of(from);
+        let ridx = self.knots.interval_index_of(to);
+        let one = <<G as RelPos>::Output as Scalar>::nearest_value_of(1.0);
+        let w = <<G as RelPos>::Output as Scalar>::nearest_value_of(self.partition_ratio);
 
-//         if lidx == ridx {
-//             let (gl, vl) = self.knots.force_get(lidx);
-//             let (gr, vr) = self.knots.force_get(ridx + 1);
-//             let wl = {
-//                 let raw = from.relpos_between(gl, gr);
-//                 if w <= raw {
-//                     Zero::zero()
-//                 } else {
-//                     // normalized length between from and partition point
-//                     -(raw - &w)
-//                 }
-//             };
-//             let wr = {
-//                 let raw = to.relpos_between(gl, gr);
-//                 if raw <= w {
-//                     Zero::zero()
-//                 } else {
-//                     // normalized length between partition point and to
-//                     raw - &w
-//                 }
-//             };
-//             // vl * (partition_point - from) + (vr * (to - partition_point))
-//             //  = vl * (gr - gl) * (partition_ratio - from.relpos(gl, gr)) + vr * (gr - gl) * (to.relpos(gl, gr) - partition_ratio)
-//             //  = (vl * (partition_ratio - from.relpos(gl, gr)) + vr * (to.relpos(gl, gr) - partition_ratio)) * (gr - gl)
-//             return (vl.clone() * &wl + &(vr.clone() * &wr)) * (gr.clone() - gl.clone());
-//         }
-//         let left_contrib = {
-//             let (gl, vl) = self.knots.force_get(lidx);
-//             let (gr, vr) = self.knots.force_get(lidx + 1);
-//             let wf = {
-//                 let raw = from.relpos_between(gl, gr);
-//                 if w <= raw {
-//                     Zero::zero()
-//                 } else {
-//                     // normalized length between from and partition point
-//                     -(raw - &w)
-//                 }
-//             };
-//         };
-//         let right_contrib = {
-//             let (gl, vl) = self.knots.force_get(ridx);
-//             let (gr, vr) = self.knots.force_get(ridx + 1);
-//             let w = to.relpos_between(gl, gr);
-//             let y = vl.clone() * &(one.clone() - &w) + vr.clone() * &w;
-//             let mid = (y + vl) * &half.into();
-//             mid * (to.clone() - gl.clone())
-//         };
-//         let mut res = left_contrib + right_contrib;
-//         for i in lidx + 1..ridx {
-//             let (gl, vl) = self.knots.force_get(i);
-//             let (gr, vr) = self.knots.force_get(i + 1);
-//             let mid = (vl.clone() + vr.clone()) * &half.into();
-//             res = res + mid * (gr.clone() - gl.clone());
-//         }
-//         res
-//     }
-// }
+        // for the following case,
+        // where f and t are from and to respectively and [i] is i-th knots
+        //
+        //      ---[0]---f---[1]-----[2]-----[3]---t---[4]---
+        //
+        // we will calculate the following 2 parts,
+        //
+        //      left_contrib  = [f ~ 1]
+        //      right_contrib = [3 ~ t]
+        //
+        // and returns ([0 ~ 1] + [1 ~ 2] + [2 ~ 3] + [3 ~ 4]) - (left_contrib + right_contrib)
+        //
+        let mut res = Zero::zero();
+        for i in lidx..ridx {
+            let (gl, vl) = self.knots.force_get(i);
+            let (gr, vr) = self.knots.force_get(i + 1);
+            let weighted_v = (vl.clone() * &w) + (vr.clone() * &(one.clone() - &w));
+            res += &(weighted_v * (gr.clone() - gl.clone()));
+        }
+        let left_trim = {
+            let (gl, vl) = self.knots.force_get(lidx);
+            let (gr, vr) = self.knots.force_get(lidx + 1);
+            let point = from.relpos_between(gl, gr);
+            // [l]---w---p---[r] => wl = w, wr = p - w
+            // [1]---p---w---[r] => wl = p, wr = 0,
+            let wl = (&point).partial_ord_min(&w).unwrap_or(&point);
+            let wr = point.clone() - wl;
+            let weighted_v = (vl.clone() * wl) + (vr.clone() * &wr);
+            weighted_v * (gr.clone() - from.clone())
+        };
+        let right_trim = {
+            let (gl, vl) = self.knots.force_get(ridx);
+            let (gr, vr) = self.knots.force_get(ridx + 1);
+            let point = to.relpos_between(gl, gr);
+            // [l]---w---p---[r] => wl = 0, wr = 1 - p
+            // [l]---p---w---[r] => wl = w - p, wr = 1 - w
+            let wr = one.clone() - (&point).partial_ord_max(&w).unwrap_or(&point);
+            let wl = one - &point - &wr;
+            let weighted_v = (vl.clone() * &wl) + (vr.clone() * &wr);
+            weighted_v * (to.clone() - gl.clone())
+        };
+        res -= &(left_trim + &right_trim);
+        res
+    }
+}
 
 // -----------------------------------------------------------------------------
 // PwConst1dBuilder

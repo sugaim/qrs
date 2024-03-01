@@ -1,8 +1,8 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Mutex, Weak};
 
 use qrs_datasrc_derive::DebugTree;
 
-use crate::{DataSrc, DataSrc2Args, DataSrc3Args, Observer, Subject, _private::_PassThroughUnary};
+use crate::{DataSrc, DataSrc2Args, DataSrc3Args, Observer, PassThroughNode, Subject};
 
 // -----------------------------------------------------------------------------
 // WhenReq
@@ -14,7 +14,7 @@ pub struct OnReq<S, F> {
     #[debug_tree(subtree)]
     src: S,
     f: F,
-    node_info: Arc<Mutex<_PassThroughUnary>>,
+    node: PassThroughNode<(), ()>,
 }
 
 //
@@ -27,14 +27,10 @@ where
     /// Create a new map.
     #[inline]
     pub(crate) fn new(mut src: S, f: F) -> Self {
-        let node_info = Arc::new(Mutex::new(_PassThroughUnary::default().pass_state()));
-        src.reg_observer(Arc::downgrade(&node_info) as _);
-        OnReq {
-            src,
-            f,
-            node_info,
-            desc: "with action on request".to_string(),
-        }
+        let (node, detector) = PassThroughNode::state_pass_through_unary(None);
+        src.reg_observer(detector);
+        let desc = "with action on request".to_string();
+        OnReq { src, f, node, desc }
     }
 
     /// Add a description
@@ -84,12 +80,12 @@ impl<S, F> OnReq<S, F> {
 impl<S: Subject, F> Subject for OnReq<S, F> {
     #[inline]
     fn reg_observer(&mut self, observer: Weak<Mutex<dyn Observer>>) {
-        self.node_info.lock().unwrap().reg_observer(observer);
+        self.node.reg_observer(observer);
     }
 
     #[inline]
     fn rm_observer(&mut self, observer: &Weak<Mutex<dyn Observer>>) {
-        self.node_info.lock().unwrap().rm_observer(observer);
+        self.node.rm_observer(observer);
     }
 }
 

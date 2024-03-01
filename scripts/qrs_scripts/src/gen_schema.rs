@@ -37,15 +37,10 @@ impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
 fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
     let mut map: HashMap<_, Vec<Box<dyn ISchemaItem>>> = HashMap::new();
     map.insert(
-        "core/qrs_chrono/calendar",
-        vec![
-            Box::<SchemaItem<qrs_chrono::calendar::Calendar>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::calendar::CalendarSymbol>>::default() as _,
-        ],
-    );
-    map.insert(
         "core/qrs_chrono",
         vec![
+            Box::<SchemaItem<qrs_chrono::Calendar>>::default() as _,
+            Box::<SchemaItem<qrs_chrono::CalendarSymbol>>::default() as _,
             Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono::FixedOffset>>>::default() as _,
             Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono::Utc>>>::default() as _,
             Box::<SchemaItem<qrs_chrono::GenericDateTime<chrono_tz::Tz>>>::default() as _,
