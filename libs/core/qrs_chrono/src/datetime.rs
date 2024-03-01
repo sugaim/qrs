@@ -17,31 +17,26 @@ use qrs_math::num::RelPos;
 // -----------------------------------------------------------------------------
 // DateTime
 //
-pub type DateTime = GenericDateTime<super::Tz>;
-
-// -----------------------------------------------------------------------------
-// GenericDateTime
-//
 
 /// Thin wrapper around [chrono::DateTime] to override some traits
 #[derive(Clone, Hash)]
-pub struct GenericDateTime<Tz: chrono::TimeZone> {
+pub struct DateTime<Tz: chrono::TimeZone = super::Tz> {
     internal: chrono::DateTime<Tz>,
 }
 
-impl<Tz: TimeZone> Copy for GenericDateTime<Tz> where Tz::Offset: Copy {}
+impl<Tz: TimeZone> Copy for DateTime<Tz> where Tz::Offset: Copy {}
 
 //
 // display, serde
 //
-impl<Tz: TimeZone> Debug for GenericDateTime<Tz> {
+impl<Tz: TimeZone> Debug for DateTime<Tz> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self.internal, f)
     }
 }
 
-impl<Tz: TimeZone> Display for GenericDateTime<Tz>
+impl<Tz: TimeZone> Display for DateTime<Tz>
 where
     Tz::Offset: Display,
 {
@@ -52,7 +47,7 @@ where
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GenericDateTime<chrono::FixedOffset> {
+impl Serialize for DateTime<chrono::FixedOffset> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -63,7 +58,7 @@ impl Serialize for GenericDateTime<chrono::FixedOffset> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GenericDateTime<chrono::FixedOffset> {
+impl<'de> Deserialize<'de> for DateTime<chrono::FixedOffset> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -74,7 +69,7 @@ impl<'de> Deserialize<'de> for GenericDateTime<chrono::FixedOffset> {
 }
 
 #[cfg(feature = "serde")]
-impl JsonSchema for GenericDateTime<chrono::FixedOffset> {
+impl JsonSchema for DateTime<chrono::FixedOffset> {
     fn schema_name() -> String {
         "DateTimeFixedOffset".to_string()
     }
@@ -90,7 +85,7 @@ impl JsonSchema for GenericDateTime<chrono::FixedOffset> {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GenericDateTime<chrono::Utc> {
+impl Serialize for DateTime<chrono::Utc> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -101,7 +96,7 @@ impl Serialize for GenericDateTime<chrono::Utc> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GenericDateTime<chrono::Utc> {
+impl<'de> Deserialize<'de> for DateTime<chrono::Utc> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -112,7 +107,7 @@ impl<'de> Deserialize<'de> for GenericDateTime<chrono::Utc> {
 }
 
 #[cfg(feature = "serde")]
-impl JsonSchema for GenericDateTime<chrono::Utc> {
+impl JsonSchema for DateTime<chrono::Utc> {
     fn schema_name() -> String {
         "DateTimeUtc".to_string()
     }
@@ -127,7 +122,7 @@ impl JsonSchema for GenericDateTime<chrono::Utc> {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GenericDateTime<chrono_tz::Tz> {
+impl Serialize for DateTime<chrono_tz::Tz> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -143,19 +138,19 @@ impl Serialize for GenericDateTime<chrono_tz::Tz> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GenericDateTime<chrono_tz::Tz> {
+impl<'de> Deserialize<'de> for DateTime<chrono_tz::Tz> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        GenericDateTime::from_str(&s).map_err(serde::de::Error::custom)
+        DateTime::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
 #[cfg(feature = "serde")]
-impl JsonSchema for GenericDateTime<chrono_tz::Tz> {
+impl JsonSchema for DateTime<chrono_tz::Tz> {
     fn schema_name() -> String {
         "DateTimeIana".to_string()
     }
@@ -184,7 +179,7 @@ impl JsonSchema for GenericDateTime<chrono_tz::Tz> {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GenericDateTime<super::Tz> {
+impl Serialize for DateTime<super::Tz> {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -198,7 +193,7 @@ impl Serialize for GenericDateTime<super::Tz> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GenericDateTime<super::Tz> {
+impl<'de> Deserialize<'de> for DateTime<super::Tz> {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -207,8 +202,8 @@ impl<'de> Deserialize<'de> for GenericDateTime<super::Tz> {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum Dt {
-            FixedOffset(GenericDateTime<chrono::FixedOffset>),
-            Iana(GenericDateTime<chrono_tz::Tz>),
+            FixedOffset(DateTime<chrono::FixedOffset>),
+            Iana(DateTime<chrono_tz::Tz>),
         }
         let dt = Dt::deserialize(deserializer)?;
         Ok(match dt {
@@ -219,7 +214,7 @@ impl<'de> Deserialize<'de> for GenericDateTime<super::Tz> {
 }
 
 #[cfg(feature = "serde")]
-impl JsonSchema for GenericDateTime<super::Tz> {
+impl JsonSchema for DateTime<super::Tz> {
     fn schema_name() -> String {
         "DateTime".to_string()
     }
@@ -229,8 +224,8 @@ impl JsonSchema for GenericDateTime<super::Tz> {
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut res = schemars::schema::SchemaObject::default();
         res.subschemas().one_of = Some(vec![
-            gen.subschema_for::<GenericDateTime<chrono::FixedOffset>>(),
-            gen.subschema_for::<GenericDateTime<chrono_tz::Tz>>(),
+            gen.subschema_for::<DateTime<chrono::FixedOffset>>(),
+            gen.subschema_for::<DateTime<chrono_tz::Tz>>(),
         ]);
         res.metadata().description =
             Some("A datetime with fixed offset or IANA timezone".to_string());
@@ -245,14 +240,14 @@ impl JsonSchema for GenericDateTime<super::Tz> {
     }
 }
 
-impl<Tz: TimeZone> GenericDateTime<Tz> {
+impl<Tz: TimeZone> DateTime<Tz> {
     #[inline]
     pub fn to_rfc3339(&self) -> String {
         self.internal.to_rfc3339()
     }
 }
 
-impl<Tz: TimeZone> GenericDateTime<Tz>
+impl<Tz: TimeZone> DateTime<Tz>
 where
     Tz::Offset: Display,
 {
@@ -277,31 +272,31 @@ where
 //
 // comparison
 //
-impl<Tz1, Tz2> PartialEq<GenericDateTime<Tz2>> for GenericDateTime<Tz1>
+impl<Tz1, Tz2> PartialEq<DateTime<Tz2>> for DateTime<Tz1>
 where
     Tz1: TimeZone,
     Tz2: TimeZone,
 {
     #[inline]
-    fn eq(&self, other: &GenericDateTime<Tz2>) -> bool {
+    fn eq(&self, other: &DateTime<Tz2>) -> bool {
         self.internal.eq(&other.internal)
     }
 }
 
-impl<Tz: TimeZone> Eq for GenericDateTime<Tz> {}
+impl<Tz: TimeZone> Eq for DateTime<Tz> {}
 
-impl<Tz1, Tz2> PartialOrd<GenericDateTime<Tz2>> for GenericDateTime<Tz1>
+impl<Tz1, Tz2> PartialOrd<DateTime<Tz2>> for DateTime<Tz1>
 where
     Tz1: TimeZone,
     Tz2: TimeZone,
 {
     #[inline]
-    fn partial_cmp(&self, other: &GenericDateTime<Tz2>) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &DateTime<Tz2>) -> Option<std::cmp::Ordering> {
         self.internal.partial_cmp(&other.internal)
     }
 }
 
-impl<Tz: TimeZone> Ord for GenericDateTime<Tz> {
+impl<Tz: TimeZone> Ord for DateTime<Tz> {
     #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.internal.cmp(&other.internal)
@@ -311,28 +306,28 @@ impl<Tz: TimeZone> Ord for GenericDateTime<Tz> {
 //
 // construction
 //
-impl<Tz: TimeZone> From<chrono::DateTime<Tz>> for GenericDateTime<Tz> {
+impl<Tz: TimeZone> From<chrono::DateTime<Tz>> for DateTime<Tz> {
     #[inline]
     fn from(internal: chrono::DateTime<Tz>) -> Self {
         Self { internal }
     }
 }
 
-impl<Tz: TimeZone> From<GenericDateTime<Tz>> for chrono::DateTime<Tz> {
+impl<Tz: TimeZone> From<DateTime<Tz>> for chrono::DateTime<Tz> {
     #[inline]
-    fn from(dt: GenericDateTime<Tz>) -> Self {
+    fn from(dt: DateTime<Tz>) -> Self {
         dt.internal
     }
 }
 
-impl<Tz: TimeZone> GenericDateTime<Tz> {
+impl<Tz: TimeZone> DateTime<Tz> {
     #[inline]
     pub fn new(datetime: chrono::NaiveDateTime, tz: Tz) -> Self {
         tz.from_local_datetime(&datetime).single().unwrap().into()
     }
 }
 
-impl FromStr for GenericDateTime<chrono::FixedOffset> {
+impl FromStr for DateTime<chrono::FixedOffset> {
     type Err = chrono::ParseError;
 
     #[inline]
@@ -341,7 +336,7 @@ impl FromStr for GenericDateTime<chrono::FixedOffset> {
     }
 }
 
-impl FromStr for GenericDateTime<chrono::Utc> {
+impl FromStr for DateTime<chrono::Utc> {
     type Err = chrono::ParseError;
 
     #[inline]
@@ -350,7 +345,7 @@ impl FromStr for GenericDateTime<chrono::Utc> {
     }
 }
 
-impl FromStr for GenericDateTime<chrono_tz::Tz> {
+impl FromStr for DateTime<chrono_tz::Tz> {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -394,14 +389,14 @@ impl FromStr for GenericDateTime<chrono_tz::Tz> {
     }
 }
 
-impl FromStr for GenericDateTime<super::Tz> {
+impl FromStr for DateTime<super::Tz> {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(dt) = GenericDateTime::<chrono_tz::Tz>::from_str(s) {
+        if let Ok(dt) = DateTime::<chrono_tz::Tz>::from_str(s) {
             return Ok(dt.with_timezone(&super::Tz::Iana(dt.internal.timezone())));
         }
-        if let Ok(dt) = GenericDateTime::<chrono::FixedOffset>::from_str(s) {
+        if let Ok(dt) = DateTime::<chrono::FixedOffset>::from_str(s) {
             return Ok(dt.with_timezone(&super::Tz::FixedOffset(*dt.internal.offset())));
         }
         Err(anyhow!(
@@ -414,7 +409,7 @@ impl FromStr for GenericDateTime<super::Tz> {
 //
 // getters
 //
-impl<Tz: TimeZone> chrono::Datelike for GenericDateTime<Tz> {
+impl<Tz: TimeZone> chrono::Datelike for DateTime<Tz> {
     #[inline]
     fn year(&self) -> i32 {
         self.internal.year()
@@ -481,7 +476,7 @@ impl<Tz: TimeZone> chrono::Datelike for GenericDateTime<Tz> {
     }
 }
 
-impl<Tz: TimeZone> chrono::Timelike for GenericDateTime<Tz> {
+impl<Tz: TimeZone> chrono::Timelike for DateTime<Tz> {
     #[inline]
     fn hour(&self) -> u32 {
         self.internal.hour()
@@ -516,15 +511,15 @@ impl<Tz: TimeZone> chrono::Timelike for GenericDateTime<Tz> {
     }
 }
 
-impl<Tz: TimeZone> GenericDateTime<Tz> {
+impl<Tz: TimeZone> DateTime<Tz> {
     /// Returns a reference to the underlying [chrono::DateTime] object.
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// let chrono_obj = chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     ///
     /// assert_eq!(dt.as_chrono(), &chrono_obj);
@@ -538,10 +533,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.local(), chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap().and_hms_opt(10, 42, 11).unwrap());
     /// ```
     #[inline]
@@ -553,10 +548,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.date(), chrono::NaiveDate::from_ymd_opt(2021, 1, 1).unwrap());
     /// ```
     #[inline]
@@ -568,10 +563,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.time(), chrono::NaiveTime::from_hms_opt(10, 42, 11).unwrap());
     /// ```
     #[inline]
@@ -583,10 +578,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.offset(), &chrono::FixedOffset::east(9 * 3600));
     /// ```
     #[inline]
@@ -604,16 +599,16 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// let dt_utc = dt.with_timezone(&chrono::Utc);
     ///
     /// assert_eq!(dt_utc, chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T01:42:11Z").unwrap().into());
     /// ```
     #[inline]
-    pub fn with_timezone<U: TimeZone>(&self, tz: &U) -> GenericDateTime<U> {
+    pub fn with_timezone<U: TimeZone>(&self, tz: &U) -> DateTime<U> {
         self.internal.with_timezone(tz).into()
     }
 
@@ -621,10 +616,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.timestamp(), dt.as_chrono().timestamp());
     /// ```
     #[inline]
@@ -636,10 +631,10 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
     ///
     /// # Examples
     /// ```
-    /// use qrs_chrono::GenericDateTime;
+    /// use qrs_chrono::DateTime;
     /// use std::str::FromStr;
     ///
-    /// let dt = GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+    /// let dt = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11+09:00").unwrap();
     /// assert_eq!(dt.timestamp_millis(), dt.as_chrono().timestamp_millis());
     /// ```
     #[inline]
@@ -651,7 +646,7 @@ impl<Tz: TimeZone> GenericDateTime<Tz> {
 //
 // operators
 //
-impl<Tz: TimeZone> Sub for GenericDateTime<Tz> {
+impl<Tz: TimeZone> Sub for DateTime<Tz> {
     type Output = super::Duration;
 
     #[inline]
@@ -659,7 +654,7 @@ impl<Tz: TimeZone> Sub for GenericDateTime<Tz> {
         (self.internal - rhs.internal).into()
     }
 }
-impl<Tz: TimeZone + Clone> Sub<&GenericDateTime<Tz>> for GenericDateTime<Tz> {
+impl<Tz: TimeZone + Clone> Sub<&DateTime<Tz>> for DateTime<Tz> {
     type Output = super::Duration;
 
     #[inline]
@@ -667,35 +662,35 @@ impl<Tz: TimeZone + Clone> Sub<&GenericDateTime<Tz>> for GenericDateTime<Tz> {
         (self.internal - rhs.internal.clone()).into()
     }
 }
-impl<Tz: TimeZone + Clone> Sub<GenericDateTime<Tz>> for &GenericDateTime<Tz> {
+impl<Tz: TimeZone + Clone> Sub<DateTime<Tz>> for &DateTime<Tz> {
     type Output = super::Duration;
 
     #[inline]
-    fn sub(self, rhs: GenericDateTime<Tz>) -> Self::Output {
+    fn sub(self, rhs: DateTime<Tz>) -> Self::Output {
         (self.internal.clone() - rhs.internal).into()
     }
 }
-impl<Tz: TimeZone + Clone> Sub<&GenericDateTime<Tz>> for &GenericDateTime<Tz> {
+impl<Tz: TimeZone + Clone> Sub<&DateTime<Tz>> for &DateTime<Tz> {
     type Output = super::Duration;
 
     #[inline]
-    fn sub(self, rhs: &GenericDateTime<Tz>) -> Self::Output {
+    fn sub(self, rhs: &DateTime<Tz>) -> Self::Output {
         (self.internal.clone() - rhs.internal.clone()).into()
     }
 }
 
 macro_rules! define_self_duration_op {
     ($op:ident, $op_fn:ident) => {
-        impl<Tz: TimeZone> std::ops::$op<super::Duration> for GenericDateTime<Tz> {
-            type Output = GenericDateTime<Tz>;
+        impl<Tz: TimeZone> std::ops::$op<super::Duration> for DateTime<Tz> {
+            type Output = DateTime<Tz>;
 
             #[inline]
             fn $op_fn(self, rhs: super::Duration) -> Self::Output {
                 (self.internal.$op_fn(*rhs.as_chrono())).into()
             }
         }
-        impl<Tz: TimeZone> std::ops::$op<&super::Duration> for GenericDateTime<Tz> {
-            type Output = GenericDateTime<Tz>;
+        impl<Tz: TimeZone> std::ops::$op<&super::Duration> for DateTime<Tz> {
+            type Output = DateTime<Tz>;
 
             #[inline]
             fn $op_fn(self, rhs: &super::Duration) -> Self::Output {
@@ -707,7 +702,7 @@ macro_rules! define_self_duration_op {
 define_self_duration_op!(Add, add);
 define_self_duration_op!(Sub, sub);
 
-impl<Tz1, Tz2> RelPos<GenericDateTime<Tz2>> for GenericDateTime<Tz1>
+impl<Tz1, Tz2> RelPos<DateTime<Tz2>> for DateTime<Tz1>
 where
     Tz1: TimeZone,
     Tz2: TimeZone,
@@ -715,11 +710,7 @@ where
     type Output = f64;
 
     #[inline]
-    fn relpos_between(
-        &self,
-        left: &GenericDateTime<Tz2>,
-        right: &GenericDateTime<Tz2>,
-    ) -> Self::Output {
+    fn relpos_between(&self, left: &DateTime<Tz2>, right: &DateTime<Tz2>) -> Self::Output {
         self.internal
             .relpos_between(&left.internal, &right.internal)
     }
@@ -1093,7 +1084,7 @@ impl<Tz: TimeZone>
     /// assert_eq!(datetime.to_rfc3339(), "2021-01-01T10:42:11+09:00");
     /// ```
     #[inline]
-    pub fn build(self) -> Result<GenericDateTime<Tz>, DateTimeBuildError> {
+    pub fn build(self) -> Result<DateTime<Tz>, DateTimeBuildError> {
         let res = self
             .timezone?
             .from_local_datetime(&self.date?.and_time(self.time?));
@@ -1119,25 +1110,23 @@ mod tests {
     #[test]
     fn test_debug() {
         // fixed offset
-        let dt: GenericDateTime<_> =
+        let dt: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
         assert_eq!(format!("{:?}", dt), "2021-01-01T10:42:11+09:00");
 
         // utc
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
         assert_eq!(format!("{:?}", dt), "2021-01-01T10:42:11Z");
 
         // IANA
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         assert_eq!(format!("{:?}", dt), "2021-01-01T05:42:11EST");
 
         // qrs_chrono::TimeZone
@@ -1156,7 +1145,7 @@ mod tests {
     #[test]
     fn test_display() {
         // fixed offset
-        let dt: GenericDateTime<_> =
+        let dt: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1164,19 +1153,17 @@ mod tests {
         assert_eq!(dt.to_string(), "2021-01-01 10:42:11 +09:00");
 
         // utc
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
 
         assert_eq!(dt.to_string(), "2021-01-01 10:42:11 UTC");
 
         // IANA
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
 
         assert_eq!(dt.to_string(), "2021-01-01 05:42:11 EST");
 
@@ -1196,39 +1183,36 @@ mod tests {
     #[test]
     fn test_from_str() {
         // fixed offset
-        let dt: GenericDateTime<_> =
-            GenericDateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime<_> =
+            DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
         assert_eq!(dt, expected);
 
         // utc
-        let dt: GenericDateTime<_> =
-            GenericDateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime<_> = DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .into();
         assert_eq!(dt, expected);
 
         // IANA
-        let dt: GenericDateTime<_> = GenericDateTime::<chrono_tz::Tz>::from_str(
-            "2021-01-01T05:42:11-05:00[America/New_York]",
-        )
-        .unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime<_> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[America/New_York]")
+                .unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .with_timezone(&chrono_tz::Tz::America__New_York)
                 .into();
         assert_eq!(dt, expected);
 
-        let dt: GenericDateTime<_> =
-            GenericDateTime::<chrono_tz::Tz>::from_str("2021-01-01T10:42:11Z[America/New_York]")
-                .unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime<_> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .with_timezone(&chrono_tz::Tz::America__New_York)
@@ -1236,60 +1220,58 @@ mod tests {
         assert_eq!(dt, expected);
 
         // IANA: error
-        let dt: Result<GenericDateTime<_>, _> =
-            GenericDateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00");
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00");
         assert!(dt.is_err());
 
-        let dt: Result<GenericDateTime<_>, _> = GenericDateTime::<chrono_tz::Tz>::from_str(
-            "2021-01-01T05:42:11-05:00[America/New_York]x",
-        );
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[America/New_York]x");
         assert!(dt.is_err());
 
-        let dt: Result<GenericDateTime<_>, _> = GenericDateTime::<chrono_tz::Tz>::from_str(
-            "2021-01-01T05:42:11-05:00x[America/New_York]",
-        );
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00x[America/New_York]");
         assert!(dt.is_err());
 
-        let dt: Result<GenericDateTime<_>, _> =
-            GenericDateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[DUMMY_TIMEZONE]");
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[DUMMY_TIMEZONE]");
         assert!(dt.is_err());
 
-        let dt: Result<GenericDateTime<_>, _> =
-            GenericDateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[]");
+        let dt: Result<DateTime<_>, _> =
+            DateTime::<chrono_tz::Tz>::from_str("2021-01-01T05:42:11-05:00[]");
         assert!(dt.is_err());
 
         // qrs_chrono::TimeZone
-        let dt = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
         assert_eq!(dt, expected);
 
-        let dt = DateTime::from_str("2021-01-01T10:42:11Z").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime = DateTime::from_str("2021-01-01T10:42:11Z").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .into();
         assert_eq!(dt, expected);
 
-        let dt = DateTime::from_str("2021-01-01T05:42:11-05:00").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime = "2021-01-01T05:42:11-05:00".parse().unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .into();
         assert_eq!(dt, expected);
 
-        let dt = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .with_timezone(&chrono_tz::Tz::America__New_York)
                 .into();
         assert_eq!(dt, expected);
 
-        let dt = DateTime::from_str("2021-01-01T05:42:11[America/New_York]").unwrap();
-        let expected: GenericDateTime<_> =
+        let dt: DateTime = DateTime::from_str("2021-01-01T05:42:11[America/New_York]").unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .with_timezone(&chrono_tz::Tz::America__New_York)
@@ -1301,7 +1283,7 @@ mod tests {
     #[test]
     fn test_serialize() {
         // fixed offset
-        let dt: GenericDateTime<_> =
+        let dt: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1309,19 +1291,17 @@ mod tests {
         assert_eq!(serialized, r#""2021-01-01T10:42:11+09:00""#);
 
         // utc
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
         let serialized = serde_json::to_string(&dt).unwrap();
         assert_eq!(serialized, r#""2021-01-01T10:42:11Z""#);
 
         // IANA
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         let serialized = serde_json::to_string(&dt).unwrap();
         assert_eq!(
             serialized,
@@ -1351,9 +1331,8 @@ mod tests {
     fn test_deserialize() {
         // fixed offset
         let serialized = r#""2021-01-01T10:42:11+09:00""#;
-        let deserialized: GenericDateTime<chrono::FixedOffset> =
-            serde_json::from_str(serialized).unwrap();
-        let expected: GenericDateTime<_> =
+        let deserialized: DateTime<chrono::FixedOffset> = serde_json::from_str(serialized).unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1361,8 +1340,8 @@ mod tests {
 
         // utc
         let serialized = r#""2021-01-01T10:42:11Z""#;
-        let deserialized: GenericDateTime<chrono::Utc> = serde_json::from_str(serialized).unwrap();
-        let expected: GenericDateTime<_> =
+        let deserialized: DateTime<chrono::Utc> = serde_json::from_str(serialized).unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .into();
@@ -1370,9 +1349,8 @@ mod tests {
 
         // IANA
         let serialized = r#""2021-01-01T05:42:11-05:00[America/New_York]""#;
-        let deserialized: GenericDateTime<chrono_tz::Tz> =
-            serde_json::from_str(serialized).unwrap();
-        let expected: GenericDateTime<_> =
+        let deserialized: DateTime<chrono_tz::Tz> = serde_json::from_str(serialized).unwrap();
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
                 .unwrap()
                 .with_timezone(&chrono_tz::Tz::America__New_York)
@@ -1382,7 +1360,7 @@ mod tests {
         // qrs_chrono::TimeZone
         let serialized = r#""2021-01-01T10:42:11+09:00""#;
         let deserialized: DateTime = serde_json::from_str(serialized).unwrap();
-        let expected: GenericDateTime<_> =
+        let expected: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1392,7 +1370,7 @@ mod tests {
     #[test]
     fn test_new() {
         // fixed offset
-        let dt = GenericDateTime::<chrono::FixedOffset>::new(
+        let dt = DateTime::<chrono::FixedOffset>::new(
             chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
             chrono::FixedOffset::east_opt(9 * 3600).unwrap(),
         );
@@ -1402,7 +1380,7 @@ mod tests {
         assert_eq!(chrono_dt, expected);
 
         // utc
-        let dt = GenericDateTime::<chrono::Utc>::new(
+        let dt = DateTime::<chrono::Utc>::new(
             chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
             chrono::Utc,
         );
@@ -1411,7 +1389,7 @@ mod tests {
         assert_eq!(chrono_dt, expected);
 
         // IANA
-        let dt = GenericDateTime::<chrono::Utc>::new(
+        let dt = DateTime::<chrono::Utc>::new(
             chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
             chrono::Utc,
         )
@@ -1424,7 +1402,7 @@ mod tests {
         assert_eq!(chrono_dt, expected);
 
         // qrs_chrono::TimeZone
-        let dt = DateTime::new(
+        let dt: DateTime = DateTime::new(
             chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
             chrono::FixedOffset::east_opt(9 * 3600).unwrap().into(),
         );
@@ -1433,7 +1411,7 @@ mod tests {
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00").unwrap();
         assert_eq!(chrono_dt, expected);
 
-        let dt = DateTime::new(
+        let dt: DateTime = DateTime::new(
             chrono::NaiveDateTime::from_str("2021-01-01T10:42:11").unwrap(),
             chrono_tz::Tz::America__New_York.into(),
         );
@@ -1448,11 +1426,11 @@ mod tests {
     #[allow(clippy::op_ref)]
     fn test_sub() {
         // fixed offset
-        let dt1: GenericDateTime<_> =
+        let dt1: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
-        let dt2: GenericDateTime<_> =
+        let dt2: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1461,12 +1439,12 @@ mod tests {
         assert_eq!(dt1 - &dt2, dt1 - dt2);
         assert_eq!(&dt1 - dt2, dt1 - dt2);
 
-        let dt1: GenericDateTime<_> =
+        let dt1: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
 
-        let dt2: GenericDateTime<_> =
+        let dt2: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:12+09:00")
                 .unwrap()
                 .into();
@@ -1476,71 +1454,63 @@ mod tests {
         assert_eq!(&dt1 - dt2, dt1 - dt2);
 
         // utc
-        let dt1: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
-        let dt2: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
         assert_eq!(dt1 - dt2, Duration::zero());
         assert_eq!(dt1 - &dt2, dt1 - dt2);
         assert_eq!(&dt1 - dt2, dt1 - dt2);
         assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
-        let dt1: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
-        let dt2: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:12Z")
-                .unwrap()
-                .into();
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:12Z")
+            .unwrap()
+            .into();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
         assert_eq!(dt1 - &dt2, dt1 - dt2);
         assert_eq!(&dt1 - dt2, dt1 - dt2);
         assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
         // IANA
-        let dt1: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
-        let dt2: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         assert_eq!(dt1 - dt2, Duration::zero());
         assert_eq!(dt1 - &dt2, dt1 - dt2);
         assert_eq!(&dt1 - dt2, dt1 - dt2);
         assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
-        let dt1: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
-        let dt2: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:12Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:12Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
         assert_eq!(dt1 - &dt2, dt1 - dt2);
         assert_eq!(&dt1 - dt2, dt1 - dt2);
         assert_eq!(&dt1 - &dt2, dt1 - dt2);
 
         // between summer time and winter time
-        let dt1: GenericDateTime<_> = chrono::NaiveDateTime::from_str("2021-03-13T08:30:00")
+        let dt1: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-13T08:30:00")
             .unwrap()
             .and_local_timezone(chrono_tz::Tz::America__New_York)
             .single()
             .unwrap()
             .into();
-        let dt2: GenericDateTime<_> = chrono::NaiveDateTime::from_str("2021-03-14T08:30:00")
+        let dt2: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-14T08:30:00")
             .unwrap()
             .and_local_timezone(chrono_tz::Tz::America__New_York)
             .single()
@@ -1552,24 +1522,24 @@ mod tests {
         assert_eq!(&dt2 - dt1, dt2 - dt1);
 
         // qrs_chrono::TimeZone
-        let dt1 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let dt2 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let dt1: DateTime = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let dt2: DateTime = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
         assert_eq!(dt1 - dt2, Duration::zero());
 
-        let dt1 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let dt2 = DateTime::from_str("2021-01-01T10:42:12+09:00").unwrap();
+        let dt1: DateTime = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let dt2: DateTime = DateTime::from_str("2021-01-01T10:42:12+09:00").unwrap();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
 
-        let dt1 = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
-        let dt2 = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let dt1: DateTime = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let dt2: DateTime = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
         assert_eq!(dt1 - dt2, Duration::zero());
 
-        let dt1 = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
-        let dt2 = DateTime::from_str("2021-01-01T10:42:12Z[America/New_York]").unwrap();
+        let dt1: DateTime = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let dt2: DateTime = DateTime::from_str("2021-01-01T10:42:12Z[America/New_York]").unwrap();
         assert_eq!(dt1 - dt2, Duration::with_secs(-1));
 
-        let dt1 = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
-        let dt2 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let dt1: DateTime = DateTime::from_str("2021-01-01T10:42:11Z[America/New_York]").unwrap();
+        let dt2: DateTime = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
         assert_eq!(dt1 - dt2, Duration::with_secs(9 * 3600));
     }
 
@@ -1577,7 +1547,7 @@ mod tests {
     #[allow(clippy::op_ref)]
     fn test_add_sub_duration() {
         // fixed offset
-        let dt: GenericDateTime<_> =
+        let dt: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1587,7 +1557,7 @@ mod tests {
         assert_eq!(dt - duration, dt);
         assert_eq!(dt - &duration, dt);
 
-        let dt: GenericDateTime<_> =
+        let dt: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
@@ -1608,20 +1578,18 @@ mod tests {
         assert_eq!(dt - &duration, dt - duration);
 
         // utc
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
         let duration = Duration::zero();
         assert_eq!(dt + duration, dt);
         assert_eq!(dt + &duration, dt);
         assert_eq!(dt - duration, dt);
         assert_eq!(dt - &duration, dt);
 
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
         let duration = Duration::with_secs(1);
         assert_eq!(
             dt + duration,
@@ -1639,20 +1607,18 @@ mod tests {
         assert_eq!(dt - &duration, dt - duration);
 
         // IANA
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         let duration = Duration::zero();
         assert_eq!(dt + duration, dt);
         assert_eq!(dt + &duration, dt);
 
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         let duration = Duration::with_secs(1);
         assert_eq!(
             dt + duration,
@@ -1663,11 +1629,10 @@ mod tests {
         );
         assert_eq!(dt + &duration, dt + duration);
 
-        let dt: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
         let duration = Duration::with_secs(1);
         assert_eq!(
             dt - duration,
@@ -1679,7 +1644,7 @@ mod tests {
         assert_eq!(dt - &duration, dt - duration);
 
         // between summer time and winter time
-        let dt: GenericDateTime<_> = chrono::NaiveDateTime::from_str("2021-03-13T08:30:00")
+        let dt: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-13T08:30:00")
             .unwrap()
             .and_local_timezone(chrono_tz::Tz::America__New_York)
             .single()
@@ -1697,7 +1662,7 @@ mod tests {
         );
         assert_eq!(dt + &duration, dt + duration);
 
-        let dt: GenericDateTime<_> = chrono::NaiveDateTime::from_str("2021-03-14T08:30:00")
+        let dt: DateTime<_> = chrono::NaiveDateTime::from_str("2021-03-14T08:30:00")
             .unwrap()
             .and_local_timezone(chrono_tz::Tz::America__New_York)
             .single()
@@ -1725,7 +1690,7 @@ mod tests {
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-12-31T10:42:11+09:00").unwrap(),
         ];
         for chrono_dt in chrono_dts {
-            let dt: GenericDateTime<_> = chrono_dt.into();
+            let dt: DateTime<_> = chrono_dt.into();
             assert_eq!(dt.year(), chrono_dt.year());
             assert_eq!(dt.month(), chrono_dt.month());
             assert_eq!(dt.month0(), chrono_dt.month0());
@@ -1766,7 +1731,7 @@ mod tests {
             chrono::DateTime::<chrono::Utc>::from_str("2021-12-31T10:42:11Z").unwrap(),
         ];
         for chrono_dt in chrono_dts {
-            let dt: GenericDateTime<_> = chrono_dt.into();
+            let dt: DateTime<_> = chrono_dt.into();
             assert_eq!(dt.year(), chrono_dt.year());
             assert_eq!(dt.month(), chrono_dt.month());
             assert_eq!(dt.month0(), chrono_dt.month0());
@@ -1813,7 +1778,7 @@ mod tests {
                 .with_timezone(&chrono_tz::Tz::America__New_York),
         ];
         for chrono_dt in chrono_dts {
-            let dt: GenericDateTime<_> = chrono_dt.into();
+            let dt: DateTime<_> = chrono_dt.into();
             assert_eq!(dt.year(), chrono_dt.year());
             assert_eq!(dt.month(), chrono_dt.month());
             assert_eq!(dt.month0(), chrono_dt.month0());
@@ -1904,7 +1869,7 @@ mod tests {
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-12-31T10:42:11+09:00").unwrap(),
         ];
         for chrono_dt in chrono_dts {
-            let dt: GenericDateTime<_> = chrono_dt.into();
+            let dt: DateTime<_> = chrono_dt.into();
             assert_eq!(dt.hour(), chrono_dt.hour());
             assert_eq!(dt.minute(), chrono_dt.minute());
             assert_eq!(dt.second(), chrono_dt.second());
@@ -1931,7 +1896,7 @@ mod tests {
             chrono::DateTime::<chrono::Utc>::from_str("2021-12-31T10:42:11Z").unwrap(),
         ];
         for chrono_dt in chrono_dts {
-            let dt: GenericDateTime<_> = chrono_dt.into();
+            let dt: DateTime<_> = chrono_dt.into();
             assert_eq!(dt.hour(), chrono_dt.hour());
             assert_eq!(dt.minute(), chrono_dt.minute());
             assert_eq!(dt.second(), chrono_dt.second());
@@ -1964,7 +1929,7 @@ mod tests {
                 .with_timezone(&chrono_tz::Tz::America__New_York),
         ];
         for chrono_dt in chrono_dts {
-            let dt: GenericDateTime<_> = chrono_dt.into();
+            let dt: DateTime<_> = chrono_dt.into();
             assert_eq!(dt.hour(), chrono_dt.hour());
             assert_eq!(dt.minute(), chrono_dt.minute());
             assert_eq!(dt.second(), chrono_dt.second());
@@ -2021,15 +1986,15 @@ mod tests {
     #[test]
     fn test_relpos() {
         // fixed
-        let dt1: GenericDateTime<_> =
+        let dt1: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-01T10:42:11+09:00")
                 .unwrap()
                 .into();
-        let dt2: GenericDateTime<_> =
+        let dt2: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-06T10:42:12+09:00")
                 .unwrap()
                 .into();
-        let dt3: GenericDateTime<_> =
+        let dt3: DateTime<_> =
             chrono::DateTime::<chrono::FixedOffset>::from_str("2021-01-11T10:42:13+09:00")
                 .unwrap()
                 .into();
@@ -2037,44 +2002,38 @@ mod tests {
         assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
 
         // utc
-        let dt1: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .into();
-        let dt2: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-06T10:42:12Z")
-                .unwrap()
-                .into();
-        let dt3: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-11T10:42:13Z")
-                .unwrap()
-                .into();
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-06T10:42:12Z")
+            .unwrap()
+            .into();
+        let dt3: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-11T10:42:13Z")
+            .unwrap()
+            .into();
 
         assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
 
         // IANA
-        let dt1: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
-        let dt2: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-06T10:42:12Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
-        let dt3: GenericDateTime<_> =
-            chrono::DateTime::<chrono::Utc>::from_str("2021-01-11T10:42:13Z")
-                .unwrap()
-                .with_timezone(&chrono_tz::Tz::America__New_York)
-                .into();
+        let dt1: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-01T10:42:11Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let dt2: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-06T10:42:12Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
+        let dt3: DateTime<_> = chrono::DateTime::<chrono::Utc>::from_str("2021-01-11T10:42:13Z")
+            .unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York)
+            .into();
 
         assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
 
         // qrs_chrono::TimeZone
-        let dt1 = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
-        let dt2 = DateTime::from_str("2021-01-06T10:42:12+09:00").unwrap();
-        let dt3 = DateTime::from_str("2021-01-11T10:42:13+09:00").unwrap();
+        let dt1: DateTime = DateTime::from_str("2021-01-01T10:42:11+09:00").unwrap();
+        let dt2: DateTime = DateTime::from_str("2021-01-06T10:42:12+09:00").unwrap();
+        let dt3: DateTime = DateTime::from_str("2021-01-11T10:42:13+09:00").unwrap();
 
         assert_eq!(dt2.relpos_between(&dt1, &dt3), 0.5);
     }

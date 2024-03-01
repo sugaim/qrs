@@ -1,6 +1,6 @@
 use std::ops::{Div, Mul, MulAssign};
 
-use qrs_chrono::Datelike;
+use chrono::Datelike;
 use qrs_chrono::{Duration, Velocity};
 use qrs_math::num::Real;
 

@@ -1021,12 +1021,10 @@ mod tests {
 
         // datetime + duration
         let base_date =
-            crate::datetime::GenericDateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z")
-                .unwrap();
+            crate::datetime::DateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z").unwrap();
         let dur = Duration::with_days(1);
         let expected =
-            crate::datetime::GenericDateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z")
-                .unwrap();
+            crate::datetime::DateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z").unwrap();
         assert_eq!(base_date + dur, expected);
         assert_eq!(base_date + &dur, expected);
     }
@@ -1057,12 +1055,10 @@ mod tests {
 
         // datetime - duration
         let base_date =
-            crate::datetime::GenericDateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z")
-                .unwrap();
+            crate::datetime::DateTime::<chrono::Utc>::from_str("2021-01-02T00:00:00Z").unwrap();
         let dur = Duration::with_days(1);
         let expected =
-            crate::datetime::GenericDateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z")
-                .unwrap();
+            crate::datetime::DateTime::<chrono::Utc>::from_str("2021-01-01T00:00:00Z").unwrap();
         assert_eq!(base_date - dur, expected);
         assert_eq!(base_date - &dur, expected);
     }

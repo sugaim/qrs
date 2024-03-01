@@ -8,6 +8,7 @@ exclude.workspace = true
 serde = ["dep:serde", "dep:schemars", "qrs_chrono/serde", "qrs_math/serde"]
 
 [dependencies]
+chrono = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 strum = { workspace = true }

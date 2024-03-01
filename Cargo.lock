@@ -858,6 +858,7 @@ dependencies = [
 name = "qrs_finance"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "qrs_chrono",
  "qrs_math",
  "schemars",
