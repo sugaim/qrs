@@ -142,7 +142,7 @@ impl JsonSchema for Calendar {
         "Calendar".to_string()
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        "qrs_chrono::calendar::Calendar".into()
+        "qrs_chrono::Calendar".into()
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         <CalendarData as JsonSchema>::json_schema(gen)
@@ -318,7 +318,7 @@ impl Calendar {
     ///
     /// # Example
     /// ```
-    /// use qrs_chrono::calendar::Calendar;
+    /// use qrs_chrono::Calendar;
     /// use chrono::NaiveDate;
     ///
     /// let cal = Calendar::builder()
@@ -359,7 +359,7 @@ impl Calendar {
     ///
     /// # Example
     /// ```
-    /// use qrs_chrono::calendar::Calendar;
+    /// use qrs_chrono::Calendar;
     /// use chrono::NaiveDate;
     ///
     /// let cal = Calendar::builder()
