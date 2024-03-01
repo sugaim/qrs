@@ -132,7 +132,6 @@ mod tests {
     use std::str::FromStr;
 
     use approx::assert_abs_diff_eq;
-    use qrs_chrono::DateTime;
     use qrs_finance::rate::Rate;
 
     use crate::curve::FlatCurve;

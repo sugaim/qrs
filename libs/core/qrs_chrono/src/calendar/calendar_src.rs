@@ -139,11 +139,7 @@ impl<S: TakeSnapshot<Key = str, Output = Calendar>> TakeSnapshot for CalendarSrc
 // =============================================================================
 #[cfg(test)]
 mod tests {
-    use std::{
-        num::NonZeroUsize,
-        str::FromStr,
-        sync::{Arc, Mutex},
-    };
+    use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
     use chrono::NaiveDate;
     use qrs_datasrc::{ext::SubjectExt, on_memory::OnMemorySrc};

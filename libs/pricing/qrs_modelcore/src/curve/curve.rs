@@ -27,7 +27,7 @@ pub enum ComponentCurve<V> {
     LogLerp(LogDfCurve<Lerp1d<DateTime, V>>),
     LogCR(LogDfCurve<CHermite1d<DateTime, V, CatmullRomScheme>>),
     ZeroRateLerp(ZeroRateCurve<Lerp1d<DateTime, RateAct365f<V>>>),
-    ZeroRateCR(ZeroRateCurve<CHermite1d<DateTime, RateAct365f<V>, CatmullRomScheme>>),
+    ZeroRateCr(ZeroRateCurve<CHermite1d<DateTime, RateAct365f<V>, CatmullRomScheme>>),
     InstFwdLerp(InstFwdCurve<Lerp1d<DateTime, RateAct365f<V>>>),
     InstFwdPwConst(InstFwdCurve<PwConst1d<DateTime, RateAct365f<V>>>),
 }
@@ -53,7 +53,7 @@ where
             LogLerp(c) => c.forward_rate(from, to),
             LogCR(c) => c.forward_rate(from, to),
             ZeroRateLerp(c) => c.forward_rate(from, to),
-            ZeroRateCR(c) => c.forward_rate(from, to),
+            ZeroRateCr(c) => c.forward_rate(from, to),
             InstFwdLerp(c) => c.forward_rate(from, to),
             InstFwdPwConst(c) => c.forward_rate(from, to),
         }
