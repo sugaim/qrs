@@ -40,6 +40,22 @@ fn _dur_to_num_units<T: FloatBased>(dur: Duration) -> T::BaseFloat {
 //
 
 /// Change per given duration.
+///
+/// The main purpose of this type is to control arithmetics
+/// between numbers and durations,
+/// which are necessary under the low layer of implementations,
+/// such as interpolation whose x-axis is datetime.
+///
+/// # Examples
+/// ```
+/// use qrs_chrono::Duration;
+///
+/// let vel = 10.0 / Duration::with_secs(1);
+/// let chg = vel * Duration::with_mins(1);
+///
+/// assert_eq!(chg, 600.0);
+/// ```
+///
 #[derive(Debug, Clone, Copy)]
 pub struct Velocity<V>(_Velocity<V>);
 

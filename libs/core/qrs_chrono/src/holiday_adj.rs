@@ -5,6 +5,32 @@ use crate::Calendar;
 // -----------------------------------------------------------------------------
 // HolidayAdj
 //
+/// Adjustment rule for holiday.
+///
+/// # Overview
+/// Adjustment rule for holiday, which is typically used after
+/// date calculation such as adding 1 month to the date.
+///
+/// Since the meaning of "holiday" depends on the calendar,
+/// this adjustment rule is used with the calendar.
+///
+/// # Examples
+/// ```
+/// use qrs_chrono::{HolidayAdj, Calendar};
+/// use chrono::NaiveDate as Date;
+///
+/// let cal = Calendar::default();
+/// let d = Date::from_ymd_opt(2023, 12, 31).unwrap();
+///
+/// // Following: Subday is shifted to the next business day.
+/// let rule = HolidayAdj::Following;
+/// assert_eq!(Some(Date::from_ymd_opt(2024, 1, 1).unwrap()), rule.adjust(d, &cal));
+///
+/// // Modified following: Shifted with following rule reaches the next month and shifted bask
+/// let rule = HolidayAdj::ModifiedFollowing;
+/// assert_eq!(Some(Date::from_ymd_opt(2023, 12, 29).unwrap()), rule.adjust(d, &cal));
+/// ```
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display, strum::EnumIter, strum::EnumString)]
 #[cfg_attr(
     feature = "serde",
@@ -12,14 +38,25 @@ use crate::Calendar;
     serde(rename_all = "snake_case")
 )]
 pub enum HolidayAdj {
+    /// No adjustment
     #[strum(serialize = "unadjust")]
     Unadjust,
+
+    /// Shift to the next business day for the holiday.
     #[strum(serialize = "following")]
     Following,
+
+    /// Shift to the next business day for the holiday,
+    /// but if it reaches the next month, shift back to the previous business day.
     #[strum(serialize = "modified_following")]
     ModifiedFollowing,
+
+    /// Shift to the previous business day for the holiday.
     #[strum(serialize = "preceding")]
     Preceding,
+
+    /// Shift to the previous business day for the holiday,
+    /// but if it reaches the previous month, shift forward to the next business day.
     #[strum(serialize = "modified_preceding")]
     ModifiedPreceding,
 }
@@ -28,9 +65,26 @@ pub enum HolidayAdj {
 // methods
 //
 impl HolidayAdj {
-    /// Adjust the given date according to the rule.
+    /// Apply the adjustment rule to the date.
     ///
-    /// If the date reaches the out of valid range of the calendar, it returns None.
+    /// The calendar has valid period.
+    /// If the date, including shifted date, reaches the out of valid period,
+    /// this function returns [`None`].
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::{HolidayAdj, Calendar};
+    /// use chrono::NaiveDate as Date;
+    ///
+    /// let cal = Calendar::default();
+    /// let d = Date::from_ymd_opt(2023, 12, 31).unwrap();
+    ///
+    /// // Following: Subday is shifted to the next business day.
+    /// assert_eq!(Some(Date::from_ymd_opt(2024, 1, 1).unwrap()), HolidayAdj::Following.adjust(d, &cal));
+    ///
+    /// // Modified following: Shifted with following rule reaches the next month and shifted bask
+    /// assert_eq!(Some(Date::from_ymd_opt(2023, 12, 29).unwrap()), HolidayAdj::ModifiedFollowing.adjust(d, &cal));
+    /// ```
     pub fn adjust(&self, d: NaiveDate, cal: &Calendar) -> Option<NaiveDate> {
         match self {
             HolidayAdj::Unadjust => {

@@ -719,10 +719,14 @@ where
 // -----------------------------------------------------------------------------
 // DateTimeBuildError
 //
+/// Error reported by [DateTimeBuilder::build]
 #[derive(Debug, thiserror::Error, Clone)]
 pub enum DateTimeBuildError {
+    /// Due to invalid date
     #[error("Invalid date: ymd=({}, {}, {})", .year, .month, .day)]
     Date { year: i32, month: u32, day: u32 },
+
+    /// Due to invalid time
     #[error("Invalid time: hms.f=({}, {}, {}, {})", .hour, .minute, .second, .nanosecond)]
     Time {
         hour: u32,
@@ -730,12 +734,20 @@ pub enum DateTimeBuildError {
         second: u32,
         nanosecond: u32,
     },
+
+    /// Due to invalid fixed offset
     #[error("Invalid fixed offset: offset_sec={}", .offset_sec)]
     FixedOffset { offset_sec: i32 },
+
+    /// Due to invalid timezone string
     #[error("Parse error: {}", .0)]
     Tz(String),
+
+    /// Specified timepoint does not exist, e.g., due to daylight saving time transition
     #[error("Specified timepoint does not exist, e.g., due to daylight saving time transition")]
     NotExist,
+
+    /// Specified timepoint is ambiguous, e.g., due to daylight saving time transition
     #[error("Specified timepoint is ambiguous, e.g., due to daylight saving time transition")]
     Ambiguous,
 }
@@ -766,7 +778,10 @@ pub struct DateTimeBuilder<D = (), T = (), Tz = ()> {
     timezone: Tz,
 }
 
-pub type DateToDateTime<Tz> = DateTimeBuilder<NaiveDate, (), Tz>;
+/// An alias for [DateTimeBuilder] with time and timezone set.
+/// So this works as a converter from date to datetime.
+pub type DateToDateTime<Tz> =
+    DateTimeBuilder<Result<NaiveDate, DateTimeBuildError>, (), Result<Tz, DateTimeBuildError>>;
 
 //
 // construction

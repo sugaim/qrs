@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 // TzOffset
 //
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[doc(hidden)]
 pub struct TzOffset(_TimeZoneOffset);
 
 //
@@ -60,9 +61,21 @@ enum _TimeZoneOffset {
 // -----------------------------------------------------------------------------
 // Timezone
 //
+
+/// A default timezone type of qrs.
+///
+/// This can be either of [chrono::FixedOffset] or [chrono_tz::Tz].
+/// Typically, especially in calculation, [chrono::FixedOffset] is enough.
+/// However, we need to daylightsaving time in business side.
+///
+/// UTC is not supported.
+/// Please use zero offset timezone instead.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tz {
+    /// See [chrono::FixedOffset]
     FixedOffset(chrono::FixedOffset),
+
+    /// See [chrono_tz::Tz]
     Iana(chrono_tz::Tz),
 }
 
@@ -254,7 +267,10 @@ impl From<chrono_tz::Tz> for Tz {
 }
 
 impl Tz {
-    /// Create a new `TimeZone` from a fixed offset in seconds(positive is east, negative is west).
+    /// Create a new [Tz] from a fixed offset in seconds(positive is east, negative is west).
+    ///
+    /// Invalid input will return None.
+    /// See [chrono::FixedOffset::east_opt] for more details.
     ///
     /// # Example
     /// ```
@@ -268,7 +284,10 @@ impl Tz {
         chrono::FixedOffset::east_opt(sec).map(Tz::FixedOffset)
     }
 
-    /// Create a new `TimeZone` from an IANA timezone identifier.
+    /// Create a new [Tz] from an IANA timezone identifier.
+    ///
+    /// Invalid input will return None.
+    /// See [chrono_tz::Tz::from_str] for more details.
     ///
     /// # Example
     /// ```

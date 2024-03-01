@@ -5,6 +5,64 @@ use chrono::{Days, Months, NaiveDate};
 // -----------------------------------------------------------------------------
 // Tenor
 //
+/// Date shift including months.
+///
+/// # Overview
+/// The meaning of "one month later" depends on the starting date.
+///
+/// For example, the actual difference between 2021-01-15 and 2021-02-15 is 31 days
+/// but the actual difference between 2021-01-31 and 2021-02-28 is 28 days.
+///
+/// This struct provides the calendar base date shift, especially for month and year shift,
+/// rather than shift with absolute time shift.
+/// ([`Duration`] is for absolute time shift.)
+///
+/// # End of month adjustment
+/// When date shifted by [Tenor::Months] or [Tenor::Years] is not exist
+/// due to excess of the end of month, it is adjusted to the end of the last month,
+/// for example, 2021-01-31 + 1 month = 2021-02-28 rather than "2021-02-31" = 2021-03-03.
+///
+/// ## Exmample
+/// ```
+/// use chrono::NaiveDate as Date;
+/// use qrs_chrono::Tenor;
+///
+/// let tenor = Tenor::Months(1);
+/// let date = Date::from_ymd_opt(2021, 1, 15).unwrap();
+/// assert_eq!(date + tenor, Date::from_ymd_opt(2021, 2, 15).unwrap());
+///
+/// let date = Date::from_ymd_opt(2021, 1, 31).unwrap();
+/// assert_eq!(date + tenor, Date::from_ymd_opt(2021, 2, 28).unwrap());
+/// ```
+///
+/// # String representation
+/// We use the ISO 8601 duration format.
+/// Although the ISO 8601 duration format allows mixed tenor (e.g. P1Y1M1D),
+/// this struct does not support mixed tenor.
+///
+/// So the string representation is either of
+/// - `P[n]D`, `-P[n]D`: n days, -n days respectively
+/// - `P[n]W`, `-P[n]W`: n weeks, -n weeks respectively
+/// - `P[n]M`, `-P[n]M`: n months, -n months respectively
+/// - `P[n]Y`, `-P[n]Y`: n years, -n years respectively
+///
+/// ## Example
+/// ```
+/// use qrs_chrono::Tenor;
+///
+/// let tenor: Tenor = "P42D".parse().unwrap();
+/// assert_eq!(tenor, Tenor::Days(42));
+/// assert_eq!(tenor.to_string(), "P42D");
+///
+/// let tenor: Tenor = "-P2M".parse().unwrap();
+/// assert_eq!(tenor, Tenor::Months(-2));
+/// assert_eq!(tenor.to_string(), "-P2M");
+///
+/// // negative values are also supported
+/// let tenor: Tenor = "P-1Y".parse().unwrap();
+/// assert_eq!(tenor, Tenor::Years(-1));
+/// assert_eq!(tenor.to_string(), "-P1Y");
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tenor {
     Days(i16),

@@ -231,6 +231,20 @@ impl schemars::JsonSchema for Calendar {
 //
 // construction
 //
+impl Default for Calendar {
+    #[inline]
+    fn default() -> Self {
+        Self::_new(
+            Vec::new(),
+            Vec::new(),
+            NaiveDate::MIN,
+            NaiveDate::MAX,
+            false,
+        )
+        .expect("Default calendar must be valid")
+    }
+}
+
 impl Calendar {
     fn _new(
         extra_holds: Vec<NaiveDate>,
