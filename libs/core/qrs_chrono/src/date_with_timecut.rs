@@ -91,6 +91,31 @@ where
     }
 }
 
+#[cfg(feature = "serde")]
+impl<Sym> schemars::JsonSchema for DateWithTimeCut<Sym>
+where
+    Sym: schemars::JsonSchema + Display + FromStr,
+{
+    fn schema_name() -> String {
+        format!("DateWithTimeCut_for_{}", Sym::schema_name())
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        format!("qrs_chrono::DateWithTimeCut<{}>", Sym::schema_id()).into()
+    }
+
+    fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let mut res = schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            format: Some("date-time".to_owned()),
+            ..Default::default()
+        };
+        res.metadata().description =
+            Some("Date with a time cut symbol. Format is 'yyyy-MM-dd@{sym}'".to_owned());
+        res.into()
+    }
+}
+
 //
 // methods
 //
