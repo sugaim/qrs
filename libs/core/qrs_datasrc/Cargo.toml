@@ -5,21 +5,23 @@ edition.workspace = true
 exclude.workspace = true
 
 [features]
-default = ["qrs_datasrc_derive"]
+default = []
 serde = ["dep:serde", "dep:schemars"]
+derive = []
 
 [dependencies]
 anyhow = { workspace = true }
 derivative = { workspace = true }
 lru = { workspace = true }
-maplit = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-uuid = { workspace = true }
-
-# internal
-qrs_datasrc_derive = { path = "qrs_datasrc_derive", optional = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+qrs_datasrc_derive = { path = "./qrs_datasrc_derive" }
 
 [dev-dependencies]
+maplit = { workspace = true }
+mockall = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
+serde_json = { workspace = true }

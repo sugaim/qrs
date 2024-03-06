@@ -381,27 +381,29 @@ impl std::ops::BitAnd for CalendarSymbol {
 // =============================================================================
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
-    #[test]
-    fn test_of_single() {
-        let sym = CalendarSymbol::of_single("TK");
-        assert_eq!(sym.unwrap(), CalendarSymbol::of_single("TK").unwrap());
+    #[rstest]
+    #[case("TK", Some(CalendarSymbol::of_single("TK").unwrap()))]
+    #[case("TK_OSE", Some(CalendarSymbol::of_single("TK_OSE").unwrap()))]
+    #[case("TK|NY", None)]
+    #[case("(TK)", None)]
+    #[case("", None)]
+    #[case(" ", None)]
+    #[case("😃", None)]
+    fn test_of_single(#[case] s: &str, #[case] expected: Option<CalendarSymbol>) {
+        let sym = CalendarSymbol::of_single(s);
 
-        let sym = CalendarSymbol::of_single("TK|NY");
-        assert!(sym.is_err());
-
-        let sym = CalendarSymbol::of_single("(TK)");
-        assert!(sym.is_err());
-
-        let sym = CalendarSymbol::of_single("");
-        assert!(sym.is_err());
-
-        let sym = CalendarSymbol::of_single(" ");
-        assert!(sym.is_err());
-
-        let sym = CalendarSymbol::of_single("😃");
-        assert!(sym.is_err());
+        match expected {
+            Some(expected) => {
+                assert_eq!(sym.unwrap(), expected);
+            }
+            None => {
+                assert!(sym.is_err());
+            }
+        }
     }
 
     #[test]
@@ -727,91 +729,41 @@ mod tests {
         assert!(sym.is_err());
     }
 
-    #[test]
-    fn test_display() {
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        assert_eq!(sym.to_string(), "TK");
+    #[rstest]
+    #[case("TK".parse().unwrap(), "TK")]
+    #[case("TK|NY".parse().unwrap(), "NY|TK")]
+    #[case("TK&NY".parse().unwrap(), "NY&TK")]
+    #[case("(TK|NY)&(LN|TK)".parse().unwrap(), "(LN|TK)&(NY|TK)")]
+    fn test_display(#[case] sym: CalendarSymbol, #[case] expected: &str) {
+        let s = sym.to_string();
 
-        let sym = CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap();
-        assert_eq!(sym.to_string(), "NY|TK");
-
-        let sym = CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap();
-        assert_eq!(sym.to_string(), "NY&TK");
-
-        let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
-        assert_eq!(sym.to_string(), "TK|LN&NY");
-
-        let sym = CalendarSymbol::of_all_closed(["TK|NY", "LN|TK"].into_iter()).unwrap();
-        assert_eq!(sym.to_string(), "(LN|TK)&(NY|TK)");
+        assert_eq!(s, expected);
     }
 
     #[cfg(feature = "serde")]
-    #[test]
-    fn test_serde() {
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let json = serde_json::to_string(&sym).unwrap();
-        assert_eq!(json, "\"TK\"");
+    #[rstest]
+    #[case("TK".parse().unwrap())]
+    #[case("TK|NY".parse().unwrap())]
+    #[case("TK&NY".parse().unwrap())]
+    #[case("(TK|NY)&(LN|TK)".parse().unwrap())]
+    fn test_serialize(#[case] sym: CalendarSymbol) {
+        let ser = serde_json::to_string(&sym).unwrap();
 
-        let sym: CalendarSymbol = serde_json::from_str(&json).unwrap();
-        assert_eq!(sym, CalendarSymbol::of_single("TK").unwrap());
-
-        let sym = CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap();
-        let json = serde_json::to_string(&sym).unwrap();
-        assert_eq!(json, "\"NY|TK\"");
-
-        let sym: CalendarSymbol = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap()
-        );
-
-        let sym = CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap();
-        let json = serde_json::to_string(&sym).unwrap();
-        assert_eq!(json, "\"NY&TK\"");
-
-        let sym: CalendarSymbol = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap()
-        );
-
-        let sym = CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap();
-        let json = serde_json::to_string(&sym).unwrap();
-        assert_eq!(json, "\"TK|LN&NY\"");
-
-        let sym: CalendarSymbol = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap()
-        );
-
-        let sym = CalendarSymbol::of_all_closed(["TK|NY", "LN|TK"].into_iter()).unwrap();
-        let json = serde_json::to_string(&sym).unwrap();
-        assert_eq!(json, "\"(LN|TK)&(NY|TK)\"");
-
-        let sym: CalendarSymbol = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_all_closed(["TK|NY", "LN|TK"].into_iter()).unwrap()
-        );
+        assert_eq!(ser, format!("\"{}\"", sym));
     }
 
-    #[test]
-    fn test_bitwise() {
-        let sym1 = CalendarSymbol::of_single("TK").unwrap();
-        let sym2 = CalendarSymbol::of_single("NY").unwrap();
+    #[cfg(feature = "serde")]
+    #[rstest]
+    #[case("TK".parse().unwrap())]
+    #[case("TK|NY".parse().unwrap())]
+    #[case("TK&NY".parse().unwrap())]
+    #[case("(TK|NY)&(LN|TK)".parse().unwrap())]
+    fn test_deserialize(#[case] sym: CalendarSymbol) {
+        let ser = serde_json::to_string(&sym).unwrap();
 
-        let sym = sym1.clone() | sym2.clone();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap()
-        );
+        let de: CalendarSymbol = serde_json::from_str(&ser).unwrap();
 
-        let sym = sym1 & sym2;
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap()
-        );
+        assert_eq!(de, sym);
     }
 
     #[test]
@@ -825,51 +777,31 @@ mod tests {
         assert!(set.contains("LN"));
     }
 
-    #[test]
-    fn test_bitor() {
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let sym = sym | CalendarSymbol::of_single("NY").unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_any_closed(["TK", "NY"].into_iter()).unwrap()
-        );
+    #[rstest]
+    #[case("TK", "NY", "TK|NY")]
+    #[case("TK", "NY&LN", "TK|NY&LN")]
+    #[case("TK", "NY|LN", "TK|NY|LN")]
+    fn test_bitor(#[case] lhs: &str, #[case] rhs: &str, #[case] expected: &str) {
+        let lhs: CalendarSymbol = lhs.parse().unwrap();
+        let rhs: CalendarSymbol = rhs.parse().unwrap();
+        let expected: CalendarSymbol = expected.parse().unwrap();
 
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let sym = sym | CalendarSymbol::of_any_closed(["NY", "LN"].into_iter()).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_any_closed(["TK", "NY", "LN"].into_iter()).unwrap()
-        );
+        let sym = lhs | rhs;
 
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let sym = sym | CalendarSymbol::of_all_closed(["NY", "LN"].into_iter()).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_any_closed(["TK", "NY&LN"].into_iter()).unwrap()
-        );
+        assert_eq!(sym, expected);
     }
 
-    #[test]
-    fn test_bitand() {
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let sym = sym & CalendarSymbol::of_single("NY").unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_all_closed(["TK", "NY"].into_iter()).unwrap()
-        );
+    #[rstest]
+    #[case("TK", "NY", "TK&NY")]
+    #[case("TK", "NY&LN", "TK&NY&LN")]
+    #[case("TK", "NY|LN", "TK&(NY|LN)")]
+    fn test_bitand(#[case] lhs: &str, #[case] rhs: &str, #[case] expected: &str) {
+        let lhs: CalendarSymbol = lhs.parse().unwrap();
+        let rhs: CalendarSymbol = rhs.parse().unwrap();
+        let expected: CalendarSymbol = expected.parse().unwrap();
 
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let sym = sym & CalendarSymbol::of_any_closed(["NY", "LN"].into_iter()).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_all_closed(["TK", "NY|LN"].into_iter()).unwrap()
-        );
+        let sym = lhs & rhs;
 
-        let sym = CalendarSymbol::of_single("TK").unwrap();
-        let sym = sym & CalendarSymbol::of_all_closed(["NY", "LN"].into_iter()).unwrap();
-        assert_eq!(
-            sym,
-            CalendarSymbol::of_all_closed(["TK", "NY", "LN"].into_iter()).unwrap()
-        );
+        assert_eq!(sym, expected);
     }
 }

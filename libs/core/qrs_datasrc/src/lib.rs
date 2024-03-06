@@ -3,12 +3,24 @@
 #[allow(unused_imports)]
 use rstest_reuse;
 
-mod datasrc;
-pub mod ext;
-mod node;
-mod observer;
-pub mod on_memory;
+#[cfg(test)]
+mod _test_util;
 
-pub use datasrc::{DataSrc, DataSrc2Args, DataSrc3Args};
-pub use node::{CacheSize, PassThroughNode};
-pub use observer::{DebugTree, Observer, StateId, Subject, TreeInfo};
+mod cache_proxy;
+mod datasrc;
+mod debug;
+mod in_memory;
+mod map;
+mod on_get;
+mod snapshot;
+
+#[cfg(feature = "derive")]
+pub use qrs_datasrc_derive::DebugTree;
+
+pub use cache_proxy::CacheProxy;
+pub use datasrc::{CacheableSrc, DataSrc, Response};
+pub use debug::{DebugTree, TreeInfo};
+pub use in_memory::InMemory;
+pub use map::Map;
+pub use on_get::OnGet;
+pub use snapshot::{Snapshot, TakeSnapshot};

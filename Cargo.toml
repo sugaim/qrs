@@ -36,6 +36,7 @@ itertools = { version = "0.12.1" }
 log = { version = "0.4.20" }
 lru = { version = "0.12.3" }
 maplit = { version = "1.0.2" }
+mockall = { version = "0.12.1" }
 num = { version = "0.4.1" }
 peg = { version = "0.8.2" }
 proc-macro2 = { version = "1.0.78" }

@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashSet,
     ops::{BitAnd, BitOr, Range},
     sync::Arc,
@@ -274,9 +275,18 @@ impl Calendar {
     ///
     /// For example, if today is not a holiday of Tokyo but a holiday of New York,
     /// the day is considered as a holiday in the new calendar.
+    #[inline]
     pub fn of_any_closed<'a, It>(cals: It) -> Self
     where
         It: IntoIterator<Item = &'a Self>,
+    {
+        let cals = cals.into_iter().map(|c| anyhow::Ok(Cow::Borrowed(c)));
+        Self::any_closed_try_from(cals).unwrap()
+    }
+
+    pub fn any_closed_try_from<'a, It, E>(cals: It) -> Result<Self, E>
+    where
+        It: IntoIterator<Item = Result<Cow<'a, Self>, E>>,
     {
         let mut extra_holds = HashSet::new();
         let mut extra_bizds: Option<HashSet<_>> = None;
@@ -285,30 +295,32 @@ impl Calendar {
         let mut treat_weekend_as_business_day = None;
 
         for cal in cals {
+            let cal = &cal?.0;
             if let Some(ref mut flag) = treat_weekend_as_business_day {
-                *flag &= cal.0.treat_weekend_as_business_day;
+                *flag &= cal.treat_weekend_as_business_day;
             } else {
-                treat_weekend_as_business_day = Some(cal.0.treat_weekend_as_business_day);
+                treat_weekend_as_business_day = Some(cal.treat_weekend_as_business_day);
             }
-            extra_holds.extend(cal.0.extra_holds.iter().copied());
+            extra_holds.extend(cal.extra_holds.iter().copied());
 
             match extra_bizds {
-                None => extra_bizds = Some(cal.0.extra_bizds.iter().copied().collect()),
+                None => extra_bizds = Some(cal.extra_bizds.iter().copied().collect()),
                 Some(ref mut bizds) => {
-                    bizds.retain(|d| cal.0.extra_bizds.contains(d));
+                    bizds.retain(|d| cal.extra_bizds.contains(d));
                 }
             }
-            valid_from = valid_from.max(cal.0.valid_from);
-            valid_to = valid_to.min(cal.0.valid_to);
+            valid_from = valid_from.max(cal.valid_from);
+            valid_to = valid_to.min(cal.valid_to);
         }
-        Self::_new(
+        let res = Self::_new(
             extra_holds.into_iter().collect(),
             extra_bizds.into_iter().flatten().collect(),
             valid_from,
             valid_to,
             treat_weekend_as_business_day.unwrap_or_default(),
         )
-        .expect("AnyClosed of valid calendars must be valid")
+        .expect("AnyClosed of valid calendars must be valid");
+        Ok(res)
     }
 
     /// Create a new calendar from multiple caneldars with all-closed strategy.
@@ -316,9 +328,18 @@ impl Calendar {
     ///
     /// For example, if today is a holiday of Tokyo but not a holiday of New York,
     /// the day is considered as a business day in the new calendar.
-    pub fn of_all_closed<'a, It>(cals: It) -> Self
+    #[inline]
+    pub fn all_closed_from<'a, It>(cals: It) -> Self
     where
         It: IntoIterator<Item = &'a Self>,
+    {
+        let cals = cals.into_iter().map(|c| anyhow::Ok(Cow::Borrowed(c)));
+        Self::all_closed_try_from(cals).unwrap()
+    }
+
+    pub fn all_closed_try_from<'a, It, E>(cals: It) -> Result<Self, E>
+    where
+        It: IntoIterator<Item = Result<Cow<'a, Self>, E>>,
     {
         let mut extra_holds: Option<HashSet<_>> = None;
         let mut extra_bizds = HashSet::new();
@@ -327,30 +348,32 @@ impl Calendar {
         let mut treat_weekend_as_business_day = None;
 
         for cal in cals {
+            let cal = &cal?.0;
             if let Some(ref mut flag) = treat_weekend_as_business_day {
-                *flag |= cal.0.treat_weekend_as_business_day;
+                *flag |= cal.treat_weekend_as_business_day;
             } else {
-                treat_weekend_as_business_day = Some(cal.0.treat_weekend_as_business_day);
+                treat_weekend_as_business_day = Some(cal.treat_weekend_as_business_day);
             }
-            extra_bizds.extend(cal.0.extra_bizds.iter().copied());
+            extra_bizds.extend(cal.extra_bizds.iter().copied());
 
             match extra_holds {
-                None => extra_holds = Some(cal.0.extra_holds.iter().copied().collect()),
+                None => extra_holds = Some(cal.extra_holds.iter().copied().collect()),
                 Some(ref mut holds) => {
-                    holds.retain(|d| cal.0.extra_holds.contains(d));
+                    holds.retain(|d| cal.extra_holds.contains(d));
                 }
             }
-            valid_from = valid_from.max(cal.0.valid_from);
-            valid_to = valid_to.min(cal.0.valid_to);
+            valid_from = valid_from.max(cal.valid_from);
+            valid_to = valid_to.min(cal.valid_to);
         }
-        Self::_new(
+        let res = Self::_new(
             extra_holds.into_iter().flatten().collect(),
             extra_bizds.into_iter().collect(),
             valid_from,
             valid_to,
             treat_weekend_as_business_day.unwrap_or_default(),
         )
-        .expect("AllClosed of valid calendars must be valid")
+        .expect("AllClosed of valid calendars must be valid");
+        Ok(res)
     }
 }
 
@@ -527,7 +550,7 @@ impl BitAnd for Calendar {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self::of_all_closed([self, rhs].iter())
+        Self::all_closed_from([self, rhs].iter())
     }
 }
 
@@ -535,7 +558,7 @@ impl BitAnd<Calendar> for &Calendar {
     type Output = Calendar;
 
     fn bitand(self, rhs: Calendar) -> Self::Output {
-        Calendar::of_all_closed([self, &rhs])
+        Calendar::all_closed_from([self, &rhs])
     }
 }
 
@@ -543,7 +566,7 @@ impl BitAnd for &Calendar {
     type Output = Calendar;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        Calendar::of_all_closed([self, rhs])
+        Calendar::all_closed_from([self, rhs])
     }
 }
 
@@ -551,7 +574,7 @@ impl BitAnd<&Calendar> for Calendar {
     type Output = Calendar;
 
     fn bitand(self, rhs: &Self) -> Self::Output {
-        Calendar::of_all_closed([&self, rhs])
+        Calendar::all_closed_from([&self, rhs])
     }
 }
 
@@ -1045,7 +1068,7 @@ mod tests {
     #[test]
     fn test_of_all_closed() {
         // empty
-        let cal = Calendar::of_all_closed(vec![]);
+        let cal = Calendar::all_closed_from(vec![]);
         assert_eq!(cal.extra_holidays(), &[]);
         assert_eq!(cal.extra_bizdays(), &[]);
         assert!(!cal.treat_weekend_as_bizday());
@@ -1059,7 +1082,7 @@ mod tests {
             false,
         )
         .unwrap();
-        let cal = Calendar::of_all_closed(vec![&cal1]);
+        let cal = Calendar::all_closed_from(vec![&cal1]);
         assert_eq!(cal, cal1);
 
         let cal1 = Calendar::_new(
@@ -1070,7 +1093,7 @@ mod tests {
             true,
         )
         .unwrap();
-        let cal = Calendar::of_all_closed(vec![&cal1]);
+        let cal = Calendar::all_closed_from(vec![&cal1]);
         assert_eq!(cal, cal1);
 
         // multiple
@@ -1094,7 +1117,7 @@ mod tests {
         )
         .unwrap();
 
-        let cal = Calendar::of_all_closed(vec![&cal1, &cal2]);
+        let cal = Calendar::all_closed_from(vec![&cal1, &cal2]);
         assert_eq!(
             cal.extra_holidays(),
             &[NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()]
@@ -1128,7 +1151,7 @@ mod tests {
         )
         .unwrap();
 
-        let cal = Calendar::of_all_closed(vec![&cal1, &cal2]);
+        let cal = Calendar::all_closed_from(vec![&cal1, &cal2]);
         assert_eq!(
             cal.extra_holidays(),
             &[NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()]
@@ -1162,7 +1185,7 @@ mod tests {
         )
         .unwrap();
 
-        let cal = Calendar::of_all_closed(vec![&cal1, &cal2]);
+        let cal = Calendar::all_closed_from(vec![&cal1, &cal2]);
         assert_eq!(
             cal.extra_holidays(),
             &[NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()]

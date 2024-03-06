@@ -22,10 +22,11 @@ thiserror = { workspace = true }
 
 # internal
 qrs_math = { workspace = true, features = ["chrono"] }
-qrs_datasrc = { workspace = true }
+qrs_datasrc = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 approx = { workspace = true }
+mockall = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
 serde_json = { workspace = true }

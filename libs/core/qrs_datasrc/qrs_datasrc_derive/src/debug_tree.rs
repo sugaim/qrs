@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
 use syn::{
-    parenthesized, parse::Parser, parse_macro_input, parse_quote, punctuated::Punctuated, Data,
-    DeriveInput, Fields, LitStr, Token, Type, WhereClause,
+    parenthesized, parse_macro_input, parse_quote, Data, DeriveInput, Fields, LitStr, Type,
+    WhereClause,
 };
 
 pub fn derive_debug_tree(input: TokenStream) -> TokenStream {
@@ -46,71 +46,48 @@ pub fn derive_debug_tree(input: TokenStream) -> TokenStream {
             quote!(
                 #crate_name ::TreeInfo::Wrap {
                     tp: std::any::type_name::<Self>().to_string(),
-                    child: Box::new(#crate_name ::TreeInfo::debug_tree(self.#field_name)),
+                    child: Box::new(#crate_name ::DebugTree::debug_tree(&self.#field_name)),
                     desc: #crate_name ::DebugTree::desc(self),
                 }
             )
         }
-        _ => quote!(
-            #crate_name ::TreeInfo::Branch {
-                tp: std::any::type_name::<Self>().to_string(),
-                desc: #crate_name ::DebugTree::desc(self),
-                children: {
-                    let mut children = std::collections::BTreeSet::new();
-                    #(
-                        children.insert(#crate_name ::DebugTree::debug_tree(self.#field_names));
-                    )*
-                    children
-                },
-            }
-        ),
+        _ => {
+            let nm_strs = fields.iter().map(|f| f.name.to_string());
+            quote!(
+                #crate_name ::TreeInfo::Branch {
+                    tp: std::any::type_name::<Self>().to_string(),
+                    desc: #crate_name ::DebugTree::desc(self),
+                    children: {
+                        let mut children = std::collections::BTreeMap::new();
+                        #(
+                            children.insert(#nm_strs.to_owned(), #crate_name ::DebugTree::debug_tree(&self.#field_names));
+                        )*
+                        children
+                    },
+                }
+            )
+        }
     };
-    let implement = match root_attribs.description {
-        None => abort!(
-            input,
-            "The `desc` or `desc_func` attribute is required for the root node"
-        ),
-        Some(Description::Lit(desc)) => quote!(
-            impl #impl_generics #crate_name ::DebugTree for #name #ty_generics #where_claues {
-                #[inline]
-                fn desc(&self) -> String {
-                    #desc.to_string()
-                }
-
-                #[inline]
-                fn debug_tree(&self) -> #crate_name ::TreeInfo {
-                    #tree_impl
-                }
-            }
-        ),
-        Some(Description::Field(desc)) => quote!(
-            impl #impl_generics #crate_name ::DebugTree for #name #ty_generics #where_claues {
-                #[inline]
-                fn desc(&self) -> String {
-                    self.#desc.to_string()
-                }
-
-                #[inline]
-                fn debug_tree(&self) -> #crate_name ::TreeInfo {
-                    #tree_impl
-                }
-            }
-        ),
-        Some(Description::Func(desc)) => quote!(
-            impl #impl_generics #crate_name ::DebugTree for #name #ty_generics #where_claues {
-                #[inline]
-                fn desc(&self) -> String {
-                    #desc (self)
-                }
-
-                #[inline]
-                fn debug_tree(&self) -> #crate_name ::TreeInfo {
-                    #tree_impl
-                }
-            }
-        ),
+    let desc_impl = match root_attribs.description {
+        None => quote!("no description".to_owned()),
+        Some(Description::Lit(desc)) => quote!(#desc.to_string()),
+        Some(Description::Field(desc)) => quote!(self.#desc.to_string()),
+        Some(Description::Func(desc)) => quote!(#desc (self)),
     };
-    implement.into()
+    quote!(
+        impl #impl_generics #crate_name ::DebugTree for #name #ty_generics #where_claues {
+            #[inline]
+            fn desc(&self) -> String {
+                #desc_impl
+            }
+
+            #[inline]
+            fn debug_tree(&self) -> #crate_name ::TreeInfo {
+                #tree_impl
+            }
+        }
+    )
+    .into()
 }
 
 fn root_attribs(input: &DeriveInput) -> RootAttribs {
@@ -121,7 +98,7 @@ fn root_attribs(input: &DeriveInput) -> RootAttribs {
 
     let mut res = RootAttribs::default();
     for attr in attrbs {
-        let _ = attr.parse_nested_meta(|meta| {
+        let res = attr.parse_nested_meta(|meta| {
             // #[debug_tree(_use_from_qrs_datasrc)]
             if meta.path.is_ident("_use_from_qrs_datasrc") {
                 res.use_from_qrs_datasrc = true;
@@ -188,50 +165,48 @@ fn root_attribs(input: &DeriveInput) -> RootAttribs {
                 "Unknown attribute. Only `desc`, `desc_field` or `desc_func` is allowed"
             );
         });
+        if let Err(err) = res {
+            abort!(attr, err);
+        }
     }
     res
 }
 
 fn get_subtrees(fields: &Fields) -> Vec<SubTreeField> {
-    let fields: Vec<_> = fields
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| {
-            let args = f
-                .attrs
-                .iter()
-                .filter_map(|attr| attr.meta.require_list().ok())
-                .filter(|attr| attr.path.is_ident("debug_tree"))
-                .filter_map(|attr| {
-                    Punctuated::<syn::MetaNameValue, Token![,]>::parse_terminated
-                        .parse(attr.tokens.clone().into())
-                        .ok()
-                })
-                .flat_map(|args| args.into_iter());
-            let mut has_subtree = false;
-            for arg in args {
-                if arg.path.is_ident("subtree") {
-                    has_subtree = true;
+    let mut subtrees = Vec::new();
+    for (i, field) in fields.iter().enumerate() {
+        let attrs = field
+            .attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("debug_tree"));
+        let mut is_subtree = false;
+        for attr in attrs {
+            let res = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("subtree") {
+                    is_subtree = true;
                 } else {
-                    abort!(arg, "Unknown attribute. Only `subtree` is allowed");
+                    abort!(attr, "Unknown attribute. Only `subtree` is allowed");
                 }
+                Ok(())
+            });
+            if let Err(err) = res {
+                abort!(attr, err);
             }
-            has_subtree
-        })
-        .collect();
-    fields
-        .iter()
-        .map(|(i, f)| match &f.ident {
-            Some(name) => SubTreeField {
-                ty: f.ty.clone(),
-                name: quote!(#name),
-            },
-            None => SubTreeField {
-                ty: f.ty.clone(),
-                name: syn::Index::from(*i).into_token_stream(),
-            },
-        })
-        .collect()
+        }
+        if is_subtree {
+            subtrees.push(match &field.ident {
+                Some(name) => SubTreeField {
+                    ty: field.ty.clone(),
+                    name: quote!(#name),
+                },
+                None => SubTreeField {
+                    ty: field.ty.clone(),
+                    name: syn::Index::from(i).into_token_stream(),
+                },
+            })
+        }
+    }
+    subtrees
 }
 
 enum Description {
