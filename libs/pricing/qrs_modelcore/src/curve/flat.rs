@@ -3,7 +3,7 @@
 //
 
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::RateAct365f;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::Real;
 
 use super::YieldCurve;
@@ -19,7 +19,7 @@ use super::YieldCurve;
     ))
 )]
 pub struct FlatCurve<V> {
-    pub rate: RateAct365f<V>,
+    pub rate: Act365fRate<V>,
 }
 
 //
@@ -32,7 +32,7 @@ impl<V: Real> YieldCurve for FlatCurve<V> {
         &self,
         _from: &DateTime,
         _to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         Ok(self.rate.clone())
     }
 }
@@ -54,7 +54,7 @@ mod tests {
             .with_hms(9, 30, 54)
             .with_timezone(Tz::fixed_offset(9 * 3600).unwrap());
         let curve = FlatCurve {
-            rate: RateAct365f::from_rate(0.05),
+            rate: Act365fRate::from_rate(0.05),
         };
         let dates = vec![
             dt_builder.clone().with_ymd(2021, 1, 1).build().unwrap(),
@@ -73,7 +73,7 @@ mod tests {
         ];
         for (from, to) in iproduct!(dates.iter(), dates.iter()) {
             let rate = curve.forward_rate(from, to).unwrap();
-            assert_eq!(rate, RateAct365f::from_rate(0.05));
+            assert_eq!(rate, Act365fRate::from_rate(0.05));
         }
     }
 
@@ -83,7 +83,7 @@ mod tests {
             .with_hms(9, 30, 54)
             .with_timezone(Tz::fixed_offset(9 * 3600).unwrap());
         let curve = FlatCurve {
-            rate: RateAct365f::from_rate(0.05),
+            rate: Act365fRate::from_rate(0.05),
         };
         let dates = vec![
             dt_builder.clone().with_ymd(2021, 1, 1).build().unwrap(),

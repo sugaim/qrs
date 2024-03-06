@@ -1,7 +1,7 @@
 use std::ops::Div;
 
 use qrs_chrono::{DateTime, Duration, Velocity};
-use qrs_finance::daycount::RateAct365f;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::{
     interp1d::{CHermite1d, CatmullRomScheme, Lerp1d, PwConst1d},
     num::{Real, RelPos},
@@ -26,10 +26,10 @@ pub enum ComponentCurve<V> {
     Flat(FlatCurve<V>),
     LogLerp(LogDfCurve<Lerp1d<DateTime, V>>),
     LogCR(LogDfCurve<CHermite1d<DateTime, V, CatmullRomScheme>>),
-    ZeroRateLerp(ZeroRateCurve<Lerp1d<DateTime, RateAct365f<V>>>),
-    ZeroRateCr(ZeroRateCurve<CHermite1d<DateTime, RateAct365f<V>, CatmullRomScheme>>),
-    InstFwdLerp(InstFwdCurve<Lerp1d<DateTime, RateAct365f<V>>>),
-    InstFwdPwConst(InstFwdCurve<PwConst1d<DateTime, RateAct365f<V>>>),
+    ZeroRateLerp(ZeroRateCurve<Lerp1d<DateTime, Act365fRate<V>>>),
+    ZeroRateCr(ZeroRateCurve<CHermite1d<DateTime, Act365fRate<V>, CatmullRomScheme>>),
+    InstFwdLerp(InstFwdCurve<Lerp1d<DateTime, Act365fRate<V>>>),
+    InstFwdPwConst(InstFwdCurve<PwConst1d<DateTime, Act365fRate<V>>>),
 }
 
 //
@@ -46,7 +46,7 @@ where
         &self,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         use ComponentCurve::*;
         match self {
             Flat(c) => c.forward_rate(from, to),

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use qrs_math::num::RelPos;
 
+use crate::DateTimeBuilder;
+
 // -----------------------------------------------------------------------------
 // DateTime
 //
@@ -306,6 +308,13 @@ impl<Tz: TimeZone> Ord for DateTime<Tz> {
 //
 // construction
 //
+impl DateTime {
+    #[inline]
+    pub fn builder() -> DateTimeBuilder {
+        DateTimeBuilder::new()
+    }
+}
+
 impl<Tz: TimeZone> From<chrono::DateTime<Tz>> for DateTime<Tz> {
     #[inline]
     fn from(internal: chrono::DateTime<Tz>) -> Self {

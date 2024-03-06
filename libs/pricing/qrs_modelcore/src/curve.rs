@@ -13,7 +13,7 @@ mod zero_rate;
 
 pub use adjusted::AdjustedCurve;
 pub use bump::Bump;
-pub use composite::{CompositeCurve, WeightedCurve};
+pub use composite::{CompositeCurve, CompositeCurveSrc, WeightedCurve};
 pub use curve::ComponentCurve;
 pub use flat::FlatCurve;
 pub use forward_rate::InstFwdCurve;

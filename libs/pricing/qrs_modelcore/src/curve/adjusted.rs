@@ -1,4 +1,4 @@
-use qrs_finance::daycount::RateAct365f;
+use qrs_finance::daycount::Act365fRate;
 
 use super::{YieldCurve, YieldCurveAdjust};
 
@@ -25,7 +25,7 @@ where
         &self,
         from: &qrs_chrono::DateTime,
         to: &qrs_chrono::DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         match self.adjuster.split_last() {
             Some((tail, rem)) => {
                 let next = AdjustedCurve {
@@ -51,7 +51,7 @@ where
         &self,
         from: &qrs_chrono::DateTime,
         to: &qrs_chrono::DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         let adjusted = AdjustedCurve {
             base: &self.base,
             adjuster: self.adjuster.as_slice(),

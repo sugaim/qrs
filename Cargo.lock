@@ -962,6 +962,8 @@ dependencies = [
  "approx",
  "derivative",
  "itertools",
+ "maplit",
+ "mockall",
  "qrs_chrono",
  "qrs_datasrc",
  "qrs_finance",

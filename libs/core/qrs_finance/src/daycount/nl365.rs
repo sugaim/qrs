@@ -4,7 +4,7 @@ use chrono::Datelike;
 use qrs_chrono::{Duration, Velocity};
 use qrs_math::num::Real;
 
-use super::{DayCount, Rate, RateDayCount, _ops::define_vector_behavior};
+use super::{DayCount, DayCountRate, Rate, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // NL365
@@ -70,14 +70,14 @@ impl DayCount for NL365 {
     }
 }
 
-impl RateDayCount for NL365 {
-    type Rate<V: Real> = RateNL365<V>;
+impl DayCountRate for NL365 {
+    type Rate<V: Real> = NL365Rate<V>;
 
     /// Create a Act365F rate from the given annual rate.
     /// Note that the unit of the argument is 1. Not percent nor bps.
     #[inline]
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V> {
-        RateNL365::from_rate(annual_rate)
+        NL365Rate::from_rate(annual_rate)
     }
 }
 
@@ -86,13 +86,13 @@ impl RateDayCount for NL365 {
 //
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct RateNL365<V>(V);
+pub struct NL365Rate<V>(V);
 
 //
 // display, serde
 //
 #[cfg(feature = "serde")]
-impl<V: schemars::JsonSchema> schemars::JsonSchema for RateNL365<V> {
+impl<V: schemars::JsonSchema> schemars::JsonSchema for NL365Rate<V> {
     fn schema_name() -> String {
         format!("RateNL365_for_{}", V::schema_name())
     }
@@ -114,7 +114,7 @@ impl<V: schemars::JsonSchema> schemars::JsonSchema for RateNL365<V> {
 //
 // methods
 //
-impl<V> RateNL365<V> {
+impl<V> NL365Rate<V> {
     /// Create a new `RateNL365` instance with the given annual rate.
     ///
     /// Unit of the argument is 1. Not percent nor bps.
@@ -125,7 +125,7 @@ impl<V> RateNL365<V> {
     }
 }
 
-impl<V: Real> Rate for RateNL365<V> {
+impl<V: Real> Rate for NL365Rate<V> {
     type Value = V;
     type Convention = NL365;
 
@@ -143,4 +143,4 @@ impl<V: Real> Rate for RateNL365<V> {
 //
 // operators
 //
-define_vector_behavior!(RateNL365);
+define_vector_behavior!(NL365Rate);

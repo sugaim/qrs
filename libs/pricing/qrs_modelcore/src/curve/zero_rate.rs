@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use qrs_chrono::{DateTime, Duration};
-use qrs_finance::daycount::{Act365f, Rate, RateAct365f, RateDayCount};
+use qrs_finance::daycount::{Act365f, Act365fRate, DayCountRate, Rate};
 use qrs_math::{func1d::Func1dDer1, num::Real};
 
 use super::YieldCurve;
@@ -27,8 +27,8 @@ pub struct ZeroRateCurve<F> {
 //
 impl<F, V: Real> YieldCurve for ZeroRateCurve<F>
 where
-    F: Func1dDer1<DateTime, Output = RateAct365f<V>>,
-    F::Der1: Mul<Duration, Output = RateAct365f<V>>,
+    F: Func1dDer1<DateTime, Output = Act365fRate<V>>,
+    F::Der1: Mul<Duration, Output = Act365fRate<V>>,
 {
     type Value = V;
 
@@ -36,7 +36,7 @@ where
         &self,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         if to < from {
             return self.forward_rate(to, from);
         }
@@ -82,9 +82,9 @@ mod tests {
                 dt_builder.clone().with_ymd(2021, 1, 16).build().unwrap(),
             ],
             vec![
-                RateAct365f::from_rate(0.05f64),
-                RateAct365f::from_rate(0.03f64),
-                RateAct365f::from_rate(0.02f64),
+                Act365fRate::from_rate(0.05f64),
+                Act365fRate::from_rate(0.03f64),
+                Act365fRate::from_rate(0.02f64),
             ],
         )
         .unwrap();

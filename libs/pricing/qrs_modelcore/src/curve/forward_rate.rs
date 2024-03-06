@@ -1,5 +1,5 @@
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::{Act365f, RateAct365f, RateDayCount};
+use qrs_finance::daycount::{Act365f, Act365fRate, DayCountRate};
 use qrs_math::{func1d::Func1dIntegrable, num::Real};
 
 use super::YieldCurve;
@@ -25,7 +25,7 @@ pub struct InstFwdCurve<F> {
 //
 impl<F, V: Real> YieldCurve for InstFwdCurve<F>
 where
-    F: Func1dIntegrable<DateTime, Output = RateAct365f<V>, Integrated = V>,
+    F: Func1dIntegrable<DateTime, Output = Act365fRate<V>, Integrated = V>,
 {
     type Value = V;
 
@@ -34,7 +34,7 @@ where
         &self,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         if to < from {
             return self.forward_rate(to, from);
         }

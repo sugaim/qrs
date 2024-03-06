@@ -3,7 +3,7 @@ use std::ops::{Div, Mul, MulAssign};
 use qrs_chrono::{Duration, Velocity};
 use qrs_math::num::{FloatBased, Real, RelPos, Vector};
 
-use super::{DayCount, Rate, RateDayCount, _ops::define_vector_behavior};
+use super::{DayCount, DayCountRate, Rate, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // Act360
@@ -38,14 +38,14 @@ impl DayCount for Act360 {
     }
 }
 
-impl RateDayCount for Act360 {
-    type Rate<V: Real> = RateAct360<V>;
+impl DayCountRate for Act360 {
+    type Rate<V: Real> = Act360Rate<V>;
 
     /// Create a Act365F rate from the given annual rate.
     /// Note that the unit of the argument is 1. Not percent nor bps.
     #[inline]
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V> {
-        RateAct360::from_rate(annual_rate)
+        Act360Rate::from_rate(annual_rate)
     }
 }
 
@@ -54,13 +54,13 @@ impl RateDayCount for Act360 {
 //
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct RateAct360<V>(V);
+pub struct Act360Rate<V>(V);
 
 //
 // display, serde
 //
 #[cfg(feature = "serde")]
-impl<V: schemars::JsonSchema> schemars::JsonSchema for RateAct360<V> {
+impl<V: schemars::JsonSchema> schemars::JsonSchema for Act360Rate<V> {
     fn schema_name() -> String {
         format!("RateAct360_for_{}", V::schema_name())
     }
@@ -82,7 +82,7 @@ impl<V: schemars::JsonSchema> schemars::JsonSchema for RateAct360<V> {
 //
 // construction
 //
-impl<V> RateAct360<V> {
+impl<V> Act360Rate<V> {
     /// Create a new `RateAct360` instance with the given annual rate.
     ///
     /// Unit of the argument is 1. Not percent nor bps.
@@ -96,7 +96,7 @@ impl<V> RateAct360<V> {
 //
 // methods
 //
-impl<V: Real> Rate for RateAct360<V> {
+impl<V: Real> Rate for Act360Rate<V> {
     type Value = V;
     type Convention = Act360;
 
@@ -113,9 +113,9 @@ impl<V: Real> Rate for RateAct360<V> {
 //
 // operators
 //
-define_vector_behavior!(RateAct360);
+define_vector_behavior!(Act360Rate);
 
-impl<V: Real> RelPos for RateAct360<V> {
+impl<V: Real> RelPos for Act360Rate<V> {
     type Output = V;
 
     #[inline]
@@ -126,7 +126,7 @@ impl<V: Real> RelPos for RateAct360<V> {
     }
 }
 
-impl<V: FloatBased + Vector<V::BaseFloat>> Mul<Duration> for RateAct360<V> {
+impl<V: FloatBased + Vector<V::BaseFloat>> Mul<Duration> for Act360Rate<V> {
     type Output = V;
 
     #[inline]

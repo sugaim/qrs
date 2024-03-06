@@ -5,8 +5,8 @@ mod nl360;
 mod nl365;
 mod traits;
 
-pub use act360::{Act360, RateAct360};
-pub use act365f::{Act365f, RateAct365f};
+pub use act360::{Act360, Act360Rate};
+pub use act365f::{Act365f, Act365fRate};
 pub use nl360::{RateNL360, NL360};
-pub use nl365::{RateNL365, NL365};
-pub use traits::{DayCount, Rate, RateDayCount};
+pub use nl365::{NL365Rate, NL365};
+pub use traits::{DayCount, DayCountRate, Rate};

@@ -1,5 +1,5 @@
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::{Act365f, RateAct365f, RateDayCount};
+use qrs_finance::daycount::{Act365f, Act365fRate, DayCountRate};
 use qrs_math::num::Real;
 
 use super::YieldCurve;
@@ -34,7 +34,7 @@ where
 {
     type Value = V;
 
-    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<RateAct365f<V>> {
+    fn forward_rate(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Act365fRate<V>> {
         if to < from {
             return self.forward_rate(to, from);
         }

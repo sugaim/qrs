@@ -1,7 +1,7 @@
 use derivative::Derivative;
 
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::RateAct365f;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::FloatBased;
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
@@ -69,7 +69,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 ))]
 pub struct Bump<V> {
     /// Bump size.
-    pub delta: RateAct365f<V>,
+    pub delta: Act365fRate<V>,
 
     /// Start datetime of the bump. If it is not set, the bump is applied from the start of the curve.
     #[cfg_attr(
@@ -95,7 +95,7 @@ impl<C: YieldCurve> YieldCurveAdjust<C> for Bump<C::Value> {
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<<C as YieldCurve>::Value>> {
+    ) -> anyhow::Result<Act365fRate<<C as YieldCurve>::Value>> {
         match from.cmp(to) {
             std::cmp::Ordering::Equal => return curve.forward_rate(from, to),
             std::cmp::Ordering::Greater => return self.adjusted_forward_rate(curve, to, from),
@@ -142,10 +142,10 @@ mod tests {
     fn test_adjusted_forward_rate() {
         // parallel bump
         let curve = FlatCurve {
-            rate: RateAct365f::from_rate(0.01),
+            rate: Act365fRate::from_rate(0.01),
         };
         let bump = Bump {
-            delta: RateAct365f::from_rate(0.01),
+            delta: Act365fRate::from_rate(0.01),
             from: None,
             to: None,
         };
@@ -156,10 +156,10 @@ mod tests {
 
         // grid bump
         let curve = FlatCurve {
-            rate: RateAct365f::from_rate(0.01),
+            rate: Act365fRate::from_rate(0.01),
         };
         let bump = Bump {
-            delta: RateAct365f::from_rate(0.01),
+            delta: Act365fRate::from_rate(0.01),
             from: Some(DateTime::from_str("2020-01-02T00:00:00Z").unwrap()),
             to: Some(DateTime::from_str("2020-01-04T00:00:00Z").unwrap()),
         };

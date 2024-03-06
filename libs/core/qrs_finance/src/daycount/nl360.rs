@@ -4,7 +4,7 @@ use chrono::Datelike;
 use qrs_chrono::{Duration, Velocity};
 use qrs_math::num::Real;
 
-use super::{DayCount, Rate, RateDayCount, _ops::define_vector_behavior};
+use super::{DayCount, DayCountRate, Rate, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // NL360
@@ -70,7 +70,7 @@ impl DayCount for NL360 {
     }
 }
 
-impl RateDayCount for NL360 {
+impl DayCountRate for NL360 {
     type Rate<V: Real> = RateNL360<V>;
 
     /// Create a Act360F rate from the given annual rate.

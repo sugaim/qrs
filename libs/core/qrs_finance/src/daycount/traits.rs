@@ -13,7 +13,7 @@ pub trait DayCount: Sized {
 // RateDayCount
 //
 /// Day count convention related to rate, such as Actual/360, Actual/365, etc.
-pub trait RateDayCount: DayCount {
+pub trait DayCountRate: DayCount {
     type Rate<V: Real>;
 
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V>;
@@ -44,7 +44,7 @@ pub trait RateDayCount: DayCount {
 /// Also, this provides a static relationship between rate and the convention.
 pub trait Rate: Sized + Vector<Self::Value> {
     type Value: Real;
-    type Convention: RateDayCount;
+    type Convention: DayCountRate;
 
     /// Get day count convention which this rate obeys.
     fn convention(&self) -> Self::Convention;

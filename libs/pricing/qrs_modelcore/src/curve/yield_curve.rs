@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::{Rate, RateAct365f};
+use qrs_finance::daycount::{Act365fRate, Rate};
 use qrs_math::num::{Exp, Real};
 
 // -----------------------------------------------------------------------------
@@ -20,7 +20,7 @@ pub trait YieldCurve {
         &self,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>>;
+    ) -> anyhow::Result<Act365fRate<Self::Value>>;
 
     /// Calculate the discount factor.
     ///
@@ -47,7 +47,7 @@ impl<C: YieldCurve> YieldCurve for Arc<C> {
         &self,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<Self::Value>> {
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
         self.as_ref().forward_rate(from, to)
     }
 }
@@ -61,5 +61,5 @@ pub trait YieldCurveAdjust<C: YieldCurve> {
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<RateAct365f<C::Value>>;
+    ) -> anyhow::Result<Act365fRate<C::Value>>;
 }
