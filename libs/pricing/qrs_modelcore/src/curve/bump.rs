@@ -23,12 +23,12 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
 /// use qrs_chrono::DateTime;
-/// use qrs_finance::daycount::{RateAct365f, Rate};
+/// use qrs_finance::daycount::{Act365fRate, Rate};
 ///
 /// use qrs_modelcore::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
-/// let curve = FlatCurve { rate: RateAct365f::from_rate(0.01) };
-/// let bump = Bump { delta: RateAct365f::from_rate(0.01), from: None, to: None };
+/// let curve = FlatCurve { rate: Act365fRate::from_rate(0.01) };
+/// let bump = Bump { delta: Act365fRate::from_rate(0.01), from: None, to: None };
 /// let from = DateTime::from_str("2020-01-01T00:00:00Z").unwrap();
 /// let to = DateTime::from_str("2020-01-02T00:00:00Z").unwrap();
 /// let res = bump.adjusted_forward_rate(&curve, &from, &to).unwrap();
@@ -40,13 +40,13 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
 /// use qrs_chrono::DateTime;
-/// use qrs_finance::daycount::{RateAct365f, Rate};
+/// use qrs_finance::daycount::{Act365fRate, Rate};
 ///
 /// use qrs_modelcore::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
-/// let curve = FlatCurve { rate: RateAct365f::from_rate(0.01) };
+/// let curve = FlatCurve { rate: Act365fRate::from_rate(0.01) };
 /// let bump = Bump {
-///     delta: RateAct365f::from_rate(0.01),
+///     delta: Act365fRate::from_rate(0.01),
 ///     from: Some(DateTime::from_str("2020-01-02T00:00:00Z").unwrap()),
 ///     to: Some(DateTime::from_str("2020-01-04T00:00:00Z").unwrap())
 /// };

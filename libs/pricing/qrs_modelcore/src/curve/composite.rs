@@ -145,9 +145,13 @@ where
         let mut hasher = DefaultHasher::new();
         let weights = self.weight.get_with_etag(req)?;
         weights.etag.hash(&mut hasher);
+        let mut hash_vals: u64 = 0;
         for (name, _) in weights.data.borrow().iter() {
-            self.crv.etag(name)?.hash(&mut hasher);
+            let mut h = DefaultHasher::new();
+            self.crv.etag(name)?.hash(&mut h);
+            hash_vals = hash_vals.overflowing_add(h.finish()).0;
         }
+        hash_vals.hash(&mut hasher);
         Ok(hasher.finish().to_string())
     }
 }

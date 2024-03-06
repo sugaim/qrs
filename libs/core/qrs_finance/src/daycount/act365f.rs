@@ -50,7 +50,7 @@ impl DayCountRate for Act365f {
 }
 
 // -----------------------------------------------------------------------------
-// RateAct365f
+// Act365fRate
 //
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -62,10 +62,10 @@ pub struct Act365fRate<V>(V);
 #[cfg(feature = "serde")]
 impl<V: schemars::JsonSchema> schemars::JsonSchema for Act365fRate<V> {
     fn schema_name() -> String {
-        format!("RateAct365f_for_{}", V::schema_name())
+        format!("Act365fRate_for_{}", V::schema_name())
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_finance::daycount::RateAct365f<{}>", V::schema_id()).into()
+        format!("qrs_finance::daycount::Act365fRate<{}>", V::schema_id()).into()
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut schema = V::json_schema(gen);
@@ -83,7 +83,7 @@ impl<V: schemars::JsonSchema> schemars::JsonSchema for Act365fRate<V> {
 // methods
 //
 impl<V> Act365fRate<V> {
-    /// Create a new `RateAct365F` instance with the given annual rate.
+    /// Create a new `Act365fRate` instance with the given annual rate.
     ///
     /// Unit of the argument is 1. Not percent nor bps.
     /// Note that user must ensure that the given value is rate in Act/365F convention.
