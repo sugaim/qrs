@@ -1,4 +1,4 @@
-use std::{fmt::Display, str::FromStr};
+use std::{borrow::Borrow, fmt::Display, str::FromStr};
 
 use anyhow::anyhow;
 use chrono::NaiveDate;
@@ -7,37 +7,37 @@ use qrs_datasrc::DataSrc;
 use crate::{DateTime, Tenor, TimeCut};
 
 // -----------------------------------------------------------------------------
-// DateWithTimeCutSym
+// DateWithTagSym
 //
-/// Date with a time cut symbol.
+/// Date with a time cut tag.
 ///
 /// Actual values of time cut can be varying.
 /// For example, if 'tokyo close' means close time at tokyo trading market,
 /// the time cut can be changed when the market open time is changed.
 ///
-/// In such cases, introducing a symbol to represent the time cut is useful
+/// In such cases, introducing a tag to represent the time cut is useful
 /// for dayly operations.
 ///
 /// # String representation
-/// The string representation of this type is `{{date}}@{{sym}}`.
+/// The string representation of this type is `{{date}}@{{tag}}`.
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DateWithTimeCut<Sym> {
+pub struct DateWithTag<Tag = String> {
     pub date: NaiveDate,
-    pub sym: Sym,
+    pub tag: Tag,
 }
 
 //
 // display, serde
 //
-impl<Sym: Display> Display for DateWithTimeCut<Sym> {
+impl<Tag: Display> Display for DateWithTag<Tag> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}@{}", self.date, self.sym)
+        write!(f, "{}@{}", self.date, self.tag)
     }
 }
 
-impl<Syn: FromStr> FromStr for DateWithTimeCut<Syn>
+impl<Syn: FromStr> FromStr for DateWithTag<Syn>
 where
     anyhow::Error: From<<Syn as FromStr>::Err>,
 {
@@ -47,21 +47,21 @@ where
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (date, sym) = s.split_once('@').ok_or_else(|| {
             anyhow!(
-                "Fail to parse DateWithTimeCut from string: {}. The string must contain '@' to separate date and symbol",
+                "Fail to parse DateWithTag from string: {}. The string must contain '@' to separate date and symbol",
                 s
             )
         })?;
-        Ok(DateWithTimeCut {
+        Ok(DateWithTag {
             date: date
                 .parse()
                 .map_err(|_| anyhow!("Fail to parse date from string: {}", date))?,
-            sym: sym.parse()?,
+            tag: sym.parse()?,
         })
     }
 }
 
 #[cfg(feature = "serde")]
-impl<Sym> serde::Serialize for DateWithTimeCut<Sym>
+impl<Sym> serde::Serialize for DateWithTag<Sym>
 where
     Sym: Display,
 {
@@ -76,32 +76,32 @@ where
 }
 
 #[cfg(feature = "serde")]
-impl<'de, Sym> serde::Deserialize<'de> for DateWithTimeCut<Sym>
+impl<'de, Sym> serde::Deserialize<'de> for DateWithTag<Sym>
 where
     Sym: FromStr,
     anyhow::Error: From<<Sym as FromStr>::Err>,
 {
     #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<DateWithTimeCut<Sym>, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<DateWithTag<Sym>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        DateWithTimeCut::from_str(&s).map_err(serde::de::Error::custom)
+        DateWithTag::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
 #[cfg(feature = "serde")]
-impl<Sym> schemars::JsonSchema for DateWithTimeCut<Sym>
+impl<Sym> schemars::JsonSchema for DateWithTag<Sym>
 where
     Sym: schemars::JsonSchema + Display + FromStr,
 {
     fn schema_name() -> String {
-        format!("DateWithTimeCut_for_{}", Sym::schema_name())
+        format!("DateWithTag_for_{}", Sym::schema_name())
     }
 
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_chrono::DateWithTimeCut<{}>", Sym::schema_id()).into()
+        format!("qrs_chrono::DateWithTag<{}>", Sym::schema_id()).into()
     }
 
     fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
@@ -111,7 +111,7 @@ where
             ..Default::default()
         };
         res.metadata().description =
-            Some("Date with a time cut symbol. Format is 'yyyy-MM-dd@{sym}'".to_owned());
+            Some("Date with a time cut tag. Format is 'yyyy-MM-dd@{tag}'".to_owned());
         res.into()
     }
 }
@@ -119,16 +119,20 @@ where
 //
 // methods
 //
-impl<Sym> DateWithTimeCut<Sym> {
+impl<Sym> DateWithTag<Sym> {
     #[inline]
-    pub fn to_datetime<Tz, Cut, Res>(&self, resolver: &Res) -> Result<DateTime<Tz>, anyhow::Error>
+    pub fn to_datetime<Tz, Cut, Res, Rq>(
+        &self,
+        resolver: &Res,
+    ) -> Result<DateTime<Tz>, anyhow::Error>
     where
         Tz: chrono::TimeZone,
         Cut: TimeCut<Tz = Tz>,
-        Res: DataSrc<Sym, Output = Cut>,
+        Sym: Borrow<Rq>,
+        Res: DataSrc<Rq, Output = Cut>,
         anyhow::Error: From<Cut::Err>,
     {
-        let cut = resolver.get(&self.sym)?;
+        let cut = resolver.get(self.tag.borrow())?;
         cut.to_datetime(self.date).map_err(Into::into)
     }
 }
@@ -136,26 +140,26 @@ impl<Sym> DateWithTimeCut<Sym> {
 //
 // operators
 //
-impl<Sym> std::ops::Add<Tenor> for DateWithTimeCut<Sym> {
+impl<Sym> std::ops::Add<Tenor> for DateWithTag<Sym> {
     type Output = Self;
 
     #[inline]
     fn add(self, rhs: Tenor) -> Self::Output {
-        DateWithTimeCut {
+        DateWithTag {
             date: self.date + rhs,
-            sym: self.sym,
+            tag: self.tag,
         }
     }
 }
 
-impl<Sym> std::ops::Sub<Tenor> for DateWithTimeCut<Sym> {
+impl<Sym> std::ops::Sub<Tenor> for DateWithTag<Sym> {
     type Output = Self;
 
     #[inline]
     fn sub(self, rhs: Tenor) -> Self::Output {
-        DateWithTimeCut {
+        DateWithTag {
             date: self.date - rhs,
-            sym: self.sym,
+            tag: self.tag,
         }
     }
 }
@@ -190,19 +194,19 @@ impl<Sym> std::ops::Sub<Tenor> for DateWithTimeCut<Sym> {
 
 //     #[test]
 //     fn test_display() {
-//         let dwtc = DateWithTimeCut {
+//         let dwtc = DateWithTag {
 //             date: ymd(2021, 1, 1),
 //             sym: "tky-close",
 //         };
 //         assert_eq!(format!("{}", dwtc), "2021-01-01@tky-close");
 
-//         let dwtc = DateWithTimeCut {
+//         let dwtc = DateWithTag {
 //             date: ymd(2021, 1, 1),
 //             sym: "nyk-close",
 //         };
 //         assert_eq!(format!("{}", dwtc), "2021-01-01@nyk-close");
 
-//         let dwtc = DateWithTimeCut {
+//         let dwtc = DateWithTag {
 //             date: ymd(2021, 1, 1),
 //             sym: 1,
 //         };
@@ -212,31 +216,31 @@ impl<Sym> std::ops::Sub<Tenor> for DateWithTimeCut<Sym> {
 //     #[test]
 //     fn test_from_str() {
 //         let s = "2021-01-01@tky-close";
-//         let dwtc: DateWithTimeCut<String> = s.parse().unwrap();
+//         let dwtc: DateWithTag<String> = s.parse().unwrap();
 //         assert_eq!(dwtc.date, ymd(2021, 1, 1));
 //         assert_eq!(dwtc.sym, "tky-close");
 
 //         let s = "2021-01-01@nyk-close";
-//         let dwtc: DateWithTimeCut<String> = s.parse().unwrap();
+//         let dwtc: DateWithTag<String> = s.parse().unwrap();
 //         assert_eq!(dwtc.date, ymd(2021, 1, 1));
 //         assert_eq!(dwtc.sym, "nyk-close");
 
 //         let s = "2021-01-01@1";
-//         let dwtc = s.parse::<DateWithTimeCut<i32>>().unwrap();
+//         let dwtc = s.parse::<DateWithTag<i32>>().unwrap();
 //         assert_eq!(dwtc.date, ymd(2021, 1, 1));
 //         assert_eq!(dwtc.sym, 1);
 
 //         // errors
 //         let s = "2021-01-01";
-//         assert!(s.parse::<DateWithTimeCut<String>>().is_err());
+//         assert!(s.parse::<DateWithTag<String>>().is_err());
 
 //         let s = "2021@tky-close";
-//         assert!(s.parse::<DateWithTimeCut<String>>().is_err());
+//         assert!(s.parse::<DateWithTag<String>>().is_err());
 //     }
 
 //     #[rstest]
 //     fn test_to_datetime(datasrc: InMemory<String, DateToDateTime>) {
-//         let dwtc = DateWithTimeCut {
+//         let dwtc = DateWithTag {
 //             date: ymd(2021, 1, 1),
 //             sym: "tky-close".to_owned(),
 //         };
@@ -251,7 +255,7 @@ impl<Sym> std::ops::Sub<Tenor> for DateWithTimeCut<Sym> {
 //                 .unwrap()
 //         );
 
-//         let dwtc = DateWithTimeCut {
+//         let dwtc = DateWithTag {
 //             date: ymd(2021, 1, 1),
 //             sym: "nyk-close".to_owned(),
 //         };
@@ -267,7 +271,7 @@ impl<Sym> std::ops::Sub<Tenor> for DateWithTimeCut<Sym> {
 //         );
 
 //         // errors
-//         let dwtc = DateWithTimeCut {
+//         let dwtc = DateWithTag {
 //             date: ymd(2021, 1, 1),
 //             sym: "unknown".to_owned(),
 //         };
@@ -277,19 +281,19 @@ impl<Sym> std::ops::Sub<Tenor> for DateWithTimeCut<Sym> {
 //     #[test]
 //     fn test_add_sub() {
 //         let bases = vec![
-//             DateWithTimeCut {
+//             DateWithTag {
 //                 date: ymd(2021, 1, 1),
 //                 sym: "tky-close",
 //             },
-//             DateWithTimeCut {
+//             DateWithTag {
 //                 date: ymd(2021, 1, 1),
 //                 sym: "nyk-close",
 //             },
-//             DateWithTimeCut {
+//             DateWithTag {
 //                 date: ymd(2020, 2, 29),
 //                 sym: "tky-close",
 //             },
-//             DateWithTimeCut {
+//             DateWithTag {
 //                 date: ymd(2021, 2, 28),
 //                 sym: "nyk-close",
 //             },

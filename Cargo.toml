@@ -12,12 +12,11 @@ members = [
     "libs/core/qrs_collections",
     "libs/core/qrs_datasrc",
     "libs/core/qrs_datasrc/qrs_datasrc_derive",
-    "libs/core/qrs_finance",
+    "libs/core/qrs_fincore",
     "libs/core/qrs_math",
 
-    # pricing
-    "libs/pricing/qrs_modelcore",
-    # "libs/domain/qrs_model",
+    # domain
+    "libs/domain/qrs_model", "libs/domain/qrs_product",
 
     # others
     "scripts/qrs_scripts",
@@ -59,8 +58,8 @@ uuid = { version = "1.7.0", features = ["v4", "serde"] }
 qrs_chrono = { path = "libs/core/qrs_chrono" }
 qrs_collections = { path = "libs/core/qrs_collections" }
 qrs_datasrc = { path = "libs/core/qrs_datasrc" }
-qrs_finance = { path = "libs/core/qrs_finance" }
+qrs_fincore = { path = "libs/core/qrs_fincore" }
 qrs_math = { path = "libs/core/qrs_math" }
 
-## pricing
-qrs_modelcore = { path = "libs/pricing/qrs_modelcore" }
+## domain
+qrs_model = { path = "libs/domain/qrs_model" }

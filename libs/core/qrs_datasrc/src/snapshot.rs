@@ -227,7 +227,7 @@ impl<K, V> Snapshot<K, V> {
     ) -> anyhow::Result<Self>
     where
         Rq: 'a + ?Sized + Eq + Hash + ToOwned<Owned = K>,
-        K: Eq + Hash + Borrow<Rq>,
+        K: Eq + Hash,
     {
         let rqs = rqs.into_iter();
         let mut data = match rqs.size_hint() {
@@ -252,7 +252,7 @@ impl<K, V> Snapshot<K, V> {
     ) -> anyhow::Result<Self>
     where
         Rq: 'a + ?Sized + Eq + Hash + ToOwned<Owned = K>,
-        K: Eq + Hash + Borrow<Rq>,
+        K: Eq + Hash,
     {
         let rqs = rqs.into_iter();
         let mut data = match rqs.size_hint() {

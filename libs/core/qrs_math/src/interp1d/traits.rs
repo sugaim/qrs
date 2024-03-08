@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use qrs_collections::Series;
+
 use crate::func1d::Func1d;
 
 // -----------------------------------------------------------------------------
@@ -10,13 +12,15 @@ use crate::func1d::Func1d;
 ///
 /// # Example
 /// ```
+/// use qrs_collections::{Series, RequireMinSize};
 /// use qrs_math::interp1d::Interp1d;
 /// use qrs_math::interp1d::Lerp1d;
 ///
 /// let grids = vec![0.0, 1.0, 2.0];
 /// let values = vec![0.0, 1.0, 0.0];
+/// let series = Series::new(grids, values).unwrap().require_min_size().unwrap();
 ///
-/// let interp = Lerp1d::new(grids, values).unwrap();
+/// let interp = Lerp1d::new(series);
 ///
 /// // knots
 /// let (knots, values) = interp.knots();
@@ -73,14 +77,16 @@ impl<F: Interp1d> Interp1d for Arc<Mutex<F>> {
 ///
 /// # Example
 /// ```
+/// use qrs_collections::Series;
 /// use qrs_math::interp1d::Interp1d;
 /// use qrs_math::interp1d::Interp1dBuilder;
 /// use qrs_math::interp1d::Lerp1dBuilder;;
 ///
 /// let grids = vec![0.0f64, 1.0f64, 2.0f64];
 /// let values = vec![0.0f64, 1.0f64, 0.0f64];
+/// let knots = Series::new(grids, values).unwrap();
 ///
-/// let interp = Lerp1dBuilder.build(grids, values).unwrap();
+/// let interp = Lerp1dBuilder.build(knots).unwrap();
 ///
 /// assert_eq!(interp.interp(&-0.5), -0.5);
 /// assert_eq!(interp.interp(&0.5), 0.5);
@@ -90,7 +96,7 @@ pub trait Interp1dBuilder<G, V> {
     type Output: Interp1d<Grid = G, Value = V>;
     type Err;
 
-    fn build(self, grids: Vec<G>, values: Vec<V>) -> Result<Self::Output, Self::Err>;
+    fn build(self, knots: Series<G, V>) -> Result<Self::Output, Self::Err>;
 }
 
 // -----------------------------------------------------------------------------
@@ -106,6 +112,7 @@ pub trait Interp1dBuilder<G, V> {
 ///
 /// # Example
 /// ```
+/// use qrs_collections::{Series, RequireMinSize};
 /// use qrs_math::interp1d::Interp1d;
 /// use qrs_math::interp1d::Interp1dBuilder;
 /// use qrs_math::interp1d::DestructibleInterp1d;
@@ -113,13 +120,14 @@ pub trait Interp1dBuilder<G, V> {
 ///
 /// let grids = vec![0.0f64, 1.0f64, 2.0f64];
 /// let values = vec![0.0f64, 1.0f64, 0.0f64];
+/// let knots = Series::new(grids, values).unwrap().require_min_size().unwrap();
 ///
-/// let interp = Lerp1d::new(grids, values).unwrap();
+/// let interp = Lerp1d::new(knots);
 /// let orig_interp = interp.clone();
 ///
 /// // destruct and rebuild
-/// let (builder, grids, values) = orig_interp.destruct();
-/// let rebuilt_interp = builder.build(grids, values).unwrap();
+/// let (builder, knots) = orig_interp.destruct();
+/// let rebuilt_interp = builder.build(knots).unwrap();
 ///
 /// assert_eq!(rebuilt_interp.interp(&-0.5), interp.interp(&-0.5));
 /// assert_eq!(rebuilt_interp.interp(&0.5), interp.interp(&0.5));
@@ -128,5 +136,5 @@ pub trait Interp1dBuilder<G, V> {
 pub trait DestructibleInterp1d: Interp1d {
     type Builer: Interp1dBuilder<Self::Grid, Self::Value, Output = Self>;
 
-    fn destruct(self) -> (Self::Builer, Vec<Self::Grid>, Vec<Self::Value>);
+    fn destruct(self) -> (Self::Builer, Series<Self::Grid, Self::Value>);
 }

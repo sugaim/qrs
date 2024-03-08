@@ -257,7 +257,7 @@ fn _parse_dur_date_part(s_date: &str) -> Result<Duration, anyhow::Error> {
         Some('+') => (1, &s_count[1..]),
         _ => (1, s_count),
     };
-    let count = s_date.parse::<i64>().map_err(|_| gen_err())?;
+    let count = s_date.parse::<i32>().map_err(|_| gen_err())?;
     Ok(Duration::with_days(sign * count * unit))
 }
 
@@ -353,14 +353,14 @@ impl Duration {
     /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qrs_core_obj = Duration::with_days(count as i64);
-    ///    let chrono_obj = chrono::Duration::days(count as i64);
+    ///    let qrs_core_obj = Duration::with_days(count);
+    ///    let chrono_obj = chrono::Duration::try_days(count as _).unwrap();
     ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
-    pub fn with_days(days: i64) -> Self {
-        chrono::Duration::days(days).into()
+    pub fn with_days(days: i32) -> Self {
+        chrono::Duration::try_days(days as _).unwrap().into()
     }
 
     /// Same as [chrono::Duration::weeks].
@@ -370,14 +370,14 @@ impl Duration {
     /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qrs_core_obj = Duration::with_weeks(count as i64);
-    ///    let chrono_obj = chrono::Duration::weeks(count as i64);
+    ///    let qrs_core_obj = Duration::with_weeks(count);
+    ///    let chrono_obj = chrono::Duration::try_weeks(count as _).unwrap();
     ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
-    pub fn with_weeks(days: i64) -> Self {
-        chrono::Duration::weeks(days).into()
+    pub fn with_weeks(weeks: i32) -> Self {
+        chrono::Duration::try_weeks(weeks as _).unwrap().into()
     }
 
     /// Same as [chrono::Duration::hours].
@@ -387,14 +387,14 @@ impl Duration {
     /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qrs_core_obj = Duration::with_hours(count as i64);
-    ///    let chrono_obj = chrono::Duration::hours(count as i64);
+    ///    let qrs_core_obj = Duration::with_hours(count);
+    ///    let chrono_obj = chrono::Duration::try_hours(count as _).unwrap();
     ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
-    pub fn with_hours(hours: i64) -> Self {
-        chrono::Duration::hours(hours).into()
+    pub fn with_hours(hours: i32) -> Self {
+        chrono::Duration::try_hours(hours as _).unwrap().into()
     }
 
     /// Same as [chrono::Duration::minutes].
@@ -404,14 +404,14 @@ impl Duration {
     /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qrs_core_obj = Duration::with_mins(count as i64);
-    ///    let chrono_obj = chrono::Duration::minutes(count as i64);
+    ///    let qrs_core_obj = Duration::with_mins(count);
+    ///    let chrono_obj = chrono::Duration::try_minutes(count as _).unwrap();
     ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
-    pub fn with_mins(mins: i64) -> Self {
-        chrono::Duration::minutes(mins).into()
+    pub fn with_mins(mins: i32) -> Self {
+        chrono::Duration::try_minutes(mins as _).unwrap().into()
     }
 
     /// Same as [chrono::Duration::seconds].
@@ -421,14 +421,14 @@ impl Duration {
     /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qrs_core_obj = Duration::with_secs(count as i64);
-    ///    let chrono_obj = chrono::Duration::seconds(count as i64);
+    ///    let qrs_core_obj = Duration::with_secs(count);
+    ///    let chrono_obj = chrono::Duration::try_seconds(count as _).unwrap();
     ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
-    pub fn with_secs(seconds: i64) -> Self {
-        chrono::Duration::seconds(seconds).into()
+    pub fn with_secs(seconds: i32) -> Self {
+        chrono::Duration::try_seconds(seconds as _).unwrap().into()
     }
 
     /// Same as [chrono::Duration::milliseconds].
@@ -438,14 +438,16 @@ impl Duration {
     /// use qrs_chrono::Duration;
     ///
     /// for count in [i32::MIN, -42, -1, 0, 1, 42, i32::MAX] {
-    ///    let qrs_core_obj = Duration::with_millsecs(count as i64);
-    ///    let chrono_obj = chrono::Duration::milliseconds(count as i64);
+    ///    let qrs_core_obj = Duration::with_millsecs(count);
+    ///    let chrono_obj = chrono::Duration::try_milliseconds(count as _).unwrap();
     ///    assert_eq!(qrs_core_obj, Duration::from(chrono_obj));
     /// }
     /// ```
     #[inline]
-    pub fn with_millsecs(millsecs: i64) -> Self {
-        chrono::Duration::milliseconds(millsecs).into()
+    pub fn with_millsecs(millsecs: i32) -> Self {
+        chrono::Duration::try_milliseconds(millsecs as _)
+            .unwrap()
+            .into()
     }
 
     /// Same as [chrono::Duration::microseconds].
@@ -885,14 +887,14 @@ mod tests {
     #[test]
     fn test_conversion() {
         // chrono -> qrs
-        let chrono_obj = chrono::Duration::days(1);
+        let chrono_obj = chrono::Duration::try_days(1).unwrap();
         let qrs_core_obj = Duration::from(chrono_obj);
         assert_eq!(qrs_core_obj, Duration::with_days(1));
 
         // qrs -> chrono
         let qrs_core_obj = Duration::with_days(1);
         let chrono_obj: chrono::Duration = qrs_core_obj.into();
-        assert_eq!(chrono_obj, chrono::Duration::days(1));
+        assert_eq!(chrono_obj, chrono::Duration::try_days(1).unwrap());
     }
 
     #[test]

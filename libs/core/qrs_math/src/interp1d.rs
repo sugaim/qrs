@@ -1,4 +1,3 @@
-mod _knots;
 mod chermite;
 mod lerp;
 mod pwconst;

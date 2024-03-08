@@ -17,4 +17,4 @@ serde_json = { workspace = true }
 # internal
 qrs_chrono = { workspace = true, features = ["serde"] }
 qrs_math = { workspace = true, features = ["serde"] }
-qrs_modelcore = { workspace = true, features = ["serde"] }
+qrs_model = { workspace = true, features = ["serde"] }

@@ -52,8 +52,8 @@ fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
         vec![Box::<SchemaItem<qrs_math::func1d::SemiContinuity>>::default() as _],
     );
     map.insert(
-        "pricing/qrs_modelcore/curve",
-        vec![Box::<SchemaItem<qrs_modelcore::curve::ComponentCurve<f64>>>::default() as _],
+        "domain/qrs_model/core/curve",
+        vec![Box::<SchemaItem<qrs_model::core::curve::ComponentCurve<f64>>>::default() as _],
     );
     map
 }
@@ -65,6 +65,9 @@ pub fn gen_schema() -> anyhow::Result<()> {
         dir
     };
 
+    if root_dir.exists() {
+        std::fs::remove_dir_all(&root_dir)?;
+    }
     for (subdir, items) in get_schema_items() {
         let mut dir = root_dir.clone();
         dir.push(subdir);

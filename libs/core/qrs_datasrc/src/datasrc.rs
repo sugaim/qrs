@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     hash::Hash,
     num::NonZeroUsize,
     sync::{Arc, Mutex},
@@ -137,7 +136,7 @@ pub trait CacheableSrc<Rq: ?Sized>: DataSrc<Rq> {
     where
         Self: Sized,
         Rq: Eq + Hash + ToOwned,
-        Rq::Owned: Eq + Hash + Borrow<Rq>,
+        Rq::Owned: Eq + Hash,
         Self::Output: Clone,
     {
         CacheProxy::new(self, cache_cap)

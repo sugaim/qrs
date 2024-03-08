@@ -1,12 +1,8 @@
 use std::ops::{Div, Mul, Sub};
 
-#[cfg(feature = "serde")]
-use schemars::JsonSchema;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use qrs_collections::{MinSized, RequireMinSize, Series};
 
 use crate::func1d::{Func1dDer1, Func1dDer2, Func1dIntegrable, SemiContinuity};
-use crate::interp1d::_knots::Knots;
 use crate::interp1d::{DestructibleInterp1d, Interp1d, Interp1dBuilder};
 use crate::num::{Arithmetic, PartialOrdMinMax, RelPos, Scalar, Vector, Zero};
 
@@ -18,14 +14,16 @@ use crate::num::{Arithmetic, PartialOrdMinMax, RelPos, Scalar, Vector, Zero};
 ///
 /// # Example
 /// ```
+/// use qrs_collections::{RequireMinSize, Series};
 /// use qrs_math::interp1d::Interp1d;
 /// use qrs_math::func1d::SemiContinuity;
 ///
 /// let grids = vec![0.0, 1.0, 2.0];
 /// let values = vec![0.0, 1.0, 0.0];
+/// let knots = Series::new(grids, values).unwrap().require_min_size().unwrap();
 /// let cont = SemiContinuity::LeftContinuous;
 /// let partition_ratio = 0.5;
-/// let interp = qrs_math::interp1d::PwConst1d::new(grids, values, cont, partition_ratio).unwrap();
+/// let interp = qrs_math::interp1d::PwConst1d::new(knots, cont, partition_ratio).unwrap();
 ///
 /// assert_eq!(interp.interp(&0.0), 0.0);
 /// assert_eq!(interp.interp(&0.5), 0.0);
@@ -34,14 +32,14 @@ use crate::num::{Arithmetic, PartialOrdMinMax, RelPos, Scalar, Vector, Zero};
 /// assert_eq!(interp.interp(&1.5), 1.0);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, schemars::JsonSchema))]
 pub struct PwConst1d<G, V> {
     /// Knots which are interpolated.
     #[cfg_attr(
         feature = "serde",
-        serde(bound(serialize = "G: Serialize + PartialOrd, V: Serialize"))
+        serde(bound(serialize = "G: serde::Serialize + PartialOrd, V: serde::Serialize"))
     )]
-    knots: Knots<G, V>,
+    knots: MinSized<Series<G, V>, 2>,
     /// Continuity of the interpolated function.
     continuity: SemiContinuity,
     /// Ratio determining partition point to use the left or right value. (0.0 <= partition <= 1.0)
@@ -52,25 +50,27 @@ pub struct PwConst1d<G, V> {
 // display, serde
 //
 #[cfg(feature = "serde")]
-impl<'de, G, V> Deserialize<'de> for PwConst1d<G, V>
+impl<'de, G, V> serde::Deserialize<'de> for PwConst1d<G, V>
 where
-    G: Deserialize<'de> + PartialOrd,
-    V: Deserialize<'de>,
+    G: serde::Deserialize<'de> + PartialOrd,
+    V: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<PwConst1d<G, V>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct Data<G, V> {
-            #[serde(bound(deserialize = "G: Deserialize<'de> + PartialOrd, V: Deserialize<'de>"))]
-            knots: Knots<G, V>,
+            #[serde(bound(
+                deserialize = "G: serde::Deserialize<'de> + PartialOrd, V: serde::Deserialize<'de>"
+            ))]
+            knots: MinSized<Series<G, V>, 2>,
             continuity: SemiContinuity,
             partition_ratio: f64,
         }
         let data = Data::deserialize(deserializer)?;
-        let (gs, vs) = data.knots.destruct();
-        Self::new(gs, vs, data.continuity, data.partition_ratio).map_err(serde::de::Error::custom)
+        Self::new(data.knots, data.continuity, data.partition_ratio)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -86,12 +86,10 @@ impl<G: PartialOrd, V> PwConst1d<G, V> {
     /// - If `gs` is not sorted in ascending order.
     #[inline]
     pub fn new(
-        gs: Vec<G>,
-        vs: Vec<V>,
+        knots: MinSized<Series<G, V>, 2>,
         cont: SemiContinuity,
         partition: f64,
     ) -> Result<Self, anyhow::Error> {
-        let knots = Knots::new(gs, vs)?;
         if !(0. ..=1.).contains(&partition) {
             return Err(anyhow::anyhow!("partition must be in [0, 1]"));
         }
@@ -118,9 +116,9 @@ impl<G: RelPos, V: Vector<G::Output>> Interp1d for PwConst1d<G, V> {
     type Value = V;
 
     fn interp(&self, x: &G) -> V {
-        let idx = self.knots.interval_index_of(x);
-        let (gl, vl) = self.knots.force_get(idx);
-        let (gr, vr) = self.knots.force_get(idx + 1);
+        let idx = self.knots.interval_index_of(x).unwrap();
+        let (gl, vl) = self.knots.get(idx).unwrap();
+        let (gr, vr) = self.knots.get(idx + 1).unwrap();
 
         let sep = <G::Output as Scalar>::nearest_value_of(self.partition_ratio);
 
@@ -178,8 +176,8 @@ where
         if to < from {
             return -self.integrate(to, from);
         }
-        let lidx = self.knots.interval_index_of(from);
-        let ridx = self.knots.interval_index_of(to);
+        let lidx = self.knots.interval_index_of(from).unwrap();
+        let ridx = self.knots.interval_index_of(to).unwrap();
         let one = <<G as RelPos>::Output as Scalar>::nearest_value_of(1.0);
         let w = <<G as RelPos>::Output as Scalar>::nearest_value_of(self.partition_ratio);
 
@@ -197,14 +195,14 @@ where
         //
         let mut res = Zero::zero();
         for i in lidx..ridx {
-            let (gl, vl) = self.knots.force_get(i);
-            let (gr, vr) = self.knots.force_get(i + 1);
+            let (gl, vl) = self.knots.get(i).unwrap();
+            let (gr, vr) = self.knots.get(i + 1).unwrap();
             let weighted_v = (vl.clone() * &w) + (vr.clone() * &(one.clone() - &w));
             res += &(weighted_v * (gr.clone() - gl.clone()));
         }
         let left_trim = {
-            let (gl, vl) = self.knots.force_get(lidx);
-            let (gr, vr) = self.knots.force_get(lidx + 1);
+            let (gl, vl) = self.knots.get(lidx).unwrap();
+            let (gr, vr) = self.knots.get(lidx + 1).unwrap();
             let point = from.relpos_between(gl, gr);
             // [l]---w---p---[r] => wl = w, wr = p - w
             // [1]---p---w---[r] => wl = p, wr = 0,
@@ -214,8 +212,8 @@ where
             weighted_v * (gr.clone() - from.clone())
         };
         let right_trim = {
-            let (gl, vl) = self.knots.force_get(ridx);
-            let (gr, vr) = self.knots.force_get(ridx + 1);
+            let (gl, vl) = self.knots.get(ridx).unwrap();
+            let (gr, vr) = self.knots.get(ridx + 1).unwrap();
             let point = to.relpos_between(gl, gr);
             // [l]---w---p---[r] => wl = 0, wr = 1 - p
             // [l]---p---w---[r] => wl = w - p, wr = 1 - w
@@ -233,7 +231,7 @@ where
 // PwConst1dBuilder
 //
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, schemars::JsonSchema))]
 pub struct PwConst1dBuilder {
     /// Continuity of the interpolated function.
     continuity: SemiContinuity,
@@ -245,12 +243,12 @@ pub struct PwConst1dBuilder {
 // display, serde
 //
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for PwConst1dBuilder {
+impl<'de> serde::Deserialize<'de> for PwConst1dBuilder {
     fn deserialize<D>(deserializer: D) -> Result<PwConst1dBuilder, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct Data {
             continuity: SemiContinuity,
             partition_ratio: f64,
@@ -288,8 +286,13 @@ where
     type Output = PwConst1d<G, V>;
     type Err = anyhow::Error;
 
-    fn build(self, gs: Vec<G>, vs: Vec<V>) -> Result<Self::Output, anyhow::Error> {
-        PwConst1d::new(gs, vs, self.continuity, self.partition_ratio)
+    #[inline]
+    fn build(self, knots: Series<G, V>) -> Result<Self::Output, Self::Err> {
+        PwConst1d::new(
+            knots.require_min_size()?,
+            self.continuity,
+            self.partition_ratio,
+        )
     }
 }
 
@@ -299,411 +302,277 @@ where
 {
     type Builer = PwConst1dBuilder;
 
-    fn destruct(self) -> (Self::Builer, Vec<G>, Vec<V>) {
-        let (gs, vs) = self.knots.destruct();
+    fn destruct(self) -> (Self::Builer, Series<G, V>) {
         let builder =
             PwConst1dBuilder::new(self.continuity, self.partition_ratio).expect("valid builder");
-        (builder, gs, vs)
+        (builder, self.knots.into_inner())
     }
 }
 
 // =============================================================================
 #[cfg(test)]
 mod tests {
+    use approx::assert_abs_diff_eq;
+    use rstest::rstest;
+
     use crate::func1d::Func1d;
 
     use super::*;
 
-    #[test]
-    fn test_pwconst1d_new() {
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, false)]
+    #[case(SemiContinuity::RightContinuous, 0.0, false)]
+    #[case(SemiContinuity::RightContinuous, 1.0, false)]
+    #[case(SemiContinuity::LeftContinuous, -0.5, true)]
+    #[case(SemiContinuity::LeftContinuous, -1e-10, true)]
+    #[case(SemiContinuity::LeftContinuous, 1.5, true)]
+    #[case(SemiContinuity::LeftContinuous, 1.0 + 1e-10, true)]
+    fn test_pwconst1d_new(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] is_err: bool,
+    ) {
         let grids = vec![0.0, 1.0, 2.0];
         let values = vec![0.0, 1.0, 0.0];
-        let interp = super::PwConst1d::new(
-            grids.clone(),
-            values.clone(),
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        assert_eq!(interp.knots().0, &grids);
-        assert_eq!(interp.knots().1, &values);
-        assert_eq!(interp.continuity, super::SemiContinuity::LeftContinuous);
-        assert_eq!(interp.partition_ratio, 0.5);
+        let knots = Series::new(grids.clone(), values.clone())
+            .unwrap()
+            .require_min_size()
+            .unwrap();
 
+        let interp = super::PwConst1d::new(knots, cont, partition);
+
+        if is_err {
+            assert!(interp.is_err());
+        } else {
+            let interp = interp.unwrap();
+            assert_eq!(interp.continuity, cont);
+            assert_eq!(interp.partition_ratio, partition);
+            assert_eq!(interp.knots.grids(), &grids);
+            assert_eq!(interp.knots.values(), &values);
+        }
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, -0.5, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.0, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.49999999, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.5, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.50000001, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.0, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.49999999, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.5, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.50000001, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.0, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.5, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, -0.5, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 0.0, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 0.49999999, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 0.5, 1.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 0.50000001, 1.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 1.0, 1.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 1.49999999, 1.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 1.5, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 1.50000001, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 2.0, 0.0)]
+    #[case(SemiContinuity::RightContinuous, 0.5, 2.5, 0.0)]
+    fn test_pwconst1d_interp(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] input: f64,
+        #[case] expected: f64,
+    ) {
         let interp = super::PwConst1d::new(
-            grids.clone(),
-            values.clone(),
-            super::SemiContinuity::RightContinuous,
-            0.0,
-        );
+            Series::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
+                .unwrap()
+                .require_min_size()
+                .unwrap(),
+            cont,
+            partition,
+        )
+        .unwrap();
+
+        let res = interp.interp(&input);
+
+        assert_abs_diff_eq!(res, expected, epsilon = 1e-10);
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, -0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.5)]
+    fn test_pwconst1d_der1(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] input: f64,
+    ) {
+        let interp = super::PwConst1d::new(
+            Series::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
+                .unwrap()
+                .require_min_size()
+                .unwrap(),
+            cont,
+            partition,
+        )
+        .unwrap();
+
+        let res = interp.der1(&input);
+
+        assert_abs_diff_eq!(res, 0.0, epsilon = 1e-10);
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, -0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.5)]
+    fn test_pwconst1d_der2(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] input: f64,
+    ) {
+        let interp = super::PwConst1d::new(
+            Series::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
+                .unwrap()
+                .require_min_size()
+                .unwrap(),
+            cont,
+            partition,
+        )
+        .unwrap();
+
+        let res = interp.der2(&input);
+
+        assert_abs_diff_eq!(res, 0.0, epsilon = 1e-10);
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, -0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.5)]
+    fn test_pwconst1d_der01(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] input: f64,
+    ) {
+        let interp = super::PwConst1d::new(
+            Series::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
+                .unwrap()
+                .require_min_size()
+                .unwrap(),
+            cont,
+            partition,
+        )
+        .unwrap();
+
+        let (der0, der1) = interp.der01(&input);
+
+        assert_eq!(der0, interp.eval(&input));
+        assert_eq!(der1, interp.der1(&input));
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, -0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 0.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 1.5)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.0)]
+    #[case(SemiContinuity::LeftContinuous, 0.5, 2.5)]
+    fn test_pwconst1d_der012(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] input: f64,
+    ) {
+        let interp = super::PwConst1d::new(
+            Series::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
+                .unwrap()
+                .require_min_size()
+                .unwrap(),
+            cont,
+            partition,
+        )
+        .unwrap();
+
+        let (der0, der1, der2) = interp.der012(&input);
+
+        assert_eq!(der0, interp.eval(&input));
+        assert_eq!(der1, interp.der1(&input));
+        assert_eq!(der2, interp.der2(&input));
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.24)]
+    #[case(SemiContinuity::RightContinuous, 0.42)]
+    fn test_pwconst1d_destruct(#[case] cont: SemiContinuity, #[case] partition: f64) {
+        let interp = super::PwConst1d::new(
+            Series::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
+                .unwrap()
+                .require_min_size()
+                .unwrap(),
+            cont,
+            partition,
+        )
+        .unwrap();
+
+        let (builder, knots) = interp.clone().destruct();
+
+        assert_eq!(builder.continuity, cont);
+        assert_eq!(builder.partition_ratio, partition);
+        assert_eq!(knots.grids(), interp.knots.grids());
+        assert_eq!(knots.values(), interp.knots.values());
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5, false)]
+    #[case(SemiContinuity::RightContinuous, 0.0, false)]
+    #[case(SemiContinuity::RightContinuous, 1.0, false)]
+    #[case(SemiContinuity::LeftContinuous, -0.5, true)]
+    #[case(SemiContinuity::LeftContinuous, -1e-10, true)]
+    #[case(SemiContinuity::LeftContinuous, 1.5, true)]
+    #[case(SemiContinuity::LeftContinuous, 1.0 + 1e-10, true)]
+    fn test_pwconst1dbuilder_new(
+        #[case] cont: SemiContinuity,
+        #[case] partition: f64,
+        #[case] is_err: bool,
+    ) {
+        let builder = super::PwConst1dBuilder::new(cont, partition);
+
+        if is_err {
+            assert!(builder.is_err());
+        } else {
+            let builder = builder.unwrap();
+            assert_eq!(builder.continuity, cont);
+            assert_eq!(builder.partition_ratio, partition);
+        }
+    }
+
+    #[rstest]
+    #[case(SemiContinuity::LeftContinuous, 0.5)]
+    #[case(SemiContinuity::RightContinuous, 0.42)]
+    fn test_pwconst1dbuilder_build(#[case] cont: SemiContinuity, #[case] partition: f64) {
+        let builder = super::PwConst1dBuilder::new(cont, partition).expect("valid builder");
+        let grids = vec![0.0, 1.0, 2.0];
+        let values = vec![0.0, 1.0, 0.0];
+        let knots = Series::new(grids.clone(), values.clone()).unwrap();
+
+        let interp = builder.build(knots);
+
         assert!(interp.is_ok());
-
-        let interp = super::PwConst1d::new(
-            grids.clone(),
-            values.clone(),
-            super::SemiContinuity::RightContinuous,
-            1.0,
-        );
-        assert!(interp.is_ok());
-
-        // errors
-        assert!(super::PwConst1d::new(
-            vec![0.0],
-            vec![0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5
-        )
-        .is_err()); // too short
-
-        assert!(super::PwConst1d::new(
-            vec![0.0, 1.0],
-            Vec::<f64>::new(),
-            super::SemiContinuity::LeftContinuous,
-            0.5
-        )
-        .is_err()); // length mismatch
-
-        assert!(super::PwConst1d::new(
-            vec![0.0, 1.0, 0.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5
-        )
-        .is_err()); // not sorted
-
-        assert!(super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            -0.5
-        )
-        .is_err()); // invalid partition
-
-        assert!(super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            -1e-10
-        )
-        .is_err()); // invalid partition
-
-        assert!(super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            1.5
-        )
-        .is_err()); // invalid partition
-
-        assert!(super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            1.0 + 1e-10
-        )
-        .is_err()); // invalid partition
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn test_pwconst1d_serialize() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        let serialized = serde_json::to_string(&interp).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,0.0]],"continuity":"left_continuous","partition_ratio":0.5}"#
-        );
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn test_pwconst1d_deserialize() {
-        let serialized = r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,0.0]],"continuity":"left_continuous","partition_ratio":0.5}"#;
-        let deserialized: super::PwConst1d<f64, f64> = serde_json::from_str(serialized).unwrap();
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        assert_eq!(deserialized, interp);
-
-        let serialized = r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,0.0]],"continuity":"right_continuous","partition_ratio":0.0}"#;
-        let deserialized: super::PwConst1d<f64, f64> = serde_json::from_str(serialized).unwrap();
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::RightContinuous,
-            0.0,
-        )
-        .expect("valid instance");
-        assert_eq!(deserialized, interp);
-
-        let serialized = r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,0.0]],"continuity":"left_continuous","partition_ratio":1.0}"#;
-        let deserialized: super::PwConst1d<f64, f64> = serde_json::from_str(serialized).unwrap();
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            1.0,
-        )
-        .expect("valid instance");
-        assert_eq!(deserialized, interp);
-
-        // errors
-        let serialized = r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,0.0]],"continuity":"left_continuous","partition_ratio":1.5}"#;
-        let deserialized: Result<super::PwConst1d<f64, f64>, _> = serde_json::from_str(serialized);
-        assert!(deserialized.is_err()); // invalid partition
-
-        let serialized = r#"{"knots":[[0.0,0.0],[1.0,1.0],[2.0,0.0]],"continuity":"left_continuous","partition_ratio":-1.5}"#;
-        let deserialized: Result<super::PwConst1d<f64, f64>, _> = serde_json::from_str(serialized);
-        assert!(deserialized.is_err()); // invalid partition
-    }
-
-    #[test]
-    fn test_pwconst1d_knots() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        assert_eq!(interp.knots().0, &[0.0, 1.0, 2.0]);
-        assert_eq!(interp.knots().1, &[0.0, 1.0, 0.0]);
-    }
-
-    #[test]
-    fn test_pwconst1d_interp() {
-        // partition = 0.5
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        assert_eq!(interp.interp(&-0.5), 0.0);
-        assert_eq!(interp.interp(&0.0), 0.0);
-        assert_eq!(interp.interp(&0.49999999), 0.0);
-        assert_eq!(interp.interp(&0.5), 0.0);
-        assert_eq!(interp.interp(&0.50000001), 1.0);
-        assert_eq!(interp.interp(&1.0), 1.0);
-        assert_eq!(interp.interp(&1.49999999), 1.0);
-        assert_eq!(interp.interp(&1.5), 1.0);
-        assert_eq!(interp.interp(&1.50000001), 0.0);
-        assert_eq!(interp.interp(&2.0), 0.0);
-        assert_eq!(interp.interp(&2.5), 0.0);
-
-        // right continuous
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::RightContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-
-        assert_eq!(interp.interp(&-0.5), 0.0);
-        assert_eq!(interp.interp(&0.0), 0.0);
-        assert_eq!(interp.interp(&0.49999999), 0.0);
-        assert_eq!(interp.interp(&0.5), 1.0);
-        assert_eq!(interp.interp(&0.50000001), 1.0);
-        assert_eq!(interp.interp(&1.0), 1.0);
-        assert_eq!(interp.interp(&1.49999999), 1.0);
-        assert_eq!(interp.interp(&1.5), 0.0);
-        assert_eq!(interp.interp(&1.50000001), 0.0);
-        assert_eq!(interp.interp(&2.0), 0.0);
-        assert_eq!(interp.interp(&2.5), 0.0);
-    }
-
-    #[test]
-    fn test_pwconst1d_der1() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        assert_eq!(interp.der1(&-0.5), 0.0);
-        assert_eq!(interp.der1(&0.0), 0.0);
-        assert_eq!(interp.der1(&0.5), 0.0);
-        assert_eq!(interp.der1(&1.0), 0.0);
-        assert_eq!(interp.der1(&1.5), 0.0);
-        assert_eq!(interp.der1(&2.0), 0.0);
-        assert_eq!(interp.der1(&2.5), 0.0);
-    }
-
-    #[test]
-    fn test_pwconst1d_der2() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        assert_eq!(interp.der2(&-0.5), 0.0);
-        assert_eq!(interp.der2(&0.0), 0.0);
-        assert_eq!(interp.der2(&0.5), 0.0);
-        assert_eq!(interp.der2(&1.0), 0.0);
-        assert_eq!(interp.der2(&1.5), 0.0);
-        assert_eq!(interp.der2(&2.0), 0.0);
-        assert_eq!(interp.der2(&2.5), 0.0);
-    }
-
-    #[test]
-    fn test_pwconst1d_der01() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-
-        let (der0, der1) = interp.der01(&-0.5);
-        assert_eq!(der0, interp.eval(&-0.5));
-        assert_eq!(der1, interp.der1(&-0.5));
-
-        let (der0, der1) = interp.der01(&0.0);
-        assert_eq!(der0, interp.eval(&0.0));
-        assert_eq!(der1, interp.der1(&0.0));
-
-        let (der0, der1) = interp.der01(&0.5);
-        assert_eq!(der0, interp.eval(&0.5));
-        assert_eq!(der1, interp.der1(&0.5));
-
-        let (der0, der1) = interp.der01(&1.0);
-        assert_eq!(der0, interp.eval(&1.0));
-        assert_eq!(der1, interp.der1(&1.0));
-
-        let (der0, der1) = interp.der01(&1.5);
-        assert_eq!(der0, interp.eval(&1.5));
-        assert_eq!(der1, interp.der1(&1.5));
-    }
-
-    #[test]
-    fn test_pwconst1d_der012() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-
-        let (der0, der1, der2) = interp.der012(&-0.5);
-        assert_eq!(der0, interp.eval(&-0.5));
-        assert_eq!(der1, interp.der1(&-0.5));
-        assert_eq!(der2, interp.der2(&-0.5));
-
-        let (der0, der1, der2) = interp.der012(&0.0);
-        assert_eq!(der0, interp.eval(&0.0));
-        assert_eq!(der1, interp.der1(&0.0));
-        assert_eq!(der2, interp.der2(&0.0));
-
-        let (der0, der1, der2) = interp.der012(&0.5);
-        assert_eq!(der0, interp.eval(&0.5));
-        assert_eq!(der1, interp.der1(&0.5));
-        assert_eq!(der2, interp.der2(&0.5));
-
-        let (der0, der1, der2) = interp.der012(&1.0);
-        assert_eq!(der0, interp.eval(&1.0));
-        assert_eq!(der1, interp.der1(&1.0));
-        assert_eq!(der2, interp.der2(&1.0));
-
-        let (der0, der1, der2) = interp.der012(&1.5);
-        assert_eq!(der0, interp.eval(&1.5));
-        assert_eq!(der1, interp.der1(&1.5));
-        assert_eq!(der2, interp.der2(&1.5));
-    }
-
-    #[test]
-    fn test_pwconst1d_destruct() {
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::LeftContinuous,
-            0.5,
-        )
-        .expect("valid instance");
-        let (builder, gs, vs) = interp.destruct();
-        assert_eq!(builder.continuity, super::SemiContinuity::LeftContinuous);
-        assert_eq!(builder.partition_ratio, 0.5);
-        assert_eq!(gs, vec![0.0, 1.0, 2.0]);
-        assert_eq!(vs, vec![0.0, 1.0, 0.0]);
-
-        let interp = super::PwConst1d::new(
-            vec![0.0, 1.0, 2.0],
-            vec![0.0, 1.0, 0.0],
-            super::SemiContinuity::RightContinuous,
-            0.42,
-        )
-        .expect("valid instance");
-        let (builder, gs, vs) = interp.destruct();
-        assert_eq!(builder.continuity, super::SemiContinuity::RightContinuous);
-        assert_eq!(builder.partition_ratio, 0.42);
-        assert_eq!(gs, vec![0.0, 1.0, 2.0]);
-        assert_eq!(vs, vec![0.0, 1.0, 0.0]);
-    }
-
-    #[test]
-    fn test_pwconst1dbuilder_new() {
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 0.5);
-        assert!(builder.is_ok());
-
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::RightContinuous, 0.42);
-        assert!(builder.is_ok());
-
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 0.0);
-        assert!(builder.is_ok());
-
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 1.0);
-        assert!(builder.is_ok());
-
-        let builder =
-            super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 1.0 + 1e-10);
-        assert!(builder.is_err());
-
-        let builder =
-            super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 0.0 - 1e-10);
-        assert!(builder.is_err());
-
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, -0.5);
-        assert!(builder.is_err());
-
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 1.5);
-        assert!(builder.is_err());
-    }
-
-    #[test]
-    fn test_pwconst1dbuilder_build() {
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::LeftContinuous, 0.5)
-            .expect("valid builder");
-        let interp = builder
-            .build(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0])
-            .expect("valid instance");
-        assert_eq!(interp.knots().0, &[0.0, 1.0, 2.0]);
-        assert_eq!(interp.knots().1, &[0.0, 1.0, 0.0]);
-        assert_eq!(interp.continuity, super::SemiContinuity::LeftContinuous);
-        assert_eq!(interp.partition_ratio, 0.5);
-
-        let builder = super::PwConst1dBuilder::new(super::SemiContinuity::RightContinuous, 0.42)
-            .expect("valid builder");
-        let interp = builder
-            .build(vec![0.0, 1.0, 3.0], vec![0.0, 1.0, 5.0])
-            .expect("valid instance");
-        assert_eq!(interp.knots().0, &[0.0, 1.0, 3.0]);
-        assert_eq!(interp.knots().1, &[0.0, 1.0, 5.0]);
-        assert_eq!(interp.continuity, super::SemiContinuity::RightContinuous);
+        let interp = interp.unwrap();
+        assert_eq!(interp.continuity, cont);
+        assert_eq!(interp.partition_ratio, partition);
+        assert_eq!(interp.knots.grids(), &grids);
+        assert_eq!(interp.knots.values(), &values);
     }
 }

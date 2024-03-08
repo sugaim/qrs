@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     hash::{BuildHasher, Hash},
     num::NonZeroUsize,
     sync::Mutex,
@@ -30,8 +29,7 @@ use crate::{CacheableSrc, DataSrc, Response};
 /// when the underlying data source supports them.
 /// But such a weak type must be related with `K` to check the key equality
 /// and store the key in the cache.
-/// So, a weak request type `Rq` must be convertible to `K` by [`ToOwned`] and
-/// `K` must be convertible to `Rq` by [`Borrow`].
+/// So, a weak request type `Rq` must be convertible to `K` by [`ToOwned`].
 /// As an example of `Rq` and `K`, we can use [`str`] and [`String`], respectively.
 #[derive(Derivative, DebugTree)]
 #[debug_tree(_use_from_qrs_datasrc, desc = "cache proxy")]
@@ -189,7 +187,7 @@ impl<Src, S, V, Rq> DataSrc<Rq> for CacheProxy<Src, Rq::Owned, V, S>
 where
     Rq: ?Sized + Eq + Hash + ToOwned,
     Src: CacheableSrc<Rq>,
-    Rq::Owned: Eq + Hash + Borrow<Rq>,
+    Rq::Owned: Eq + Hash,
     S: BuildHasher,
     Src::Output: Into<V> + Clone,
     V: Into<Src::Output> + Clone,
@@ -206,7 +204,7 @@ impl<Src, S, V, Rq> CacheableSrc<Rq> for CacheProxy<Src, Rq::Owned, V, S>
 where
     Rq: ?Sized + Eq + Hash + ToOwned,
     Src: CacheableSrc<Rq>,
-    Rq::Owned: Eq + Hash + Borrow<Rq>,
+    Rq::Owned: Eq + Hash,
     S: BuildHasher,
     Src::Output: Into<V> + Clone,
     V: Into<Src::Output> + Clone,

@@ -1,0 +1,28 @@
+[package]
+name = "qrs_model"
+version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "dep:schemars", "qrs_fincore/serde"]
+
+[dependencies]
+anyhow = { workspace = true }
+derivative = { workspace = true }
+itertools = { workspace = true }
+serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+
+# internal
+qrs_chrono = { workspace = true }
+qrs_collections = { workspace = true }
+qrs_datasrc = { workspace = true }
+qrs_fincore = { workspace = true }
+qrs_math = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+maplit = { workspace = true }
+mockall = { workspace = true }

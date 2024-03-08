@@ -1,0 +1,398 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ComponentCurve_for_double",
+  "oneOf": [
+    {
+      "description": "A flat curve is a curve that has a constant value for all tenors.",
+      "type": "object",
+      "required": [
+        "rate",
+        "type"
+      ],
+      "properties": {
+        "rate": {
+          "$ref": "#/definitions/Act365fRate_for_double"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "flat"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "logdf",
+        "type"
+      ],
+      "properties": {
+        "logdf": {
+          "$ref": "#/definitions/Lerp1d_for_DateTime_and_double"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "log_lerp"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "logdf",
+        "type"
+      ],
+      "properties": {
+        "logdf": {
+          "$ref": "#/definitions/CHermite1d_for_DateTime_and_double_and_CatmullRomScheme"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "log_c_r"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "base_date",
+        "type",
+        "zero_rate"
+      ],
+      "properties": {
+        "base_date": {
+          "description": "Base date of zero rates.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/DateTime"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "zero_rate_lerp"
+          ]
+        },
+        "zero_rate": {
+          "description": "Zero rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Lerp1d_for_DateTime_and_Act365fRate_for_double"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "base_date",
+        "type",
+        "zero_rate"
+      ],
+      "properties": {
+        "base_date": {
+          "description": "Base date of zero rates.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/DateTime"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "zero_rate_cr"
+          ]
+        },
+        "zero_rate": {
+          "description": "Zero rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CHermite1d_for_DateTime_and_Act365fRate_for_double_and_CatmullRomScheme"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "A curve based on instant forward rates.",
+      "type": "object",
+      "required": [
+        "instant_forward_rate",
+        "type"
+      ],
+      "properties": {
+        "instant_forward_rate": {
+          "description": "Forward rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Lerp1d_for_DateTime_and_Act365fRate_for_double"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "inst_fwd_lerp"
+          ]
+        }
+      }
+    },
+    {
+      "description": "A curve based on instant forward rates.",
+      "type": "object",
+      "required": [
+        "instant_forward_rate",
+        "type"
+      ],
+      "properties": {
+        "instant_forward_rate": {
+          "description": "Forward rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PwConst1d_for_DateTime_and_Act365fRate_for_double"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "inst_fwd_pw_const"
+          ]
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "Act365fRate_for_double": {
+      "description": "Annual rate with Act/365 fixed convention. Unit is 1. Not percentage nor bps.",
+      "type": "number",
+      "format": "double"
+    },
+    "CHermite1d_for_DateTime_and_Act365fRate_for_double_and_CatmullRomScheme": {
+      "type": "object",
+      "required": [
+        "knots",
+        "scheme"
+      ],
+      "properties": {
+        "knots": {
+          "$ref": "#/definitions/MinSized_for_Series_for_DateTime_and_Act365fRate_for_double"
+        },
+        "scheme": {
+          "$ref": "#/definitions/CatmullRomScheme"
+        }
+      }
+    },
+    "CHermite1d_for_DateTime_and_double_and_CatmullRomScheme": {
+      "type": "object",
+      "required": [
+        "knots",
+        "scheme"
+      ],
+      "properties": {
+        "knots": {
+          "$ref": "#/definitions/MinSized_for_Series_for_DateTime_and_double"
+        },
+        "scheme": {
+          "$ref": "#/definitions/CatmullRomScheme"
+        }
+      }
+    },
+    "CatmullRomScheme": {
+      "type": "object",
+      "required": [
+        "method"
+      ],
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/FiniteDiffMethod"
+        }
+      }
+    },
+    "DateTime": {
+      "description": "A datetime with fixed offset or IANA timezone",
+      "examples": [
+        "2021-01-01T10:42:11+09:00",
+        "2021-01-01T10:42:11Z",
+        "2021-01-01T10:42:11[America/New_York]",
+        "2021-01-01T10:42:11Z[America/New_York]",
+        "2021-01-01T10:42:11+09:00[Asia/Tokyo]"
+      ],
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DateTimeFixedOffset"
+        },
+        {
+          "$ref": "#/definitions/DateTimeIana"
+        }
+      ]
+    },
+    "DateTimeFixedOffset": {
+      "description": "A datetime with fixed offset timezone",
+      "type": "string",
+      "format": "date-time"
+    },
+    "DateTimeIana": {
+      "description": "A datetime with IANA timezone, {RFC3339}[{IANA timezone}] or %Y-%m-%dT%H:%M:%S[{IANA timezone}]",
+      "examples": [
+        "2021-01-01T10:42:11[America/New_York]",
+        "2021-01-01T10:42:11Z[America/New_York]",
+        "2021-01-01T10:42:11+09:00[Asia/Tokyo]"
+      ],
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(Z|[\\+-]\\d{2}:\\d{2}|[\\+-]\\d{4})?(\\[.+\\])$"
+    },
+    "FiniteDiffMethod": {
+      "description": "Finite difference method",
+      "oneOf": [
+        {
+          "description": "Forward difference",
+          "type": "string",
+          "enum": [
+            "forward"
+          ]
+        },
+        {
+          "description": "Backward difference",
+          "type": "string",
+          "enum": [
+            "backward"
+          ]
+        },
+        {
+          "description": "Central difference",
+          "type": "string",
+          "enum": [
+            "central"
+          ]
+        }
+      ]
+    },
+    "Lerp1d_for_DateTime_and_Act365fRate_for_double": {
+      "description": "1-dimensional linear interpolation",
+      "type": "object",
+      "required": [
+        "knots"
+      ],
+      "properties": {
+        "knots": {
+          "$ref": "#/definitions/MinSized_for_Series_for_DateTime_and_Act365fRate_for_double"
+        }
+      }
+    },
+    "Lerp1d_for_DateTime_and_double": {
+      "description": "1-dimensional linear interpolation",
+      "type": "object",
+      "required": [
+        "knots"
+      ],
+      "properties": {
+        "knots": {
+          "$ref": "#/definitions/MinSized_for_Series_for_DateTime_and_double"
+        }
+      }
+    },
+    "MinSized_for_Series_for_DateTime_and_Act365fRate_for_double": {
+      "description": "Series for 1-dimensional interpolation",
+      "items": {
+        "description": "An item of a series, which is a collection of values marked by grids(ordered keys)",
+        "type": "object",
+        "required": [
+          "grid",
+          "value"
+        ],
+        "properties": {
+          "grid": {
+            "$ref": "#/definitions/DateTime"
+          },
+          "value": {
+            "$ref": "#/definitions/Act365fRate_for_double"
+          }
+        }
+      },
+      "additionalItems": false,
+      "minItems": 2
+    },
+    "MinSized_for_Series_for_DateTime_and_double": {
+      "description": "Series for 1-dimensional interpolation",
+      "items": {
+        "description": "An item of a series, which is a collection of values marked by grids(ordered keys)",
+        "type": "object",
+        "required": [
+          "grid",
+          "value"
+        ],
+        "properties": {
+          "grid": {
+            "$ref": "#/definitions/DateTime"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "additionalItems": false,
+      "minItems": 2
+    },
+    "PwConst1d_for_DateTime_and_Act365fRate_for_double": {
+      "description": "1-dimensional linear interpolation.\n\n# Example ``` use qrs_collections::{RequireMinSize, Series}; use qrs_math::interp1d::Interp1d; use qrs_math::func1d::SemiContinuity;\n\nlet grids = vec![0.0, 1.0, 2.0]; let values = vec![0.0, 1.0, 0.0]; let knots = Series::new(grids, values).unwrap().require_min_size().unwrap(); let cont = SemiContinuity::LeftContinuous; let partition_ratio = 0.5; let interp = qrs_math::interp1d::PwConst1d::new(knots, cont, partition_ratio).unwrap();\n\nassert_eq!(interp.interp(&0.0), 0.0); assert_eq!(interp.interp(&0.5), 0.0); assert_eq!(interp.interp(&0.5001), 1.0); assert_eq!(interp.interp(&1.0), 1.0); assert_eq!(interp.interp(&1.5), 1.0); ```",
+      "type": "object",
+      "required": [
+        "continuity",
+        "knots",
+        "partition_ratio"
+      ],
+      "properties": {
+        "continuity": {
+          "description": "Continuity of the interpolated function.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemiContinuity"
+            }
+          ]
+        },
+        "knots": {
+          "description": "Knots which are interpolated.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MinSized_for_Series_for_DateTime_and_Act365fRate_for_double"
+            }
+          ]
+        },
+        "partition_ratio": {
+          "description": "Ratio determining partition point to use the left or right value. (0.0 <= partition <= 1.0)",
+          "type": "number",
+          "format": "double"
+        }
+      }
+    },
+    "SemiContinuity": {
+      "description": "Semi continuity",
+      "oneOf": [
+        {
+          "description": "`f(x-) = f(x)`\n\n```txt o--------- | ----------x ```",
+          "type": "string",
+          "enum": [
+            "left_continuous"
+          ]
+        },
+        {
+          "description": "`f(x) = f(x+)`\n\n```txt x--------- | ----------o ```",
+          "type": "string",
+          "enum": [
+            "right_continuous"
+          ]
+        }
+      ]
+    }
+  }
+}
