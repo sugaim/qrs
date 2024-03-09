@@ -1,7 +1,8 @@
 [package]
-name = "qrs_fincore"
+name = "qrs_finance"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 exclude.workspace = true
 
 [features]
@@ -13,9 +14,12 @@ chrono = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 strum = { workspace = true }
+thiserror = { workspace = true }
 
 # internal
+qrs_collections = { workspace = true }
 qrs_chrono = { workspace = true }
+qrs_finance_derive = { path = "./qrs_finance_derive" }
 qrs_math = { workspace = true }
 
 [dev-dependencies]

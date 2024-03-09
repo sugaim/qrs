@@ -168,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.15.3"
+version = "3.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea184aa71bb362a1157c896979544cc23974e08fd265f29ea96b59f0b4a555b"
+checksum = "7ff69b9dd49fd426c69a0db9fc04dd934cdb6645ff000864d98f7e2af8830eaa"
 
 [[package]]
 name = "bytecheck"
@@ -933,16 +933,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "qrs_fincore"
+name = "qrs_finance"
 version = "0.1.0"
 dependencies = [
  "chrono",
  "maplit",
  "qrs_chrono",
+ "qrs_collections",
+ "qrs_finance_derive",
  "qrs_math",
  "schemars",
  "serde",
  "strum",
+ "thiserror",
+]
+
+[[package]]
+name = "qrs_finance_derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.52",
 ]
 
 [[package]]
@@ -978,19 +991,8 @@ dependencies = [
  "qrs_chrono",
  "qrs_collections",
  "qrs_datasrc",
- "qrs_fincore",
+ "qrs_finance",
  "qrs_math",
- "schemars",
- "serde",
-]
-
-[[package]]
-name = "qrs_product"
-version = "0.1.0"
-dependencies = [
- "qrs_chrono",
- "qrs_collections",
- "qrs_fincore",
  "schemars",
  "serde",
 ]

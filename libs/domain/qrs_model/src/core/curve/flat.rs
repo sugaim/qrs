@@ -3,7 +3,7 @@
 //
 
 use qrs_chrono::DateTime;
-use qrs_fincore::daycount::Act365fRate;
+use qrs_finance::core::daycount::Act365fRate;
 use qrs_math::num::Real;
 
 use super::YieldCurve;

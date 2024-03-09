@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use qrs_chrono::{DateTime, Duration};
-use qrs_fincore::daycount::{Act365f, Act365fRate, DayCountRate, Rate};
+use qrs_finance::core::daycount::{Act365f, Act365fRate, DayCountRate, Rate};
 use qrs_math::{func1d::Func1dDer1, num::Real};
 
 use super::YieldCurve;

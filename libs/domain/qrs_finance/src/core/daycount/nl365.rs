@@ -7,12 +7,12 @@ use qrs_math::num::Real;
 use super::{DayCount, DayCountRate, Rate, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
-// NL360
+// NL365
 //
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NL360;
+pub struct NL365;
 
-impl Default for NL360 {
+impl Default for NL365 {
     #[inline]
     fn default() -> Self {
         Self
@@ -22,16 +22,16 @@ impl Default for NL360 {
 //
 // display, serde
 //
-impl std::fmt::Display for NL360 {
+impl std::fmt::Display for NL365 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NL/360")
+        write!(f, "NL/365")
     }
 }
 
 //
 // methods
 //
-impl DayCount for NL360 {
+impl DayCount for NL365 {
     fn dcf(&self, from: &qrs_chrono::DateTime, to: &qrs_chrono::DateTime) -> f64 {
         match from.cmp(to) {
             std::cmp::Ordering::Less => {}
@@ -43,7 +43,7 @@ impl DayCount for NL360 {
         }
 
         const MILSEC_PER_DAY: f64 = 1000.0 * 60.0 * 60.0 * 24.0;
-        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
+        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 365.0;
         let is_leap_year = |year: i32| year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 
         let mut leap_days = 0;
@@ -70,40 +70,40 @@ impl DayCount for NL360 {
     }
 }
 
-impl DayCountRate for NL360 {
-    type Rate<V: Real> = RateNL360<V>;
+impl DayCountRate for NL365 {
+    type Rate<V: Real> = NL365Rate<V>;
 
-    /// Create a Act360F rate from the given annual rate.
+    /// Create a Act365F rate from the given annual rate.
     /// Note that the unit of the argument is 1. Not percent nor bps.
     #[inline]
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V> {
-        RateNL360::from_rate(annual_rate)
+        NL365Rate::from_rate(annual_rate)
     }
 }
 
 // -----------------------------------------------------------------------------
-// RateNL360
+// RateNL365
 //
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct RateNL360<V>(V);
+pub struct NL365Rate<V>(V);
 
 //
 // display, serde
 //
 #[cfg(feature = "serde")]
-impl<V: schemars::JsonSchema> schemars::JsonSchema for RateNL360<V> {
+impl<V: schemars::JsonSchema> schemars::JsonSchema for NL365Rate<V> {
     fn schema_name() -> String {
-        format!("RateNL360_for_{}", V::schema_name())
+        format!("RateNL365_for_{}", V::schema_name())
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_fincore::daycount::RateNL360<{}>", V::schema_id()).into()
+        format!("qrs_finance::daycount::RateNL365<{}>", V::schema_id()).into()
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut schema = V::json_schema(gen);
         if let schemars::schema::Schema::Object(ref mut schema) = schema {
             schema.metadata().description = Some(
-                "Annual rate with NL/360 convention. Unit is 1. Not percentage nor bps."
+                "Annual rate with NL/365 convention. Unit is 1. Not percentage nor bps."
                     .to_string(),
             );
         }
@@ -114,24 +114,24 @@ impl<V: schemars::JsonSchema> schemars::JsonSchema for RateNL360<V> {
 //
 // methods
 //
-impl<V> RateNL360<V> {
-    /// Create a new `RateNL360` instance with the given annual rate.
+impl<V> NL365Rate<V> {
+    /// Create a new `RateNL365` instance with the given annual rate.
     ///
     /// Unit of the argument is 1. Not percent nor bps.
-    /// Note that user must ensure that the given value is rate in NL/360F convention.
+    /// Note that user must ensure that the given value is rate in NL/365F convention.
     #[inline]
     pub fn from_rate(value: V) -> Self {
         Self(value)
     }
 }
 
-impl<V: Real> Rate for RateNL360<V> {
+impl<V: Real> Rate for NL365Rate<V> {
     type Value = V;
-    type Convention = NL360;
+    type Convention = NL365;
 
     #[inline]
     fn convention(&self) -> Self::Convention {
-        NL360
+        NL365
     }
 
     #[inline]
@@ -143,4 +143,4 @@ impl<V: Real> Rate for RateNL360<V> {
 //
 // operators
 //
-define_vector_behavior!(RateNL360);
+define_vector_behavior!(NL365Rate);

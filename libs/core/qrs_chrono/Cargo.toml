@@ -3,6 +3,7 @@ name = "qrs_chrono"
 version.workspace = true
 edition.workspace = true
 exclude.workspace = true
+rust-version.workspace = true
 
 [features]
 serde = ["dep:serde", "dep:serde_json", "dep:schemars", "qrs_datasrc/serde"]

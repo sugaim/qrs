@@ -1,7 +1,7 @@
 use derivative::Derivative;
 
 use qrs_chrono::DateTime;
-use qrs_fincore::daycount::Act365fRate;
+use qrs_finance::core::daycount::Act365fRate;
 use qrs_math::num::FloatBased;
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
@@ -23,7 +23,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
 /// use qrs_chrono::DateTime;
-/// use qrs_fincore::daycount::{Act365fRate, Rate};
+/// use qrs_finance::core::daycount::{Act365fRate, Rate};
 ///
 /// use qrs_model::core::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
@@ -40,7 +40,7 @@ use super::{YieldCurve, YieldCurveAdjust};
 /// use std::str::FromStr;
 /// use approx::assert_abs_diff_eq;
 /// use qrs_chrono::DateTime;
-/// use qrs_fincore::daycount::{Act365fRate, Rate};
+/// use qrs_finance::core::daycount::{Act365fRate, Rate};
 ///
 /// use qrs_model::core::curve::{Bump, FlatCurve, YieldCurveAdjust};
 ///
@@ -132,7 +132,7 @@ mod tests {
     use std::str::FromStr;
 
     use approx::assert_abs_diff_eq;
-    use qrs_fincore::daycount::Rate;
+    use qrs_finance::core::daycount::Rate;
 
     use crate::core::curve::FlatCurve;
 

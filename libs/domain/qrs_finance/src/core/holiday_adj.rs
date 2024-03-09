@@ -17,7 +17,7 @@ use qrs_chrono::{Calendar, Datelike, NaiveDate};
 /// # Examples
 /// ```
 /// use qrs_chrono::Calendar;
-/// use qrs_fincore::HolidayAdj;
+/// use qrs_finance::core::HolidayAdj;
 /// use chrono::NaiveDate as Date;
 ///
 /// let cal = Calendar::default();
@@ -75,7 +75,7 @@ impl HolidayAdj {
     /// # Example
     /// ```
     /// use qrs_chrono::Calendar;
-    /// use qrs_fincore::HolidayAdj;
+    /// use qrs_finance::core::HolidayAdj;
     /// use chrono::NaiveDate as Date;
     ///
     /// let cal = Calendar::default();

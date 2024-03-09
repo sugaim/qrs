@@ -1,5 +1,5 @@
 use qrs_chrono::DateTime;
-use qrs_fincore::daycount::{Act365f, Act365fRate, DayCountRate};
+use qrs_finance::core::daycount::{Act365f, Act365fRate, DayCountRate};
 use qrs_math::num::Real;
 
 use super::YieldCurve;

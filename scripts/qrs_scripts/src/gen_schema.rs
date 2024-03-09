@@ -1,8 +1,6 @@
 mod schema_cleaner;
 mod schema_collector;
 
-use std::{path::Path, str::FromStr};
-
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     visit::Visitor,
@@ -15,7 +13,6 @@ use self::schema_collector::SchemaCollector;
 
 trait ISchemaItem {
     fn gen(&self, collector: &mut SchemaCollector) -> anyhow::Result<()>;
-    fn check(&self, dirpath: &Path) -> anyhow::Result<()>;
 }
 
 struct SchemaItem<T>(std::marker::PhantomData<T>);
@@ -28,10 +25,10 @@ impl<T> Default for SchemaItem<T> {
 
 impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
     fn gen(&self, collector: &mut SchemaCollector) -> anyhow::Result<()> {
-        gen_schema_single::<T>(collector)
-    }
-    fn check(&self, dirpath: &Path) -> anyhow::Result<()> {
-        check_same_schema::<T>(dirpath);
+        let mut gen: SchemaGenerator = SchemaSettings::draft07().into();
+        let mut schema = gen.root_schema_for::<T>();
+        SchemaCleaner.visit_root_schema(&mut schema);
+        collector.visit_root_schema(&mut schema);
         Ok(())
     }
 }
@@ -51,7 +48,15 @@ fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
     ]
 }
 
-pub fn gen_schema() -> anyhow::Result<()> {
+fn gen_schema() -> anyhow::Result<SchemaCollector> {
+    let mut collector = SchemaCollector::default();
+    for item in get_schema_items() {
+        item.gen(&mut collector)?;
+    }
+    Ok(collector)
+}
+
+pub fn write_schema() -> anyhow::Result<()> {
     let root_dir = {
         let mut dir = workspace_root()?;
         dir.push("schemas");
@@ -62,10 +67,7 @@ pub fn gen_schema() -> anyhow::Result<()> {
         std::fs::remove_dir_all(&root_dir)?;
     }
     std::fs::create_dir_all(&root_dir)?;
-    let mut collector = SchemaCollector::default();
-    for item in get_schema_items() {
-        item.gen(&mut collector)?;
-    }
+    let collector = gen_schema()?;
     for (name, sch) in &collector.definitions {
         let filepath = root_dir.join(format!("{name}.yaml"));
         let y = serde_yaml::to_string(&sch);
@@ -81,46 +83,10 @@ pub fn gen_schema() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn json_schema_setting() -> SchemaGenerator {
-    SchemaSettings::draft07().into()
-}
-
-fn gen_schema_single<T: JsonSchema>(collector: &mut SchemaCollector) -> Result<(), anyhow::Error> {
-    gen_json_schema_single::<T>(collector)?;
-    Ok(())
-}
-
-fn gen_json_schema_single<T: JsonSchema>(collector: &mut SchemaCollector) -> anyhow::Result<()> {
-    let mut gen = json_schema_setting();
-    let mut schema = gen.root_schema_for::<T>();
-    SchemaCleaner.visit_root_schema(&mut schema);
-    collector.visit_root_schema(&mut schema);
-    Ok(())
-}
-
-// check that the stored schema is the same as the latest schema
-fn check_same_schema<T: JsonSchema>(dirpath: &Path) {
-    let stored = {
-        let filepath = dirpath.join(format!("{}.json", T::schema_name()));
-        let s = std::fs::read_to_string(filepath);
-        assert!(s.is_ok(), "Failed to read file: {:?}", s);
-        let s = s.unwrap();
-        let j = serde_json::Value::from_str(&s);
-        assert!(j.is_ok(), "Failed to parse JSON: {:?}", j);
-        j.unwrap()
-    };
-    let latest = {
-        let mut gen = json_schema_setting();
-        let schema = gen.root_schema_for::<T>();
-        let j = serde_json::to_value(&schema);
-        assert!(j.is_ok(), "Failed to serialize schema: {:?}", j);
-        j.unwrap()
-    };
-    assert_eq!(stored, latest);
-}
-
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
@@ -130,9 +96,36 @@ mod tests {
             dir.push("schemas");
             dir
         };
-
-        for item in get_schema_items() {
-            item.check(&root_dir).unwrap();
-        }
+        let expected = {
+            let mut res: HashMap<String, serde_yaml::Value> = HashMap::default();
+            for file in std::fs::read_dir(root_dir).unwrap() {
+                let file = file.unwrap();
+                let path = file.path();
+                let name = path.file_stem().unwrap().to_str().unwrap();
+                let s = std::fs::read_to_string(&path).unwrap();
+                let y: Result<serde_yaml::Value, _> = serde_yaml::from_str(&s);
+                assert!(y.is_ok(), "Failed to parse schema: {:?}", y);
+                res.insert(name.to_string(), y.unwrap());
+            }
+            res
+        };
+        let generated = {
+            let schemas = gen_schema();
+            assert!(schemas.is_ok(), "Failed to generate schema");
+            let schemas = schemas.unwrap();
+            let mut res = HashMap::default();
+            for (name, sch) in &schemas.definitions {
+                let y = serde_yaml::to_value(sch);
+                assert!(y.is_ok(), "Failed to serialize schema: {:?}", y);
+                res.insert(name.clone(), y.unwrap());
+            }
+            for (name, sch) in &schemas.roots {
+                let y = serde_yaml::to_value(sch);
+                assert!(y.is_ok(), "Failed to serialize schema: {:?}", y);
+                res.insert(name.clone(), y.unwrap());
+            }
+            res
+        };
+        assert_eq!(expected, generated);
     }
 }

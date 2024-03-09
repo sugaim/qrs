@@ -3,6 +3,7 @@ name = "qrs_datasrc"
 version.workspace = true
 edition.workspace = true
 exclude.workspace = true
+rust-version.workspace = true
 
 [features]
 default = []

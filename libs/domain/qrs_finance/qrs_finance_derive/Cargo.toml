@@ -1,5 +1,5 @@
 [package]
-name = "qrs_datasrc_derive"
+name = "qrs_finance_derive"
 version.workspace = true
 edition.workspace = true
 exclude.workspace = true

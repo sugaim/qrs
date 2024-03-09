@@ -1,6 +1,7 @@
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.76.0"
 
 exclude = ["scripts/**"]
 
@@ -12,12 +13,12 @@ members = [
     "libs/core/qrs_collections",
     "libs/core/qrs_datasrc",
     "libs/core/qrs_datasrc/qrs_datasrc_derive",
-    "libs/core/qrs_fincore",
     "libs/core/qrs_math",
 
     # domain
+    "libs/domain/qrs_finance",
+    "libs/domain/qrs_finance/qrs_finance_derive",
     "libs/domain/qrs_model",
-    "libs/domain/qrs_product",
 
     # others
     "scripts/qrs_scripts",
@@ -60,8 +61,8 @@ uuid = { version = "1.7.0", features = ["v4", "serde"] }
 qrs_chrono = { path = "libs/core/qrs_chrono" }
 qrs_collections = { path = "libs/core/qrs_collections" }
 qrs_datasrc = { path = "libs/core/qrs_datasrc" }
-qrs_fincore = { path = "libs/core/qrs_fincore" }
 qrs_math = { path = "libs/core/qrs_math" }
 
 ## domain
+qrs_finance = { path = "libs/domain/qrs_finance" }
 qrs_model = { path = "libs/domain/qrs_model" }

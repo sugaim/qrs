@@ -1,4 +1,4 @@
-use qrs_fincore::Ccy;
+use crate::core::Ccy;
 
 // -----------------------------------------------------------------------------
 // Collateral
@@ -25,17 +25,17 @@ mod ccy_serde {
 
     #[derive(Serialize, Deserialize, JsonSchema)]
     pub(super) struct Ccy {
-        ccy: qrs_fincore::Ccy,
+        ccy: crate::core::Ccy,
     }
 
-    pub(super) fn serialize<S>(ccy: &qrs_fincore::Ccy, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(ccy: &crate::core::Ccy, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         Ccy { ccy: *ccy }.serialize(serializer)
     }
 
-    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<qrs_fincore::Ccy, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<crate::core::Ccy, D::Error>
     where
         D: Deserializer<'de>,
     {
