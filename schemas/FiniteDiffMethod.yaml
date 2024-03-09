@@ -1,0 +1,7 @@
+title: FiniteDiffMethod
+description: Finite difference method
+type: string
+enum:
+- forward
+- backward
+- central

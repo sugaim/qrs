@@ -1,0 +1,10 @@
+title: CHermite1d_for_DateTime_and_Act365fRate_for_double_and_CatmullRomScheme
+type: object
+required:
+- knots
+- scheme
+properties:
+  knots:
+    $ref: ./MinSized_for_Series_for_DateTime_and_Act365fRate_for_double.yaml
+  scheme:
+    $ref: ./CatmullRomScheme.yaml

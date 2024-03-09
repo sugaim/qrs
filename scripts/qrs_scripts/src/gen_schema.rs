@@ -1,16 +1,20 @@
-use std::{collections::HashMap, path::Path, str::FromStr};
+mod schema_cleaner;
+mod schema_collector;
 
-use log::info;
+use std::{path::Path, str::FromStr};
 
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
+    visit::Visitor,
     JsonSchema,
 };
 
-use crate::utils::workspace_root;
+use crate::{gen_schema::schema_cleaner::SchemaCleaner, utils::workspace_root};
+
+use self::schema_collector::SchemaCollector;
 
 trait ISchemaItem {
-    fn gen(&self, dirpath: &Path) -> anyhow::Result<()>;
+    fn gen(&self, collector: &mut SchemaCollector) -> anyhow::Result<()>;
     fn check(&self, dirpath: &Path) -> anyhow::Result<()>;
 }
 
@@ -23,8 +27,8 @@ impl<T> Default for SchemaItem<T> {
 }
 
 impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
-    fn gen(&self, dirpath: &Path) -> anyhow::Result<()> {
-        gen_schema_single::<T>(dirpath)
+    fn gen(&self, collector: &mut SchemaCollector) -> anyhow::Result<()> {
+        gen_schema_single::<T>(collector)
     }
     fn check(&self, dirpath: &Path) -> anyhow::Result<()> {
         check_same_schema::<T>(dirpath);
@@ -32,30 +36,19 @@ impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
     }
 }
 
-fn get_schema_items() -> HashMap<&'static str, Vec<Box<dyn ISchemaItem>>> {
-    let mut map: HashMap<_, Vec<Box<dyn ISchemaItem>>> = HashMap::new();
-    map.insert(
-        "core/qrs_chrono",
-        vec![
-            Box::<SchemaItem<qrs_chrono::Calendar>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::CalendarSymbol>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::DateTime<chrono::FixedOffset>>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::DateTime<chrono::Utc>>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::DateTime<chrono_tz::Tz>>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::DateTime>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::Tz>>::default() as _,
-            Box::<SchemaItem<qrs_chrono::Duration>>::default() as _,
-        ],
-    );
-    map.insert(
-        "core/qrs_math/func1d",
-        vec![Box::<SchemaItem<qrs_math::func1d::SemiContinuity>>::default() as _],
-    );
-    map.insert(
-        "domain/qrs_model/core/curve",
-        vec![Box::<SchemaItem<qrs_model::core::curve::ComponentCurve<f64>>>::default() as _],
-    );
-    map
+fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
+    type SchItem<T> = Box<SchemaItem<T>>;
+    vec![
+        SchItem::<qrs_chrono::Calendar>::default() as _,
+        SchItem::<qrs_chrono::CalendarSymbol>::default() as _,
+        SchItem::<qrs_chrono::DateTime<chrono::FixedOffset>>::default() as _,
+        SchItem::<qrs_chrono::DateTime<chrono::Utc>>::default() as _,
+        SchItem::<qrs_chrono::DateTime<chrono_tz::Tz>>::default() as _,
+        SchItem::<qrs_chrono::DateTime>::default() as _,
+        SchItem::<qrs_chrono::Tz>::default() as _,
+        SchItem::<qrs_chrono::Duration>::default() as _,
+        SchItem::<qrs_model::core::curve::ComponentCurve<f64>>::default() as _,
+    ]
 }
 
 pub fn gen_schema() -> anyhow::Result<()> {
@@ -68,13 +61,22 @@ pub fn gen_schema() -> anyhow::Result<()> {
     if root_dir.exists() {
         std::fs::remove_dir_all(&root_dir)?;
     }
-    for (subdir, items) in get_schema_items() {
-        let mut dir = root_dir.clone();
-        dir.push(subdir);
-        std::fs::create_dir_all(&dir)?;
-        for item in items {
-            item.gen(&dir)?;
-        }
+    std::fs::create_dir_all(&root_dir)?;
+    let mut collector = SchemaCollector::default();
+    for item in get_schema_items() {
+        item.gen(&mut collector)?;
+    }
+    for (name, sch) in &collector.definitions {
+        let filepath = root_dir.join(format!("{name}.yaml"));
+        let y = serde_yaml::to_string(&sch);
+        assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
+        std::fs::write(filepath, y.unwrap())?;
+    }
+    for (name, sch) in &collector.roots {
+        let filepath = root_dir.join(format!("{name}.yaml"));
+        let y = serde_yaml::to_string(&sch);
+        assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
+        std::fs::write(filepath, y.unwrap())?;
     }
     Ok(())
 }
@@ -83,18 +85,17 @@ fn json_schema_setting() -> SchemaGenerator {
     SchemaSettings::draft07().into()
 }
 
-fn gen_schema_single<T: JsonSchema>(dirpath: &Path) -> Result<(), anyhow::Error> {
-    gen_json_schema_single::<T>(dirpath)?;
+fn gen_schema_single<T: JsonSchema>(collector: &mut SchemaCollector) -> Result<(), anyhow::Error> {
+    gen_json_schema_single::<T>(collector)?;
     Ok(())
 }
 
-fn gen_json_schema_single<T: JsonSchema>(dirpath: &Path) -> Result<(), anyhow::Error> {
+fn gen_json_schema_single<T: JsonSchema>(collector: &mut SchemaCollector) -> anyhow::Result<()> {
     let mut gen = json_schema_setting();
-    let schema = gen.root_schema_for::<T>();
-    let schema_str = serde_json::to_string_pretty(&schema).unwrap();
-    let filepath = dirpath.join(format!("{}.json", T::schema_name()));
-    info!("Writing schema to {}", filepath.display());
-    std::fs::write(filepath, schema_str).map_err(anyhow::Error::from)
+    let mut schema = gen.root_schema_for::<T>();
+    SchemaCleaner.visit_root_schema(&mut schema);
+    collector.visit_root_schema(&mut schema);
+    Ok(())
 }
 
 // check that the stored schema is the same as the latest schema
@@ -130,12 +131,8 @@ mod tests {
             dir
         };
 
-        for (subdir, items) in get_schema_items() {
-            let mut dir = root_dir.clone();
-            dir.push(subdir);
-            for item in items {
-                item.check(&dir).unwrap();
-            }
+        for item in get_schema_items() {
+            item.check(&root_dir).unwrap();
         }
     }
 }

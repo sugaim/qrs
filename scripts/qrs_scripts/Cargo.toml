@@ -13,6 +13,7 @@ env_logger = { workspace = true }
 log = { workspace = true }
 schemars = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 
 # internal
 qrs_chrono = { workspace = true, features = ["serde"] }

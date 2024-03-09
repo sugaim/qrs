@@ -1,0 +1,88 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: ComponentCurve_for_double
+oneOf:
+- description: A flat curve is a curve that has a constant value for all tenors.
+  type: object
+  required:
+  - rate
+  - type
+  properties:
+    rate:
+      $ref: ./Act365fRate_for_double.yaml
+    type:
+      type: string
+      const: flat
+- type: object
+  required:
+  - logdf
+  - type
+  properties:
+    logdf:
+      $ref: ./Lerp1d_for_DateTime_and_double.yaml
+    type:
+      type: string
+      const: log_lerp
+- type: object
+  required:
+  - logdf
+  - type
+  properties:
+    logdf:
+      $ref: ./CHermite1d_for_DateTime_and_double_and_CatmullRomScheme.yaml
+    type:
+      type: string
+      const: log_c_r
+- type: object
+  required:
+  - base_date
+  - type
+  - zero_rate
+  properties:
+    base_date:
+      description: Base date of zero rates.
+      $ref: ./DateTime.yaml
+    type:
+      type: string
+      const: zero_rate_lerp
+    zero_rate:
+      description: Zero rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.
+      $ref: ./Lerp1d_for_DateTime_and_Act365fRate_for_double.yaml
+- type: object
+  required:
+  - base_date
+  - type
+  - zero_rate
+  properties:
+    base_date:
+      description: Base date of zero rates.
+      $ref: ./DateTime.yaml
+    type:
+      type: string
+      const: zero_rate_cr
+    zero_rate:
+      description: Zero rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.
+      $ref: ./CHermite1d_for_DateTime_and_Act365fRate_for_double_and_CatmullRomScheme.yaml
+- description: A curve based on instant forward rates.
+  type: object
+  required:
+  - instant_forward_rate
+  - type
+  properties:
+    instant_forward_rate:
+      description: Forward rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.
+      $ref: ./Lerp1d_for_DateTime_and_Act365fRate_for_double.yaml
+    type:
+      type: string
+      const: inst_fwd_lerp
+- description: A curve based on instant forward rates.
+  type: object
+  required:
+  - instant_forward_rate
+  - type
+  properties:
+    instant_forward_rate:
+      description: Forward rate curve, which is a function from datetime to annualized(ACT/365Fixed) rate.
+      $ref: ./PwConst1d_for_DateTime_and_Act365fRate_for_double.yaml
+    type:
+      type: string
+      const: inst_fwd_pw_const

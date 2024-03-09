@@ -32,7 +32,11 @@ use crate::num::{Arithmetic, PartialOrdMinMax, RelPos, Scalar, Vector, Zero};
 /// assert_eq!(interp.interp(&1.5), 1.0);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, schemars::JsonSchema),
+    schemars(description = "1-dimensional piecewise constant interpolation.")
+)]
 pub struct PwConst1d<G, V> {
     /// Knots which are interpolated.
     #[cfg_attr(

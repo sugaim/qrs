@@ -1,0 +1,4 @@
+title: Act365fRate_for_double
+description: Annual rate with Act/365 fixed convention. Unit is 1. Not percentage nor bps.
+type: number
+format: double

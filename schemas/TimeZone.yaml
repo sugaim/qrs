@@ -1,0 +1,11 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: TimeZone
+description: String for timezone. Either of '+/-HH:mm', '+/-HH:mm:ss' or IANA timezone identifier is available
+examples:
+- +09:00
+- -05:00
+- +09:00:00
+- Asia/Tokyo
+- America/New_York
+- Etc/UTC
+type: string

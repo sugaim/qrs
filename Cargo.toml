@@ -16,7 +16,8 @@ members = [
     "libs/core/qrs_math",
 
     # domain
-    "libs/domain/qrs_model", "libs/domain/qrs_product",
+    "libs/domain/qrs_model",
+    "libs/domain/qrs_product",
 
     # others
     "scripts/qrs_scripts",
@@ -47,6 +48,7 @@ rust_decimal = { version = "1.34.2" }
 schemars = { version = "0.8.16", features = ["chrono", "uuid1", "either"] }
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
+serde_yaml = { version = "0.9.32" }
 static_assertions = { version = "1.1.0" }
 strum = { version = "0.26.1", features = ["derive"] }
 syn = { version = "2.0.48", features = ["full"] }

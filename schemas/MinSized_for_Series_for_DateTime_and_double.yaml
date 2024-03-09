@@ -1,0 +1,16 @@
+title: MinSized_for_Series_for_DateTime_and_double
+description: Series for 1-dimensional interpolation
+items:
+  description: An item of a series, which is a collection of values marked by grids(ordered keys)
+  type: object
+  required:
+  - grid
+  - value
+  properties:
+    grid:
+      $ref: ./DateTime.yaml
+    value:
+      type: number
+      format: double
+additionalItems: false
+minItems: 2
