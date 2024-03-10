@@ -7,11 +7,19 @@ exclude.workspace = true
 
 [features]
 default = []
-serde = ["dep:serde", "dep:schemars"]
+serde = [
+  "dep:serde",
+  "dep:schemars",
+  "qrs_collections/serde",
+  "qrs_chrono/serde",
+]
 
 [dependencies]
+anyhow = { workspace = true }
 chrono = { workspace = true }
+derivative = { workspace = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true }
 schemars = { workspace = true, optional = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -19,6 +27,7 @@ thiserror = { workspace = true }
 # internal
 qrs_collections = { workspace = true }
 qrs_chrono = { workspace = true }
+qrs_datasrc = { workspace = true }
 qrs_finance_derive = { path = "./qrs_finance_derive" }
 qrs_math = { workspace = true }
 

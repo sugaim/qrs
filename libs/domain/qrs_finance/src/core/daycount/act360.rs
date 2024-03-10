@@ -3,7 +3,7 @@ use std::ops::{Div, Mul, MulAssign};
 use qrs_chrono::{Duration, Velocity};
 use qrs_math::num::{FloatBased, Real, RelPos, Vector};
 
-use super::{DayCount, DayCountRate, Rate, _ops::define_vector_behavior};
+use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // Act360
@@ -30,7 +30,7 @@ impl std::fmt::Display for Act360 {
 //
 // methods
 //
-impl DayCount for Act360 {
+impl Dcf for Act360 {
     #[inline]
     fn dcf(&self, from: &qrs_chrono::DateTime, to: &qrs_chrono::DateTime) -> f64 {
         const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
@@ -38,7 +38,7 @@ impl DayCount for Act360 {
     }
 }
 
-impl DayCountRate for Act360 {
+impl RateDcf for Act360 {
     type Rate<V: Real> = Act360Rate<V>;
 
     /// Create a Act365F rate from the given annual rate.
@@ -96,7 +96,7 @@ impl<V> Act360Rate<V> {
 //
 // methods
 //
-impl<V: Real> Rate for Act360Rate<V> {
+impl<V: Real> InterestRate for Act360Rate<V> {
     type Value = V;
     type Convention = Act360;
 

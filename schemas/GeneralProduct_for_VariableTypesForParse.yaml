@@ -1,0 +1,360 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: GeneralProduct_for_VariableTypesForParse
+type: object
+required:
+- collateral
+- components
+properties:
+  collateral:
+    $ref: '#/definitions/Collateral'
+  components:
+    $ref: '#/definitions/Components_for_VariableTypesForParse'
+definitions:
+  CalendarSymbol:
+    description: A symbol for a calendar. Combined calendars are available. As an atom, only alphanumeric characters or '_' are allowed.
+    examples:
+    - TK
+    - TK|NY
+    - TK&NY
+    - (TK|NY)&(LN|TK)
+    type: string
+  Cashflow_for_VariableTypesForParse:
+    oneOf:
+    - type: object
+      required:
+      - coupon_base
+      - rate
+      - type
+      properties:
+        coupon_base:
+          $ref: '#/definitions/CouponBase_for_VariableTypesForParse'
+        rate:
+          $ref: '#/definitions/ValueOrId_for_double'
+        type:
+          type: string
+          const: fixed_coupon
+    - type: object
+      required:
+      - convention
+      - coupon_base
+      - reference_rate
+      - type
+      properties:
+        convention:
+          $ref: '#/definitions/ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol'
+        coupon_base:
+          $ref: '#/definitions/CouponBase_for_VariableTypesForParse'
+        gearing:
+          $ref: '#/definitions/ValueOrId_for_double'
+        reference_rate:
+          type: string
+        spread:
+          $ref: '#/definitions/ValueOrId_for_double'
+        type:
+          type: string
+          const: overnight_index_coupon
+  Ccy:
+    type: string
+    enum:
+    - JPY
+    - USD
+  Collateral:
+    oneOf:
+    - description: Money
+      type: object
+      required:
+      - ccy
+      - type
+      properties:
+        ccy:
+          $ref: '#/definitions/Ccy'
+        type:
+          type: string
+          const: money
+    - description: Equity shares
+      type: object
+      required:
+      - company
+      - type
+      properties:
+        company:
+          type: string
+        type:
+          type: string
+          const: share
+  Components_for_VariableTypesForParse:
+    type: object
+    required:
+    - cashflows
+    - constants
+    - legs
+    - markets
+    - processes
+    properties:
+      cashflows:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Cashflow_for_VariableTypesForParse'
+      constants:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Constant'
+      legs:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Leg_for_VariableTypesForParse'
+      markets:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Market'
+      processes:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Process_for_VariableTypesForParse'
+  CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol:
+    type: object
+    required:
+    - calendar
+    - daycount
+    properties:
+      calendar:
+        $ref: '#/definitions/CalendarSymbol'
+      daycount:
+        $ref: '#/definitions/DayCountSymbol'
+      floor_target:
+        $ref: '#/definitions/CompoundingFloorTarget'
+      lockout:
+        type: integer
+        format: int32
+      lookback:
+        $ref: '#/definitions/CompoundingLockback'
+  CompoundingFloorTarget:
+    type: string
+    enum:
+    - overall
+    - each_rate
+  CompoundingLockback:
+    oneOf:
+    - type: object
+      required:
+      - days
+      - type
+      properties:
+        days:
+          type: integer
+          format: int32
+        type:
+          type: string
+          const: without_observation_shift
+    - type: object
+      required:
+      - days
+      - type
+      properties:
+        days:
+          type: integer
+          format: int32
+        type:
+          type: string
+          const: observation_shift
+    - type: object
+      required:
+      - days
+      - type
+      properties:
+        days:
+          type: integer
+          format: int32
+        type:
+          type: string
+          const: weighted_observation_shift
+  Constant:
+    anyOf:
+    - type: number
+      format: double
+    - type: integer
+      format: int64
+    - type: boolean
+    - type: object
+      additionalProperties: true
+  CouponBase_for_VariableTypesForParse:
+    type: object
+    required:
+    - daycount
+    - entitle
+    - notional
+    - payment
+    - period_end
+    - period_start
+    properties:
+      daycount:
+        $ref: '#/definitions/DayCountSymbol'
+      entitle:
+        $ref: '#/definitions/DateWithTag_for_String'
+      notional:
+        $ref: '#/definitions/Money_for_ValueOrId_for_double'
+      payment:
+        $ref: '#/definitions/DateWithTag_for_String'
+      period_end:
+        $ref: '#/definitions/DateWithTag_for_String'
+      period_start:
+        $ref: '#/definitions/DateWithTag_for_String'
+  DateWithTag_for_String:
+    description: Date with a time cut tag. Format is 'yyyy-MM-dd@{tag}'
+    type: string
+    pattern: ^\d{4}-\d{2}-\d{2}@.*$
+  DayCountSymbol:
+    oneOf:
+    - type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          const: act360
+    - type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          const: act365f
+    - type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          const: nl360
+    - type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          const: nl365
+    - type: object
+      required:
+      - calendar
+      - timezone
+      - type
+      properties:
+        calendar:
+          $ref: '#/definitions/CalendarSymbol'
+        timezone:
+          $ref: '#/definitions/TimeZone'
+        type:
+          type: string
+          const: bd252
+  Leg_for_VariableTypesForParse:
+    oneOf:
+    - type: object
+      required:
+      - cashflows
+      - type
+      properties:
+        cashflows:
+          type: array
+          items:
+            type: string
+        type:
+          type: string
+          const: straight
+  Market:
+    oneOf:
+    - type: object
+      required:
+      - reference
+      - type
+      properties:
+        reference:
+          $ref: '#/definitions/OvernightRate'
+        type:
+          type: string
+          const: overnight_rate
+  MinSized1_for_Array_of_MinSized1_for_Map_of_ValueOrId_for_double:
+    type: array
+    items:
+      $ref: '#/definitions/MinSized1_for_Map_of_ValueOrId_for_double'
+    minItems: 1
+  MinSized1_for_Array_of_String:
+    type: array
+    items:
+      type: string
+    minItems: 1
+  MinSized1_for_Array_of_ValueOrId_for_double:
+    type: array
+    items:
+      $ref: '#/definitions/ValueOrId_for_double'
+    minItems: 1
+  MinSized1_for_Map_of_ValueOrId_for_double:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      $ref: '#/definitions/ValueOrId_for_double'
+  Money_for_ValueOrId_for_double:
+    type: object
+    required:
+    - amount
+    - ccy
+    properties:
+      amount:
+        $ref: '#/definitions/ValueOrId_for_double'
+      ccy:
+        $ref: '#/definitions/Ccy'
+  OvernightRate:
+    type: string
+    enum:
+    - TONA
+    - SOFR
+  Process_for_VariableTypesForParse:
+    oneOf:
+    - type: object
+      required:
+      - series
+      - type
+      properties:
+        series:
+          $ref: '#/definitions/MinSized1_for_Array_of_MinSized1_for_Map_of_ValueOrId_for_double'
+        type:
+          type: string
+          const: deterministic_float
+    - type: object
+      required:
+      - type
+      - values
+      properties:
+        type:
+          type: string
+          const: constant_float
+        values:
+          $ref: '#/definitions/MinSized1_for_Array_of_ValueOrId_for_double'
+    - type: object
+      required:
+      - references
+      - type
+      properties:
+        references:
+          $ref: '#/definitions/MinSized1_for_Array_of_String'
+        type:
+          type: string
+          const: market
+  TimeZone:
+    description: String for timezone. Either of '+/-HH:mm', '+/-HH:mm:ss' or IANA timezone identifier is available
+    examples:
+    - +09:00
+    - -05:00
+    - +09:00:00
+    - Asia/Tokyo
+    - America/New_York
+    - Etc/UTC
+    type: string
+  ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol:
+    anyOf:
+    - $ref: '#/definitions/CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol'
+    - type: string
+  ValueOrId_for_double:
+    anyOf:
+    - type: number
+      format: double
+    - type: string

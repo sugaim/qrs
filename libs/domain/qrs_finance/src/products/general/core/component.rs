@@ -5,8 +5,7 @@ use std::fmt::Display;
 //
 pub trait Component {
     fn category(&self) -> ComponentCategory;
-    fn value_type(&self) -> ValueType;
-    fn depends_on(&self) -> impl IntoIterator<Item = (&str, ComponentCategory, ValueType)>;
+    fn depends_on(&self) -> impl IntoIterator<Item = (&str, ComponentCategory)>;
 }
 
 // -----------------------------------------------------------------------------
@@ -19,28 +18,43 @@ pub trait Component {
     serde(rename_all = "snake_case")
 )]
 pub enum ValueType {
-    #[strum(serialize = "float")]
-    Float,
+    #[strum(serialize = "number")]
+    Number,
     #[strum(serialize = "integer")]
     Integer,
     #[strum(serialize = "boolean")]
     Boolean,
+    #[strum(serialize = "object")]
+    Object,
 }
 
 // -----------------------------------------------------------------------------
 // ComponentCategory
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumString, strum::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(rename_all = "snake_case")
+    serde(rename_all = "snake_case", tag = "type", content = "value_type")
 )]
 pub enum ComponentCategory {
-    #[strum(serialize = "constant")]
-    Constant,
-    #[strum(serialize = "process")]
-    Process,
+    Constant(ValueType),
+    Market,
+    Process(ValueType),
+    Cashflow,
+    Leg,
+}
+
+impl Display for ComponentCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ComponentCategory::Constant(vt) => write!(f, "constant.{}", vt),
+            ComponentCategory::Market => write!(f, "market"),
+            ComponentCategory::Process(vt) => write!(f, "process.{}", vt),
+            ComponentCategory::Cashflow => write!(f, "cashflow"),
+            ComponentCategory::Leg => write!(f, "leg"),
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------

@@ -1,0 +1,9 @@
+title: Constant
+anyOf:
+- type: number
+  format: double
+- type: integer
+  format: int64
+- type: boolean
+- type: object
+  additionalProperties: true

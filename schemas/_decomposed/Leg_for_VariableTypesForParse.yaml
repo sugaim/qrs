@@ -1,0 +1,14 @@
+title: Leg_for_VariableTypesForParse
+oneOf:
+- type: object
+  required:
+  - cashflows
+  - type
+  properties:
+    cashflows:
+      type: array
+      items:
+        type: string
+    type:
+      type: string
+      const: straight

@@ -1,0 +1,43 @@
+title: DayCountSymbol
+oneOf:
+- type: object
+  required:
+  - type
+  properties:
+    type:
+      type: string
+      const: act360
+- type: object
+  required:
+  - type
+  properties:
+    type:
+      type: string
+      const: act365f
+- type: object
+  required:
+  - type
+  properties:
+    type:
+      type: string
+      const: nl360
+- type: object
+  required:
+  - type
+  properties:
+    type:
+      type: string
+      const: nl365
+- type: object
+  required:
+  - calendar
+  - timezone
+  - type
+  properties:
+    calendar:
+      $ref: ./CalendarSymbol.yaml
+    timezone:
+      $ref: ./TimeZone.yaml
+    type:
+      type: string
+      const: bd252

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::products::general::{Component, ComponentCategory, ValueType};
 
 // -----------------------------------------------------------------------------
@@ -10,9 +12,10 @@ use crate::products::general::{Component, ComponentCategory, ValueType};
     serde(untagged)
 )]
 pub enum Constant {
-    Float(f64),
-    Integer(i64),
+    Number(f64),
+    Int(i64),
     Boolean(bool),
+    Object(HashMap<String, serde_json::Value>),
 }
 
 //
@@ -21,20 +24,16 @@ pub enum Constant {
 impl Component for Constant {
     #[inline]
     fn category(&self) -> ComponentCategory {
-        ComponentCategory::Constant
-    }
-
-    #[inline]
-    fn value_type(&self) -> ValueType {
         match self {
-            Constant::Float(_) => ValueType::Float,
-            Constant::Integer(_) => ValueType::Integer,
-            Constant::Boolean(_) => ValueType::Boolean,
+            Constant::Number(_) => ComponentCategory::Constant(ValueType::Number),
+            Constant::Int(_) => ComponentCategory::Constant(ValueType::Integer),
+            Constant::Boolean(_) => ComponentCategory::Constant(ValueType::Boolean),
+            Constant::Object(_) => ComponentCategory::Constant(ValueType::Object),
         }
     }
 
     #[inline]
-    fn depends_on(&self) -> impl IntoIterator<Item = (&str, ComponentCategory, ValueType)> {
+    fn depends_on(&self) -> impl IntoIterator<Item = (&str, ComponentCategory)> {
         [].into_iter()
     }
 }

@@ -936,14 +936,18 @@ dependencies = [
 name = "qrs_finance"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
+ "derivative",
  "maplit",
  "qrs_chrono",
  "qrs_collections",
+ "qrs_datasrc",
  "qrs_finance_derive",
  "qrs_math",
  "schemars",
  "serde",
+ "serde_json",
  "strum",
  "thiserror",
 ]
@@ -1007,6 +1011,7 @@ dependencies = [
  "env_logger",
  "log",
  "qrs_chrono",
+ "qrs_finance",
  "qrs_math",
  "qrs_model",
  "schemars",

@@ -11,7 +11,7 @@ properties:
     $ref: ./SemiContinuity.yaml
   knots:
     description: Knots which are interpolated.
-    $ref: ./MinSized_for_Series_for_DateTime_and_Act365fRate_for_double.yaml
+    $ref: ./MinSized2_for_Series_for_DateTime_and_Act365fRate_for_double.yaml
   partition_ratio:
     description: Ratio determining partition point to use the left or right value. (0.0 <= partition <= 1.0)
     type: number

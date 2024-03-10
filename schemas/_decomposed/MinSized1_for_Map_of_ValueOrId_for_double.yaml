@@ -1,0 +1,5 @@
+title: MinSized1_for_Map_of_ValueOrId_for_double
+type: object
+minProperties: 1
+additionalProperties:
+  $ref: ./ValueOrId_for_double.yaml

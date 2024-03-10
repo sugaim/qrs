@@ -1,0 +1,35 @@
+title: CompoundingLockback
+oneOf:
+- type: object
+  required:
+  - days
+  - type
+  properties:
+    days:
+      type: integer
+      format: int32
+    type:
+      type: string
+      const: without_observation_shift
+- type: object
+  required:
+  - days
+  - type
+  properties:
+    days:
+      type: integer
+      format: int32
+    type:
+      type: string
+      const: observation_shift
+- type: object
+  required:
+  - days
+  - type
+  properties:
+    days:
+      type: integer
+      format: int32
+    type:
+      type: string
+      const: weighted_observation_shift

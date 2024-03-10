@@ -1,6 +1,7 @@
 mod schema_cleaner;
 mod schema_collector;
 
+use qrs_finance::products::general::VariableTypesForParse;
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     visit::Visitor,
@@ -25,7 +26,11 @@ impl<T> Default for SchemaItem<T> {
 
 impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
     fn gen(&self, collector: &mut SchemaCollector) -> anyhow::Result<()> {
-        let mut gen: SchemaGenerator = SchemaSettings::draft07().into();
+        let mut gen: SchemaGenerator = SchemaSettings::draft07()
+            .with(|s| {
+                s.option_add_null_type = false;
+            })
+            .into();
         let mut schema = gen.root_schema_for::<T>();
         SchemaCleaner.visit_root_schema(&mut schema);
         collector.visit_root_schema(&mut schema);
@@ -44,12 +49,18 @@ fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
         SchItem::<qrs_chrono::DateTime>::default() as _,
         SchItem::<qrs_chrono::Tz>::default() as _,
         SchItem::<qrs_chrono::Duration>::default() as _,
+        SchItem::<qrs_finance::products::general::GeneralProduct<VariableTypesForParse>>::default()
+            as _,
         SchItem::<qrs_model::core::curve::ComponentCurve<f64>>::default() as _,
     ]
 }
 
-fn gen_schema() -> anyhow::Result<SchemaCollector> {
-    let mut collector = SchemaCollector::default();
+fn gen_schema(remove_defs: bool) -> anyhow::Result<SchemaCollector> {
+    let mut collector = SchemaCollector {
+        remove_defs,
+        ..Default::default()
+    };
+
     for item in get_schema_items() {
         item.gen(&mut collector)?;
     }
@@ -66,19 +77,26 @@ pub fn write_schema() -> anyhow::Result<()> {
     if root_dir.exists() {
         std::fs::remove_dir_all(&root_dir)?;
     }
-    std::fs::create_dir_all(&root_dir)?;
-    let collector = gen_schema()?;
-    for (name, sch) in &collector.definitions {
-        let filepath = root_dir.join(format!("{name}.yaml"));
-        let y = serde_yaml::to_string(&sch);
-        assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
-        std::fs::write(filepath, y.unwrap())?;
-    }
-    for (name, sch) in &collector.roots {
-        let filepath = root_dir.join(format!("{name}.yaml"));
-        let y = serde_yaml::to_string(&sch);
-        assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
-        std::fs::write(filepath, y.unwrap())?;
+    let mut decomposed = root_dir.clone();
+    decomposed.push("_decomposed");
+    let cases = [(false, root_dir), (true, decomposed)];
+    for (remove_defs, dir) in cases {
+        std::fs::create_dir_all(&dir)?;
+        let collector = gen_schema(remove_defs)?;
+        if remove_defs {
+            for (name, sch) in &collector.definitions {
+                let filepath = dir.join(format!("{name}.yaml"));
+                let y = serde_yaml::to_string(&sch);
+                assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
+                std::fs::write(filepath, y.unwrap())?;
+            }
+        }
+        for (name, sch) in &collector.roots {
+            let filepath = dir.join(format!("{name}.yaml"));
+            let y = serde_yaml::to_string(&sch);
+            assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
+            std::fs::write(filepath, y.unwrap())?;
+        }
     }
     Ok(())
 }
@@ -94,6 +112,7 @@ mod tests {
         let root_dir = {
             let mut dir = workspace_root().unwrap();
             dir.push("schemas");
+            dir.push("_decomposed");
             dir
         };
         let expected = {
@@ -110,7 +129,7 @@ mod tests {
             res
         };
         let generated = {
-            let schemas = gen_schema();
+            let schemas = gen_schema(true);
             assert!(schemas.is_ok(), "Failed to generate schema");
             let schemas = schemas.unwrap();
             let mut res = HashMap::default();

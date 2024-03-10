@@ -5,4 +5,4 @@ required:
 - knots
 properties:
   knots:
-    $ref: ./MinSized_for_Series_for_DateTime_and_double.yaml
+    $ref: ./MinSized2_for_Series_for_DateTime_and_double.yaml

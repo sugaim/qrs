@@ -1,4 +1,2 @@
-mod collateral;
+pub mod core;
 pub mod general;
-
-pub use collateral::Collateral;

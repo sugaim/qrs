@@ -1,0 +1,10 @@
+title: Money_for_ValueOrId_for_double
+type: object
+required:
+- amount
+- ccy
+properties:
+  amount:
+    $ref: ./ValueOrId_for_double.yaml
+  ccy:
+    $ref: ./Ccy.yaml

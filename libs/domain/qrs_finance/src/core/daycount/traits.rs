@@ -1,19 +1,19 @@
 use qrs_chrono::DateTime;
-use qrs_math::num::{Real, Scalar, Vector};
+use qrs_math::num::{Real, Scalar};
 
 // -----------------------------------------------------------------------------
-// DayCount
+// Dcf
 //
 /// Day count convention
-pub trait DayCount: Sized {
+pub trait Dcf: Sized {
     fn dcf(&self, from: &DateTime, to: &DateTime) -> f64;
 }
 
 // -----------------------------------------------------------------------------
-// RateDayCount
+// RateDcf
 //
 /// Day count convention related to rate, such as Actual/360, Actual/365, etc.
-pub trait DayCountRate: DayCount {
+pub trait RateDcf: Dcf {
     type Rate<V: Real>;
 
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V>;
@@ -35,16 +35,16 @@ pub trait DayCountRate: DayCount {
 }
 
 // -----------------------------------------------------------------------------
-// Rate
+// InterestRate
 //
 /// Trait for financial rate.
 ///
 /// Rate is not just a number because it obeys some day count convention.
 /// So this trait provides access to rate value and day count convention consistently.
 /// Also, this provides a static relationship between rate and the convention.
-pub trait Rate: Sized + Vector<Self::Value> {
+pub trait InterestRate: Sized {
     type Value: Real;
-    type Convention: DayCountRate;
+    type Convention: RateDcf;
 
     /// Get day count convention which this rate obeys.
     fn convention(&self) -> Self::Convention;

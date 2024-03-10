@@ -10,12 +10,15 @@ use crate::core::Ccy;
     serde(rename_all = "snake_case", tag = "type")
 )]
 pub enum Collateral {
+    /// Money
     #[cfg_attr(
         feature = "serde",
         serde(with = "ccy_serde"),
         schemars(with = "ccy_serde::Ccy")
     )]
     Money(Ccy),
+    /// Equity shares
+    Share { company: String },
 }
 
 #[cfg(feature = "serde")]

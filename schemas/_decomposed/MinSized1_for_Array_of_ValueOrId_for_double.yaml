@@ -1,0 +1,5 @@
+title: MinSized1_for_Array_of_ValueOrId_for_double
+type: array
+items:
+  $ref: ./ValueOrId_for_double.yaml
+minItems: 1

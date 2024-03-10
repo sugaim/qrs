@@ -4,15 +4,15 @@ use chrono::Datelike;
 use qrs_chrono::{Duration, Velocity};
 use qrs_math::num::Real;
 
-use super::{DayCount, DayCountRate, Rate, _ops::define_vector_behavior};
+use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
-// NL365
+// Nl365
 //
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NL365;
+pub struct Nl365;
 
-impl Default for NL365 {
+impl Default for Nl365 {
     #[inline]
     fn default() -> Self {
         Self
@@ -22,7 +22,7 @@ impl Default for NL365 {
 //
 // display, serde
 //
-impl std::fmt::Display for NL365 {
+impl std::fmt::Display for Nl365 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NL/365")
     }
@@ -31,7 +31,7 @@ impl std::fmt::Display for NL365 {
 //
 // methods
 //
-impl DayCount for NL365 {
+impl Dcf for Nl365 {
     fn dcf(&self, from: &qrs_chrono::DateTime, to: &qrs_chrono::DateTime) -> f64 {
         match from.cmp(to) {
             std::cmp::Ordering::Less => {}
@@ -70,34 +70,34 @@ impl DayCount for NL365 {
     }
 }
 
-impl DayCountRate for NL365 {
-    type Rate<V: Real> = NL365Rate<V>;
+impl RateDcf for Nl365 {
+    type Rate<V: Real> = Nl365Rate<V>;
 
     /// Create a Act365F rate from the given annual rate.
     /// Note that the unit of the argument is 1. Not percent nor bps.
     #[inline]
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V> {
-        NL365Rate::from_rate(annual_rate)
+        Nl365Rate::from_rate(annual_rate)
     }
 }
 
 // -----------------------------------------------------------------------------
-// RateNL365
+// RateNl365
 //
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct NL365Rate<V>(V);
+pub struct Nl365Rate<V>(V);
 
 //
 // display, serde
 //
 #[cfg(feature = "serde")]
-impl<V: schemars::JsonSchema> schemars::JsonSchema for NL365Rate<V> {
+impl<V: schemars::JsonSchema> schemars::JsonSchema for Nl365Rate<V> {
     fn schema_name() -> String {
-        format!("RateNL365_for_{}", V::schema_name())
+        format!("RateNl365_for_{}", V::schema_name())
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_finance::daycount::RateNL365<{}>", V::schema_id()).into()
+        format!("qrs_finance::daycount::RateNl365<{}>", V::schema_id()).into()
     }
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut schema = V::json_schema(gen);
@@ -114,8 +114,8 @@ impl<V: schemars::JsonSchema> schemars::JsonSchema for NL365Rate<V> {
 //
 // methods
 //
-impl<V> NL365Rate<V> {
-    /// Create a new `RateNL365` instance with the given annual rate.
+impl<V> Nl365Rate<V> {
+    /// Create a new `RateNl365` instance with the given annual rate.
     ///
     /// Unit of the argument is 1. Not percent nor bps.
     /// Note that user must ensure that the given value is rate in NL/365F convention.
@@ -125,13 +125,13 @@ impl<V> NL365Rate<V> {
     }
 }
 
-impl<V: Real> Rate for NL365Rate<V> {
+impl<V: Real> InterestRate for Nl365Rate<V> {
     type Value = V;
-    type Convention = NL365;
+    type Convention = Nl365;
 
     #[inline]
     fn convention(&self) -> Self::Convention {
-        NL365
+        Nl365
     }
 
     #[inline]
@@ -143,4 +143,4 @@ impl<V: Real> Rate for NL365Rate<V> {
 //
 // operators
 //
-define_vector_behavior!(NL365Rate);
+define_vector_behavior!(Nl365Rate);

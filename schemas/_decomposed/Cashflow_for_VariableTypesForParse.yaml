@@ -1,0 +1,35 @@
+title: Cashflow_for_VariableTypesForParse
+oneOf:
+- type: object
+  required:
+  - coupon_base
+  - rate
+  - type
+  properties:
+    coupon_base:
+      $ref: ./CouponBase_for_VariableTypesForParse.yaml
+    rate:
+      $ref: ./ValueOrId_for_double.yaml
+    type:
+      type: string
+      const: fixed_coupon
+- type: object
+  required:
+  - convention
+  - coupon_base
+  - reference_rate
+  - type
+  properties:
+    convention:
+      $ref: ./ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol.yaml
+    coupon_base:
+      $ref: ./CouponBase_for_VariableTypesForParse.yaml
+    gearing:
+      $ref: ./ValueOrId_for_double.yaml
+    reference_rate:
+      type: string
+    spread:
+      $ref: ./ValueOrId_for_double.yaml
+    type:
+      type: string
+      const: overnight_index_coupon

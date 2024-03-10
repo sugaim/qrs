@@ -1,0 +1,24 @@
+title: Collateral
+oneOf:
+- description: Money
+  type: object
+  required:
+  - ccy
+  - type
+  properties:
+    ccy:
+      $ref: ./Ccy.yaml
+    type:
+      type: string
+      const: money
+- description: Equity shares
+  type: object
+  required:
+  - company
+  - type
+  properties:
+    company:
+      type: string
+    type:
+      type: string
+      const: share

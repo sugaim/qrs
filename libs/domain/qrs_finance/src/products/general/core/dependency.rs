@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use crate::products::general::components::{constant::Constant, process::Process};
+use derivative::Derivative;
 
-use super::ComponentKey;
+use crate::products::general::components::{constant::Constant, market::Market, process::Process};
+
+use super::{ComponentKey, VariableTypes};
 
 // -----------------------------------------------------------------------------
 // DependencyError
@@ -19,8 +21,9 @@ pub enum DependencyError {
 // -----------------------------------------------------------------------------
 // ComponentGraph
 //
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ComponentGraph {
+#[derive(Debug, Clone, Default, Derivative)]
+pub struct ComponentGraph<Ts: VariableTypes> {
     pub constants: HashMap<String, Constant>,
-    pub process: HashMap<String, Process>,
+    pub markets: HashMap<String, Market>,
+    pub process: HashMap<String, Process<Ts>>,
 }

@@ -107,11 +107,11 @@ where
     fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut res = schemars::schema::SchemaObject {
             instance_type: Some(schemars::schema::InstanceType::String.into()),
-            format: Some("date-time".to_owned()),
             ..Default::default()
         };
         res.metadata().description =
             Some("Date with a time cut tag. Format is 'yyyy-MM-dd@{tag}'".to_owned());
+        res.string().pattern = Some("^\\d{4}-\\d{2}-\\d{2}@.*$".to_owned());
         res.into()
     }
 }

@@ -1,0 +1,22 @@
+title: CouponBase_for_VariableTypesForParse
+type: object
+required:
+- daycount
+- entitle
+- notional
+- payment
+- period_end
+- period_start
+properties:
+  daycount:
+    $ref: ./DayCountSymbol.yaml
+  entitle:
+    $ref: ./DateWithTag_for_String.yaml
+  notional:
+    $ref: ./Money_for_ValueOrId_for_double.yaml
+  payment:
+    $ref: ./DateWithTag_for_String.yaml
+  period_end:
+    $ref: ./DateWithTag_for_String.yaml
+  period_start:
+    $ref: ./DateWithTag_for_String.yaml

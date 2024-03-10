@@ -1,0 +1,5 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: DateTimeUtc
+description: A datetime with UTC timezone
+type: string
+format: date-time

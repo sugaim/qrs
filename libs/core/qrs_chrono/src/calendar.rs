@@ -15,11 +15,13 @@ use chrono::{Datelike, NaiveDate};
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, schemars::JsonSchema))]
 struct CalendarData {
-    /// The extra holidays of the calendar. These days are non-business day weekdays.
+    /// The extra holidays of the calendar. These days are non-business day weekdays
+    /// if `treat_weekend_as_business_day` is `false`.
     #[cfg_attr(feature = "serde", serde(rename = "extra_holidays"))]
     extra_holds: Vec<NaiveDate>,
 
     /// The extra business days of the calendar. These days are business day weekends.
+    /// Must be empty if `treat_weekend_as_business_day` is `true`.
     #[cfg_attr(feature = "serde", serde(rename = "extra_business_days"))]
     extra_bizds: Vec<NaiveDate>,
 
@@ -85,6 +87,12 @@ impl CalendarData {
         extra_bizds.sort();
         extra_bizds.dedup();
 
+        // check that extra business days are empty
+        // when weekends are treated as business days
+        ensure!(
+            !treat_weekend_as_business_day || extra_bizds.is_empty(),
+            "Extra business days must be empty when treat_weekend_as_business_day is true"
+        );
         // check that extra_holds are weekdays
         ensure!(
             treat_weekend_as_business_day
@@ -303,10 +311,12 @@ impl Calendar {
             }
             extra_holds.extend(cal.extra_holds.iter().copied());
 
-            match extra_bizds {
-                None => extra_bizds = Some(cal.extra_bizds.iter().copied().collect()),
-                Some(ref mut bizds) => {
-                    bizds.retain(|d| cal.extra_bizds.contains(d));
+            if !treat_weekend_as_business_day.unwrap() {
+                match extra_bizds {
+                    None => extra_bizds = Some(cal.extra_bizds.iter().copied().collect()),
+                    Some(ref mut bizds) => {
+                        bizds.retain(|d| cal.extra_bizds.contains(d));
+                    }
                 }
             }
             valid_from = valid_from.max(cal.valid_from);
@@ -314,7 +324,12 @@ impl Calendar {
         }
         let res = Self::_new(
             extra_holds.into_iter().collect(),
-            extra_bizds.into_iter().flatten().collect(),
+            if treat_weekend_as_business_day.unwrap_or_default() {
+                // if weekends are business days, extra business days must be empty
+                Vec::new()
+            } else {
+                extra_bizds.into_iter().flatten().collect()
+            },
             valid_from,
             valid_to,
             treat_weekend_as_business_day.unwrap_or_default(),
@@ -354,7 +369,9 @@ impl Calendar {
             } else {
                 treat_weekend_as_business_day = Some(cal.treat_weekend_as_business_day);
             }
-            extra_bizds.extend(cal.extra_bizds.iter().copied());
+            if !treat_weekend_as_business_day.unwrap() {
+                extra_bizds.extend(cal.extra_bizds.iter().copied());
+            }
 
             match extra_holds {
                 None => extra_holds = Some(cal.extra_holds.iter().copied().collect()),
@@ -367,7 +384,12 @@ impl Calendar {
         }
         let res = Self::_new(
             extra_holds.into_iter().flatten().collect(),
-            extra_bizds.into_iter().collect(),
+            if treat_weekend_as_business_day.unwrap_or_default() {
+                // if weekends are business days, extra business days must be empty
+                Vec::new()
+            } else {
+                extra_bizds.into_iter().collect()
+            },
             valid_from,
             valid_to,
             treat_weekend_as_business_day.unwrap_or_default(),
@@ -425,6 +447,36 @@ impl Calendar {
     #[inline]
     pub fn treat_weekend_as_bizday(&self) -> bool {
         self.0.treat_weekend_as_business_day
+    }
+
+    /// Count the business days between the given dates.
+    pub fn num_bizdays(&self, start: NaiveDate, end: NaiveDate) -> u64 {
+        if end <= start {
+            return 0;
+        }
+        if self.treat_weekend_as_bizday() {
+            let hol_stt = self.extra_holidays().partition_point(|d| *d < start);
+            let hol_end = self.extra_holidays().partition_point(|d| *d < end);
+            return ((end - start).num_days() - (hol_end - hol_stt) as i64) as u64;
+        }
+        let prev_stt_mon = start - chrono::Days::new(start.weekday().num_days_from_monday() as _);
+        let prev_end_mon = end - chrono::Days::new(end.weekday().num_days_from_monday() as _);
+        let naive_count = (prev_end_mon - prev_stt_mon).num_days() / 7 * 5
+            - start.weekday().num_days_from_monday().min(5) as i64
+            + end.weekday().num_days_from_monday().min(5) as i64;
+
+        let extra_hols = {
+            let stt = self.extra_holidays().partition_point(|d| *d < start);
+            let end = self.extra_holidays().partition_point(|d| *d < end);
+            (end - stt) as i64
+        };
+        let extra_bds = {
+            let stt = self.extra_bizdays().partition_point(|d| *d < start);
+            let end = self.extra_bizdays().partition_point(|d| *d < end);
+            (end - stt) as i64
+        };
+
+        (naive_count - extra_hols + extra_bds) as u64
     }
 
     /// Check if the given date is a holiday.
@@ -910,16 +962,13 @@ mod tests {
                 end: NaiveDate::from_ymd_opt(2021, 1, 10).unwrap()
             }
         );
-        let json = r#"{"extra_holidays":["2021-01-01"],"extra_business_days":["2021-01-02"],"valid_from":"2021-01-01","valid_to":"2021-01-10","treat_weekend_as_business_day":true}"#;
+        let json = r#"{"extra_holidays":["2021-01-01"],"extra_business_days":[],"valid_from":"2021-01-01","valid_to":"2021-01-10","treat_weekend_as_business_day":true}"#;
         let cal: Calendar = serde_json::from_str(json).unwrap();
         assert_eq!(
             cal.extra_holidays(),
             &[NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()]
         );
-        assert_eq!(
-            cal.extra_bizdays(),
-            &[NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()]
-        );
+        assert_eq!(cal.extra_bizdays(), &[]);
         assert!(cal.treat_weekend_as_bizday());
         assert_eq!(
             cal.valid_period(),
@@ -952,7 +1001,7 @@ mod tests {
 
         let cal1 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
-            vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
+            vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
             true,
@@ -998,10 +1047,7 @@ mod tests {
 
         let cal1 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
-            vec![
-                NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
-                NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(),
-            ],
+            vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
             true,
@@ -1032,10 +1078,7 @@ mod tests {
 
         let cal1 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()],
-            vec![
-                NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
-                NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(),
-            ],
+            vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
             true,
@@ -1043,7 +1086,7 @@ mod tests {
         .unwrap();
         let cal2 = Calendar::_new(
             vec![NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()],
-            vec![NaiveDate::from_ymd_opt(2021, 1, 2).unwrap()],
+            vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
             true,
@@ -1058,10 +1101,7 @@ mod tests {
                 NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()
             ]
         );
-        assert_eq!(
-            cal.extra_bizdays(),
-            &[NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),]
-        );
+        assert_eq!(cal.extra_bizdays(), &[]);
         assert!(cal.treat_weekend_as_bizday());
     }
 
@@ -1136,7 +1176,7 @@ mod tests {
                 NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
                 NaiveDate::from_ymd_opt(2021, 1, 5).unwrap(),
             ],
-            vec![NaiveDate::from_ymd_opt(2021, 1, 3).unwrap()],
+            vec![],
             NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2021, 1, 10).unwrap(),
             true,
@@ -1156,13 +1196,7 @@ mod tests {
             cal.extra_holidays(),
             &[NaiveDate::from_ymd_opt(2021, 1, 5).unwrap()]
         );
-        assert_eq!(
-            cal.extra_bizdays(),
-            &[
-                NaiveDate::from_ymd_opt(2021, 1, 2).unwrap(),
-                NaiveDate::from_ymd_opt(2021, 1, 3).unwrap()
-            ]
-        );
+        assert_eq!(cal.extra_bizdays(), &[]);
         assert!(cal.treat_weekend_as_bizday());
 
         let cal1 = Calendar::_new(

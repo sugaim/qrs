@@ -1,0 +1,29 @@
+title: Components_for_VariableTypesForParse
+type: object
+required:
+- cashflows
+- constants
+- legs
+- markets
+- processes
+properties:
+  cashflows:
+    type: object
+    additionalProperties:
+      $ref: ./Cashflow_for_VariableTypesForParse.yaml
+  constants:
+    type: object
+    additionalProperties:
+      $ref: ./Constant.yaml
+  legs:
+    type: object
+    additionalProperties:
+      $ref: ./Leg_for_VariableTypesForParse.yaml
+  markets:
+    type: object
+    additionalProperties:
+      $ref: ./Market.yaml
+  processes:
+    type: object
+    additionalProperties:
+      $ref: ./Process_for_VariableTypesForParse.yaml

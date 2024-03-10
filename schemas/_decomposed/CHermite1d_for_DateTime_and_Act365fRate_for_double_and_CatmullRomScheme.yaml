@@ -5,6 +5,6 @@ required:
 - scheme
 properties:
   knots:
-    $ref: ./MinSized_for_Series_for_DateTime_and_Act365fRate_for_double.yaml
+    $ref: ./MinSized2_for_Series_for_DateTime_and_Act365fRate_for_double.yaml
   scheme:
     $ref: ./CatmullRomScheme.yaml

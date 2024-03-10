@@ -1,0 +1,5 @@
+title: Ccy
+type: string
+enum:
+- JPY
+- USD

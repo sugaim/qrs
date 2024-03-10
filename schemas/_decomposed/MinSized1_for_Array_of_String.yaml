@@ -1,0 +1,5 @@
+title: MinSized1_for_Array_of_String
+type: array
+items:
+  type: string
+minItems: 1

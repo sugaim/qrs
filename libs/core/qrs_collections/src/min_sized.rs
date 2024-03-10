@@ -63,7 +63,7 @@ where
     C: schemars::JsonSchema,
 {
     fn schema_name() -> String {
-        format!("MinSized_for_{}", C::schema_name())
+        format!("MinSized{}_for_{}", N, C::schema_name())
     }
 
     fn schema_id() -> std::borrow::Cow<'static, str> {
@@ -77,25 +77,30 @@ where
         let Schema::Object(mut obj) = res else {
             return res;
         };
-        let (is_string, is_array) = match &obj.instance_type {
+        let (is_string, is_array, is_object) = match &obj.instance_type {
             Some(SingleOrVec::Single(inst_type)) => {
                 let inst_type = inst_type.as_ref();
                 (
                     inst_type == &InstanceType::String,
                     inst_type == &InstanceType::Array,
+                    inst_type == &InstanceType::Object,
                 )
             }
             Some(SingleOrVec::Vec(inst_types)) => (
                 inst_types.contains(&InstanceType::String),
                 inst_types.contains(&InstanceType::Array),
+                inst_types.contains(&InstanceType::Object),
             ),
-            _ => (false, false),
+            _ => (false, false, false),
         };
         if is_string {
             obj.string().min_length = Some(N as _);
         }
         if is_array {
             obj.array().min_items = Some(N as _);
+        }
+        if is_object {
+            obj.object().min_properties = Some(N as _);
         }
         Schema::Object(obj)
     }

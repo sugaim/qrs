@@ -1,4 +1,4 @@
-title: MinSized_for_Series_for_DateTime_and_double
+title: MinSized2_for_Series_for_DateTime_and_double
 description: Series for 1-dimensional interpolation
 items:
   description: An item of a series, which is a collection of values marked by grids(ordered keys)

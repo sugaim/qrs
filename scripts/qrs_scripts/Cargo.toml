@@ -17,5 +17,6 @@ serde_yaml = { workspace = true }
 
 # internal
 qrs_chrono = { workspace = true, features = ["serde"] }
+qrs_finance = { workspace = true, features = ["serde"] }
 qrs_math = { workspace = true, features = ["serde"] }
 qrs_model = { workspace = true, features = ["serde"] }
