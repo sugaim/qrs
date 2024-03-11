@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use qrs_chrono::DateTime;
 use qrs_finance::core::daycount::{Act365fRate, InterestRate};
@@ -52,14 +52,27 @@ impl<C: YieldCurve> YieldCurve for Arc<C> {
     }
 }
 
+impl<C: YieldCurve> YieldCurve for Mutex<C> {
+    type Value = C::Value;
+
+    #[inline]
+    fn forward_rate(
+        &self,
+        from: &DateTime,
+        to: &DateTime,
+    ) -> anyhow::Result<Act365fRate<Self::Value>> {
+        self.lock().unwrap().forward_rate(from, to)
+    }
+}
+
 // -----------------------------------------------------------------------------
 // YieldCurveAdjust
 //
-pub trait YieldCurveAdjust<C: YieldCurve> {
-    fn adjusted_forward_rate(
+pub trait YieldCurveAdjust<V: Real> {
+    fn adjusted_forward_rate<C: YieldCurve<Value = V>>(
         &self,
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<Act365fRate<C::Value>>;
+    ) -> anyhow::Result<Act365fRate<V>>;
 }

@@ -2,7 +2,7 @@ use derivative::Derivative;
 
 use qrs_chrono::DateTime;
 use qrs_finance::core::daycount::Act365fRate;
-use qrs_math::num::FloatBased;
+use qrs_math::num::{FloatBased, Real};
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
 #[cfg(feature = "serde")]
@@ -89,13 +89,13 @@ pub struct Bump<V> {
 //
 // methods
 //
-impl<C: YieldCurve> YieldCurveAdjust<C> for Bump<C::Value> {
-    fn adjusted_forward_rate(
+impl<V: Real> YieldCurveAdjust<V> for Bump<V> {
+    fn adjusted_forward_rate<C: YieldCurve<Value = V>>(
         &self,
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<Act365fRate<<C as YieldCurve>::Value>> {
+    ) -> anyhow::Result<Act365fRate<V>> {
         match from.cmp(to) {
             std::cmp::Ordering::Equal => return curve.forward_rate(from, to),
             std::cmp::Ordering::Greater => return self.adjusted_forward_rate(curve, to, from),

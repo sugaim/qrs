@@ -373,6 +373,7 @@ impl<'a, G, V> IntoIterator for &'a mut Series<G, V> {
 // -----------------------------------------------------------------------------
 // SeriesIter
 //
+#[derive(Debug, Clone)]
 pub struct SeriesIter<'a, G, V> {
     gs: std::slice::Iter<'a, G>,
     vs: std::slice::Iter<'a, V>,
@@ -408,6 +409,7 @@ impl<'a, G, V> FusedIterator for SeriesIter<'a, G, V> {}
 // -----------------------------------------------------------------------------
 // SeriesIntoIter
 //
+#[derive(Debug, Clone)]
 pub struct SeriesIntoIter<G, V> {
     gs: std::vec::IntoIter<G>,
     vs: std::vec::IntoIter<V>,
@@ -444,6 +446,7 @@ impl<G, V> FusedIterator for SeriesIntoIter<G, V> {}
 // -----------------------------------------------------------------------------
 // SeriesIterMut
 //
+#[derive(Debug)]
 pub struct SeriesIterMut<'a, G, V> {
     gs: std::slice::Iter<'a, G>,
     vs: std::slice::IterMut<'a, V>,

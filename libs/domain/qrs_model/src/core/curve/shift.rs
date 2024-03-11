@@ -1,5 +1,6 @@
 use qrs_chrono::{DateTime, Duration};
 use qrs_finance::core::daycount::Act365fRate;
+use qrs_math::num::Real;
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
 #[cfg(feature = "serde")]
@@ -47,14 +48,14 @@ pub struct Shift {
 //
 // methods
 //
-impl<C: YieldCurve> YieldCurveAdjust<C> for Shift {
+impl<V: Real> YieldCurveAdjust<V> for Shift {
     #[inline]
-    fn adjusted_forward_rate(
+    fn adjusted_forward_rate<C: YieldCurve<Value = V>>(
         &self,
         curve: &C,
         from: &DateTime,
         to: &DateTime,
-    ) -> anyhow::Result<Act365fRate<<C as YieldCurve>::Value>> {
+    ) -> anyhow::Result<Act365fRate<V>> {
         let from = *from - self.dt;
         let to = *to - self.dt;
         curve.forward_rate(&from, &to)

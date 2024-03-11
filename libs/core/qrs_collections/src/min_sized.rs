@@ -1,4 +1,7 @@
-use std::{borrow::Borrow, ops::Deref};
+use std::{
+    borrow::Borrow,
+    ops::{Deref, Index, IndexMut},
+};
 
 // -----------------------------------------------------------------------------
 // MinSizedError
@@ -12,6 +15,19 @@ pub enum MinSizedError {
 // -----------------------------------------------------------------------------
 // MinSized
 //
+/// A thin wrapper which guarantees that the length of the inner data is at least N at type level.
+///
+/// To calculate the length, it uses the [`ExactSizeIterator`] trait for the reference of the inner data.
+/// That is, this struct requires the following bounds on the inner data `C`:
+/// - `&'a C: IntoIterator`
+/// - `<&'a C as IntoIterator>::IntoIter: ExactSizeIterator`
+///
+/// where `'a` is any lifetime which is greater than the lifetime of the inner data, `C: 'a`.
+///
+/// This struct implements [`Deref`], [`Borrow`], and [`AsRef`] to access the inner data immutablely.
+/// On the other hand, to prevent changing the length of the inner data,
+/// this struct does not expose inner data as mutable reference.
+/// Only [`IntoIterator`] for the mutable reference or [`IndexMut`] is way to access the inner data as mutable.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MinSized<C, const N: usize>(C);
 
@@ -46,7 +62,7 @@ where
 impl<'de, C, const N: usize> serde::Deserialize<'de> for MinSized<C, N>
 where
     C: serde::Deserialize<'de>,
-    C: ExactSizeIter,
+    C: SizedContainer,
 {
     fn deserialize<D>(deserializer: D) -> Result<MinSized<C, N>, D::Error>
     where
@@ -115,7 +131,7 @@ impl<C, const N: usize> MinSized<C, N> {
     #[inline]
     pub fn new(data: C) -> Result<Self, MinSizedError>
     where
-        C: ExactSizeIter,
+        C: SizedContainer,
     {
         let len = data.len();
         if len < N {
@@ -133,7 +149,7 @@ pub trait RequireMinSize<const N: usize>: Sized {
     fn require_min_size(self) -> Result<MinSized<Self, N>, MinSizedError>;
 }
 
-impl<C: ExactSizeIter, const N: usize> RequireMinSize<N> for C {
+impl<C: SizedContainer, const N: usize> RequireMinSize<N> for C {
     fn require_min_size(self) -> Result<MinSized<Self, N>, MinSizedError> {
         MinSized::new(self)
     }
@@ -162,13 +178,6 @@ impl<C, const N: usize> AsRef<C> for MinSized<C, N> {
     }
 }
 
-impl<C, const N: usize> MinSized<C, N> {
-    /// Get the inner data.
-    #[inline]
-    pub fn into_inner(self) -> C {
-        self.0
-    }
-}
 impl<C, const N: usize> IntoIterator for MinSized<C, N>
 where
     C: IntoIterator,
@@ -178,6 +187,52 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+impl<'a, C, const N: usize> IntoIterator for &'a mut MinSized<C, N>
+where
+    &'a mut C: IntoIterator,
+{
+    type Item = <&'a mut C as IntoIterator>::Item;
+    type IntoIter = <&'a mut C as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<C, const N: usize, Idx> Index<Idx> for MinSized<C, N>
+where
+    C: Index<Idx>,
+{
+    type Output = C::Output;
+
+    fn index(&self, index: Idx) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<C, const N: usize, Idx> IndexMut<Idx> for MinSized<C, N>
+where
+    C: IndexMut<Idx>,
+{
+    fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+impl<C, const N: usize> MinSized<C, N> {
+    /// Get the inner data.
+    #[inline]
+    pub fn inner(&self) -> &C {
+        &self.0
+    }
+
+    /// Get the inner data.
+    #[inline]
+    pub fn into_inner(self) -> C {
+        self.0
     }
 }
 
@@ -193,14 +248,14 @@ where
     type Iter = <&'this I as IntoIterator>::IntoIter;
 }
 
-pub trait ExactSizeIter: for<'this> RefIntoIter<'this> {
+pub trait SizedContainer: for<'this> RefIntoIter<'this> {
     fn iter(&self) -> <Self as RefIntoIter<'_>>::Iter;
     fn len(&self) -> usize {
         self.iter().len()
     }
 }
 
-impl<I> ExactSizeIter for I
+impl<I> SizedContainer for I
 where
     for<'this> &'this I: IntoIterator,
     for<'this> <&'this I as IntoIterator>::IntoIter: ExactSizeIterator,
