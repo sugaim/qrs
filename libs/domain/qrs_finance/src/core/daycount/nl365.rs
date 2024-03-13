@@ -84,14 +84,12 @@ impl RateDcf for Nl365 {
 // -----------------------------------------------------------------------------
 // RateNl365
 //
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Deserialize, serde::Serialize)]
 pub struct Nl365Rate<V>(V);
 
 //
 // display, serde
 //
-#[cfg(feature = "serde")]
 impl<V: schemars::JsonSchema> schemars::JsonSchema for Nl365Rate<V> {
     fn schema_name() -> String {
         format!("RateNl365_for_{}", V::schema_name())

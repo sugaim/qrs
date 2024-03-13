@@ -15,6 +15,8 @@ pub use act365f::{Act365f, Act365fRate};
 pub use bd252::{Bd252, Bd252Rate};
 pub use nl360::{Nl360, Nl360Rate};
 pub use nl365::{Nl365, Nl365Rate};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 pub use traits::{Dcf, InterestRate, RateDcf};
 
 // -----------------------------------------------------------------------------
@@ -105,31 +107,27 @@ impl RateDcf for DayCount {
 // -----------------------------------------------------------------------------
 // DayCountSymbol
 //
-#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(tag = "type")
-)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type")]
 pub enum DayCountSymbol {
-    #[cfg_attr(feature = "serde", serde(rename = "act360"))]
+    #[serde(rename = "act360")]
     #[strum(serialize = "act360")]
     Act360,
-    #[cfg_attr(feature = "serde", serde(rename = "act365f"))]
+    #[serde(rename = "act365f")]
     #[strum(serialize = "act365f")]
     Act365f,
-    #[cfg_attr(feature = "serde", serde(rename = "nl360"))]
+    #[serde(rename = "nl360")]
     #[strum(serialize = "nl360")]
     Nl360,
-    #[cfg_attr(feature = "serde", serde(rename = "nl365"))]
+    #[serde(rename = "nl365")]
     #[strum(serialize = "nl365")]
     Nl365,
-    #[cfg_attr(feature = "serde", serde(rename = "bd252"))]
+    #[serde(rename = "bd252")]
     #[strum(serialize = "bd252")]
     Bd252 {
-        #[cfg_attr(feature = "serde", serde(rename = "calendar"))]
+        #[serde(rename = "calendar")]
         cal: CalendarSymbol,
-        #[cfg_attr(feature = "serde", serde(rename = "timezone"))]
+        #[serde(rename = "timezone")]
         tz: Tz,
     },
 }

@@ -1,4 +1,8 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString};
 
 // -----------------------------------------------------------------------------
 // Component
@@ -11,12 +15,10 @@ pub trait Component {
 // -----------------------------------------------------------------------------
 // ValueType
 //
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumString, strum::Display)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(rename_all = "snake_case")
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, Display, Serialize, Deserialize, JsonSchema,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum ValueType {
     #[strum(serialize = "number")]
     Number,
@@ -31,12 +33,8 @@ pub enum ValueType {
 // -----------------------------------------------------------------------------
 // ComponentCategory
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(rename_all = "snake_case", tag = "type", content = "value_type")
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", tag = "type", content = "value_type")]
 pub enum ComponentCategory {
     Constant(ValueType),
     Market,
@@ -60,7 +58,7 @@ impl Display for ComponentCategory {
 // -----------------------------------------------------------------------------
 // ComponentKey
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ComponentKey {
     pub cat: ComponentCategory,
     pub name: String,
@@ -73,4 +71,24 @@ impl Display for ComponentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}[{}]", self.name, self.cat)
     }
+}
+
+// -----------------------------------------------------------------------------
+// VariableTypes
+//
+pub trait VariableTypes {
+    type Number;
+    type Integer;
+    type Boolean;
+
+    type DateTime;
+    type DayCount;
+    type Calendar;
+
+    type CashflowRef;
+    type LegRef;
+    type MarketRef;
+    type ProcessRef;
+
+    type CompoundingConvention;
 }

@@ -2,7 +2,7 @@ use std::{ops::Div, sync::Arc};
 
 use derivative::Derivative;
 use qrs_chrono::{DateTime, Duration, Velocity};
-use qrs_datasrc::{DataSrc, DebugTree, TakeSnapshot};
+use qrs_datasrc::{CacheableSrc, DataSrc, DebugTree, TakeSnapshot};
 use qrs_finance::core::daycount::Act365fRate;
 use qrs_math::num::{Real, RelPos};
 
@@ -13,10 +13,7 @@ use super::{DiscountAdjust, DiscountKey};
 // -----------------------------------------------------------------------------
 // DiscountCurve
 //
-#[derive(Debug, Clone, Derivative)]
-#[derivative(PartialEq(
-    bound = "V: PartialOrd + qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat>"
-))]
+#[derive(Debug, Clone)]
 pub struct DiscountCurve<V> {
     crv: AdjustedCurve<Arc<Curve<V>>, DiscountAdjust<V>>,
 }
@@ -153,6 +150,17 @@ where
     }
 }
 
+impl<S, V> CacheableSrc<DiscountKey> for DiscountSrc<S>
+where
+    S: CacheableSrc<DiscountKey, Output = Arc<Curve<V>>>,
+    V: Real<BaseFloat = <DateTime as RelPos>::Output> + Div<Duration, Output = Velocity<V>>,
+{
+    #[inline]
+    fn etag(&self, req: &DiscountKey) -> anyhow::Result<String> {
+        self.src.etag(req)
+    }
+}
+
 impl<S, V> DataSrc<DiscountReq<V>> for DiscountSrc<S>
 where
     S: DataSrc<DiscountKey>,
@@ -169,6 +177,18 @@ where
                 adjustments: req.adjustments.clone(),
             },
         })
+    }
+}
+
+impl<S, V> CacheableSrc<DiscountReq<V>> for DiscountSrc<S>
+where
+    S: CacheableSrc<DiscountKey>,
+    S::Output: Into<Arc<Curve<V>>>,
+    V: Real<BaseFloat = <DateTime as RelPos>::Output> + Div<Duration, Output = Velocity<V>>,
+{
+    #[inline]
+    fn etag(&self, req: &DiscountReq<V>) -> anyhow::Result<String> {
+        self.src.etag(&req.key)
     }
 }
 

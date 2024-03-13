@@ -1,6 +1,9 @@
 use chrono::Days;
 
 use qrs_chrono::{Calendar, Datelike, NaiveDate};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{Display, EnumIter, EnumString};
 
 // -----------------------------------------------------------------------------
 // HolidayAdj
@@ -32,12 +35,20 @@ use qrs_chrono::{Calendar, Datelike, NaiveDate};
 /// assert_eq!(Some(Date::from_ymd_opt(2023, 12, 29).unwrap()), rule.adjust(d, &cal));
 /// ```
 ///
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display, strum::EnumIter, strum::EnumString)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(rename_all = "snake_case")
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Display,
+    EnumIter,
+    EnumString,
+    Serialize,
+    Deserialize,
+    JsonSchema,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum HolidayAdj {
     /// No adjustment
     #[strum(serialize = "unadjust")]

@@ -1,4 +1,4 @@
-title: Cashflow_for_VariableTypesForParse
+title: Cashflow_for_VariableTypesForData_for_double
 oneOf:
 - type: object
   required:
@@ -7,7 +7,7 @@ oneOf:
   - type
   properties:
     coupon_base:
-      $ref: ./CouponBase_for_VariableTypesForParse.yaml
+      $ref: ./CouponBase_for_VariableTypesForData_for_double.yaml
     rate:
       $ref: ./ValueOrId_for_double.yaml
     type:
@@ -21,9 +21,9 @@ oneOf:
   - type
   properties:
     convention:
-      $ref: ./ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol.yaml
+      type: string
     coupon_base:
-      $ref: ./CouponBase_for_VariableTypesForParse.yaml
+      $ref: ./CouponBase_for_VariableTypesForData_for_double.yaml
     gearing:
       $ref: ./ValueOrId_for_double.yaml
     reference_rate:

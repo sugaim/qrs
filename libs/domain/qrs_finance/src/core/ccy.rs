@@ -1,14 +1,25 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{Display, EnumIter, EnumString};
+
 // -----------------------------------------------------------------------------
 // Ccy
 //
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, strum::Display, strum::EnumIter, strum::EnumString,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Display,
+    EnumIter,
+    EnumString,
+    Serialize,
+    Deserialize,
+    JsonSchema,
 )]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(rename_all = "UPPERCASE")
-)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Ccy {
     JPY,
     USD,

@@ -1,14 +1,36 @@
 $schema: http://json-schema.org/draft-07/schema#
-title: GeneralProduct_for_VariableTypesForParse
+title: ProductData_for_double
 type: object
 required:
+- cashflows
 - collateral
-- components
+- constants
+- legs
+- markets
+- processes
 properties:
+  cashflows:
+    type: object
+    additionalProperties:
+      $ref: '#/definitions/Cashflow_for_VariableTypesForData_for_double'
   collateral:
     $ref: '#/definitions/Collateral'
-  components:
-    $ref: '#/definitions/Components_for_VariableTypesForParse'
+  constants:
+    type: object
+    additionalProperties:
+      $ref: '#/definitions/Constant'
+  legs:
+    type: object
+    additionalProperties:
+      $ref: '#/definitions/Leg_for_VariableTypesForData_for_double'
+  markets:
+    type: object
+    additionalProperties:
+      $ref: '#/definitions/Market'
+  processes:
+    type: object
+    additionalProperties:
+      $ref: '#/definitions/Process_for_VariableTypesForData_for_double'
 definitions:
   CalendarSymbol:
     description: A symbol for a calendar. Combined calendars are available. As an atom, only alphanumeric characters or '_' are allowed.
@@ -18,7 +40,7 @@ definitions:
     - TK&NY
     - (TK|NY)&(LN|TK)
     type: string
-  Cashflow_for_VariableTypesForParse:
+  Cashflow_for_VariableTypesForData_for_double:
     oneOf:
     - type: object
       required:
@@ -27,7 +49,7 @@ definitions:
       - type
       properties:
         coupon_base:
-          $ref: '#/definitions/CouponBase_for_VariableTypesForParse'
+          $ref: '#/definitions/CouponBase_for_VariableTypesForData_for_double'
         rate:
           $ref: '#/definitions/ValueOrId_for_double'
         type:
@@ -41,9 +63,9 @@ definitions:
       - type
       properties:
         convention:
-          $ref: '#/definitions/ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol'
+          type: string
         coupon_base:
-          $ref: '#/definitions/CouponBase_for_VariableTypesForParse'
+          $ref: '#/definitions/CouponBase_for_VariableTypesForData_for_double'
         gearing:
           $ref: '#/definitions/ValueOrId_for_double'
         reference_rate:
@@ -82,102 +104,38 @@ definitions:
         type:
           type: string
           const: share
-  Components_for_VariableTypesForParse:
-    type: object
-    required:
-    - cashflows
-    - constants
-    - legs
-    - markets
-    - processes
-    properties:
-      cashflows:
-        type: object
-        additionalProperties:
-          $ref: '#/definitions/Cashflow_for_VariableTypesForParse'
-      constants:
-        type: object
-        additionalProperties:
-          $ref: '#/definitions/Constant'
-      legs:
-        type: object
-        additionalProperties:
-          $ref: '#/definitions/Leg_for_VariableTypesForParse'
-      markets:
-        type: object
-        additionalProperties:
-          $ref: '#/definitions/Market'
-      processes:
-        type: object
-        additionalProperties:
-          $ref: '#/definitions/Process_for_VariableTypesForParse'
-  CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol:
-    type: object
-    required:
-    - calendar
-    - daycount
-    properties:
-      calendar:
-        $ref: '#/definitions/CalendarSymbol'
-      daycount:
-        $ref: '#/definitions/DayCountSymbol'
-      floor_target:
-        $ref: '#/definitions/CompoundingFloorTarget'
-      lockout:
-        type: integer
-        format: int32
-      lookback:
-        $ref: '#/definitions/CompoundingLockback'
-  CompoundingFloorTarget:
-    type: string
-    enum:
-    - overall
-    - each_rate
-  CompoundingLockback:
+  Constant:
     oneOf:
     - type: object
       required:
-      - days
-      - type
+      - Number
       properties:
-        days:
-          type: integer
-          format: int32
-        type:
-          type: string
-          const: without_observation_shift
+        Number:
+          type: number
+          format: double
+      additionalProperties: false
     - type: object
       required:
-      - days
-      - type
+      - Int
       properties:
-        days:
+        Int:
           type: integer
-          format: int32
-        type:
-          type: string
-          const: observation_shift
+          format: int64
+      additionalProperties: false
     - type: object
       required:
-      - days
-      - type
+      - Boolean
       properties:
-        days:
-          type: integer
-          format: int32
-        type:
-          type: string
-          const: weighted_observation_shift
-  Constant:
-    anyOf:
-    - type: number
-      format: double
-    - type: integer
-      format: int64
-    - type: boolean
+        Boolean:
+          type: boolean
+      additionalProperties: false
     - type: object
-      additionalProperties: true
-  CouponBase_for_VariableTypesForParse:
+      required:
+      - Object
+      properties:
+        Object: true
+      additionalProperties: false
+  CouponBase_for_VariableTypesForData_for_double:
     type: object
     required:
     - daycount
@@ -246,7 +204,7 @@ definitions:
         type:
           type: string
           const: bd252
-  Leg_for_VariableTypesForParse:
+  Leg_for_VariableTypesForData_for_double:
     oneOf:
     - type: object
       required:
@@ -307,7 +265,7 @@ definitions:
     enum:
     - TONA
     - SOFR
-  Process_for_VariableTypesForParse:
+  Process_for_VariableTypesForData_for_double:
     oneOf:
     - type: object
       required:
@@ -349,12 +307,20 @@ definitions:
     - America/New_York
     - Etc/UTC
     type: string
-  ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol:
-    anyOf:
-    - $ref: '#/definitions/CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol'
-    - type: string
   ValueOrId_for_double:
-    anyOf:
-    - type: number
-      format: double
-    - type: string
+    oneOf:
+    - type: object
+      required:
+      - Value
+      properties:
+        Value:
+          type: number
+          format: double
+      additionalProperties: false
+    - type: object
+      required:
+      - Id
+      properties:
+        Id:
+          type: string
+      additionalProperties: false

@@ -1,12 +1,11 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 // -----------------------------------------------------------------------------
 // OvernightRate
 //
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(rename_all = "UPPERCASE")
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "UPPERCASE")]
 #[allow(clippy::upper_case_acronyms)]
 pub enum OvernightRate {
     TONA,

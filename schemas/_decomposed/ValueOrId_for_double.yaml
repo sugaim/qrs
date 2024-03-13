@@ -1,5 +1,17 @@
 title: ValueOrId_for_double
-anyOf:
-- type: number
-  format: double
-- type: string
+oneOf:
+- type: object
+  required:
+  - Value
+  properties:
+    Value:
+      type: number
+      format: double
+  additionalProperties: false
+- type: object
+  required:
+  - Id
+  properties:
+    Id:
+      type: string
+  additionalProperties: false

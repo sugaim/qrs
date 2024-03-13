@@ -1,5 +1,0 @@
-title: CompoundingFloorTarget
-type: string
-enum:
-- overall
-- each_rate

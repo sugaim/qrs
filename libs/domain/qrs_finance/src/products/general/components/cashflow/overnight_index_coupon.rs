@@ -1,51 +1,58 @@
+use derivative::Derivative;
 use qrs_finance_derive::Component;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use crate::products::{core::CompoundingConvention, general::VariableTypes};
+use crate::products::general::core::VariableTypes;
 
 use super::CouponBase;
 
 // -----------------------------------------------------------------------------
 // OvernightIndexCoupon
 //
-#[derive(Clone, Debug, PartialEq, Component)]
-#[component(_use_from_qrs_finance, category = "Cashflow")]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(bound(
-        serialize = "CouponBase<Ts>: serde::Serialize,
-            Ts::Number: serde::Serialize,
-            Ts::ProcessRef: serde::Serialize,
-            Ts::General<CompoundingConvention<Ts::DayCount, Ts::Calendar>>: serde::Serialize",
-        deserialize = "CouponBase<Ts>: serde::Deserialize<'de>,
-            Ts::Number: serde::Deserialize<'de>,
-            Ts::ProcessRef: serde::Deserialize<'de>,
-            Ts::General<CompoundingConvention<Ts::DayCount, Ts::Calendar>>: serde::Deserialize<'de>"
-    )),
-    schemars(bound = "Ts: schemars::JsonSchema,
-            CouponBase<Ts>: schemars::JsonSchema,
-            Ts::Number: schemars::JsonSchema,
-            Ts::ProcessRef: schemars::JsonSchema,
-            Ts::General<CompoundingConvention<Ts::DayCount, Ts::Calendar>>: schemars::JsonSchema")
+#[derive(Derivative, Component, Serialize, Deserialize, JsonSchema)]
+#[derivative(
+    Debug(bound = "CouponBase<Ts>: std::fmt::Debug,
+        Ts::ProcessRef: std::fmt::Debug,
+        Ts::Number: std::fmt::Debug,
+        Ts::CompoundingConvention: std::fmt::Debug"),
+    Clone(bound = "CouponBase<Ts>: Clone,
+        Ts::ProcessRef: Clone,
+        Ts::Number: Clone,
+        Ts::CompoundingConvention: Clone"),
+    PartialEq(bound = "CouponBase<Ts>: PartialEq,
+        Ts::ProcessRef: PartialEq,
+        Ts::Number: PartialEq,
+        Ts::CompoundingConvention: PartialEq")
 )]
+#[component(_use_from_qrs_finance, category = "Cashflow")]
+#[serde(bound(
+    serialize = "CouponBase<Ts>: Serialize,
+            Ts::Number: Serialize,
+            Ts::ProcessRef: Serialize,
+            Ts::CompoundingConvention: Serialize",
+    deserialize = "CouponBase<Ts>: Deserialize<'de>,
+            Ts::Number: Deserialize<'de>,
+            Ts::ProcessRef: Deserialize<'de>,
+            Ts::CompoundingConvention: Deserialize<'de>"
+))]
+#[schemars(bound = "Ts: JsonSchema,
+            CouponBase<Ts>: JsonSchema,
+            Ts::Number: JsonSchema,
+            Ts::ProcessRef: JsonSchema,
+            Ts::CompoundingConvention: JsonSchema")]
 pub struct OvernightIndexCoupon<Ts: VariableTypes> {
-    #[cfg_attr(feature = "serde", serde(rename = "coupon_base"))]
+    #[serde(rename = "coupon_base")]
     pub base: CouponBase<Ts>,
 
-    pub convention: Ts::General<CompoundingConvention<Ts::DayCount, Ts::Calendar>>,
+    pub convention: Ts::CompoundingConvention,
 
     #[component(field(category = "Process", value_type = "Number"))]
     pub reference_rate: Ts::ProcessRef,
 
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "Option::is_none")
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spread: Option<Ts::Number>,
 
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "Option::is_none")
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gearing: Option<Ts::Number>,
 }

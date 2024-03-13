@@ -1,7 +1,9 @@
-title: Components_for_VariableTypesForParse
+$schema: http://json-schema.org/draft-07/schema#
+title: ProductData_for_double
 type: object
 required:
 - cashflows
+- collateral
 - constants
 - legs
 - markets
@@ -10,7 +12,9 @@ properties:
   cashflows:
     type: object
     additionalProperties:
-      $ref: ./Cashflow_for_VariableTypesForParse.yaml
+      $ref: ./Cashflow_for_VariableTypesForData_for_double.yaml
+  collateral:
+    $ref: ./Collateral.yaml
   constants:
     type: object
     additionalProperties:
@@ -18,7 +22,7 @@ properties:
   legs:
     type: object
     additionalProperties:
-      $ref: ./Leg_for_VariableTypesForParse.yaml
+      $ref: ./Leg_for_VariableTypesForData_for_double.yaml
   markets:
     type: object
     additionalProperties:
@@ -26,4 +30,4 @@ properties:
   processes:
     type: object
     additionalProperties:
-      $ref: ./Process_for_VariableTypesForParse.yaml
+      $ref: ./Process_for_VariableTypesForData_for_double.yaml

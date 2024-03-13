@@ -9,14 +9,14 @@ use qrs_math::{
 };
 
 use super::{
-    AdjustedCurve, Bump, CompositeCurve, FlatCurve, InstFwdCurve, LogDfCurve, Shift, YieldCurve,
-    YieldCurveAdjust, ZeroRateCurve,
+    AdjustedCurve, Bump, CompositeCurve, DynYieldCurve, FlatCurve, InstFwdCurve, LogDfCurve, Shift,
+    YieldCurve, YieldCurveAdjust, ZeroRateCurve,
 };
 
 // -----------------------------------------------------------------------------
 // ComponentCurve
 //
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Deserialize, serde::Serialize, schemars::JsonSchema),
@@ -34,6 +34,8 @@ pub enum ComponentCurve<V> {
     ZeroRateCr(ZeroRateCurve<CHermite1d<DateTime, Act365fRate<V>, CatmullRomScheme>>),
     InstFwdLerp(InstFwdCurve<Lerp1d<DateTime, Act365fRate<V>>>),
     InstFwdPwConst(InstFwdCurve<PwConst1d<DateTime, Act365fRate<V>>>),
+    #[cfg_attr(feature = "serde", serde(skip))]
+    Any(Box<dyn DynYieldCurve<V>>),
 }
 
 //
@@ -60,6 +62,7 @@ where
             ZeroRateCr(c) => c.forward_rate(from, to),
             InstFwdLerp(c) => c.forward_rate(from, to),
             InstFwdPwConst(c) => c.forward_rate(from, to),
+            Any(c) => c.forward_rate(from, to),
         }
     }
 }

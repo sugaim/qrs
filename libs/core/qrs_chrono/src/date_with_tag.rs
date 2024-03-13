@@ -126,6 +126,7 @@ impl<Sym> DateWithTag<Sym> {
         resolver: &Res,
     ) -> Result<DateTime<Tz>, anyhow::Error>
     where
+        Rq: ?Sized,
         Tz: chrono::TimeZone,
         Cut: TimeCut<Tz = Tz>,
         Sym: Borrow<Rq>,

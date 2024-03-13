@@ -6,11 +6,12 @@ exclude.workspace = true
 
 [features]
 default = []
-serde = ["dep:serde", "dep:schemars", "qrs_finance/serde"]
+serde = ["dep:serde", "dep:schemars"]
 
 [dependencies]
 anyhow = { workspace = true }
 derivative = { workspace = true }
+dyn-clone = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }

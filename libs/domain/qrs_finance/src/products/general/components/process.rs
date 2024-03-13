@@ -1,31 +1,46 @@
 mod number;
 
-pub use number::{ConstantFloat, DeterministicFloat, MarketRef};
+use derivative::Derivative;
+use qrs_finance_derive::Component;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use crate::products::general::VariableTypes;
+use crate::products::general::core::VariableTypes;
+
+pub use number::{ConstantFloat, DeterministicFloat, MarketRef};
 
 // -----------------------------------------------------------------------------
 // Process
 //
-#[derive(Debug, PartialEq, Clone, qrs_finance_derive::Component)]
+#[derive(Derivative, Component, Serialize, Deserialize, JsonSchema)]
 #[component(_use_from_qrs_finance)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(tag = "type", rename_all = "snake_case"),
-    serde(bound(
-        serialize = "DeterministicFloat<Ts>: serde::Serialize,
-            ConstantFloat<Ts>: serde::Serialize,
-            MarketRef<Ts>: serde::Serialize",
-        deserialize = "DeterministicFloat<Ts>: serde::Deserialize<'de>,
-            ConstantFloat<Ts>: serde::Deserialize<'de>,
-            MarketRef<Ts>: serde::Deserialize<'de>"
-    )),
-    schemars(bound = "Ts: schemars::JsonSchema,
-        DeterministicFloat<Ts>: schemars::JsonSchema,
-        ConstantFloat<Ts>: schemars::JsonSchema,
-        MarketRef<Ts>: schemars::JsonSchema")
+#[derivative(
+    Debug(bound = "DeterministicFloat<Ts>: std::fmt::Debug,
+        ConstantFloat<Ts>: std::fmt::Debug,
+        MarketRef<Ts>: std::fmt::Debug"),
+    Clone(bound = "DeterministicFloat<Ts>: Clone,
+        ConstantFloat<Ts>: Clone,
+        MarketRef<Ts>: Clone"),
+    PartialEq(bound = "DeterministicFloat<Ts>: PartialEq,
+        ConstantFloat<Ts>: PartialEq,
+        MarketRef<Ts>: PartialEq")
 )]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    bound(
+        serialize = "DeterministicFloat<Ts>: Serialize,
+            ConstantFloat<Ts>: Serialize,
+            MarketRef<Ts>: Serialize",
+        deserialize = "DeterministicFloat<Ts>: Deserialize<'de>,
+            ConstantFloat<Ts>: Deserialize<'de>,
+            MarketRef<Ts>: Deserialize<'de>"
+    )
+)]
+#[schemars(bound = "Ts: JsonSchema,
+        DeterministicFloat<Ts>: JsonSchema,
+        ConstantFloat<Ts>: JsonSchema,
+        MarketRef<Ts>: JsonSchema")]
 pub enum Process<Ts: VariableTypes> {
     DeterministicFloat(DeterministicFloat<Ts>),
     ConstantFloat(ConstantFloat<Ts>),

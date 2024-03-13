@@ -52,14 +52,12 @@ impl RateDcf for Act360 {
 // -----------------------------------------------------------------------------
 // RateAct360
 //
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Deserialize, serde::Serialize)]
 pub struct Act360Rate<V>(V);
 
 //
 // display, serde
 //
-#[cfg(feature = "serde")]
 impl<V: schemars::JsonSchema> schemars::JsonSchema for Act360Rate<V> {
     fn schema_name() -> String {
         format!("RateAct360_for_{}", V::schema_name())

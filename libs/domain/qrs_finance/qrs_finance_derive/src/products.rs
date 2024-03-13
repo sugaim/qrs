@@ -58,6 +58,8 @@ fn impl_for_enum(input: &DeriveInput) -> TokenStream {
         }
         res
     };
+    let variant_iter_impl = generate_variant_iter(variants.len());
+    let variant_items = generate_variant_items(variants.len());
     quote! {
         impl #impl_generics #module_name ::Component for #name #ty_generics #where_clause {
             #[inline]
@@ -74,12 +76,13 @@ fn impl_for_enum(input: &DeriveInput) -> TokenStream {
                 &str,
                 #module_name ::ComponentCategory
             )> {
-                let mut res = Vec::new();
-                match self {
+                #variant_iter_impl
+
+                let res = match self {
                     #(
-                        Self :: #variants (variant) => {
-                            res.extend(#module_name ::Component::depends_on(variant))
-                        },
+                        Self :: #variants (variant) => VariantIntoIter:: #variant_items (
+                            #module_name ::Component::depends_on(variant)
+                        ),
                     )*
                 };
                 res
@@ -189,9 +192,9 @@ struct ParsedRootAttribute {
 impl ParsedRootAttribute {
     fn module_name(&self) -> proc_macro2::TokenStream {
         if self.is_from_qrs_finance {
-            quote!(crate::products::general)
+            quote!(crate::products::general::core)
         } else {
-            quote!(qrs_finance::products::general)
+            quote!(qrs_finance::products::general::core)
         }
     }
 
@@ -298,5 +301,62 @@ impl ParsedFieldAttribute {
             })?;
         }
         Ok(res)
+    }
+}
+
+fn generate_variant_items(n: usize) -> Vec<syn::Ident> {
+    (0..n)
+        .map(|i| syn::Ident::new(&format!("T{}", i), proc_macro2::Span::call_site()))
+        .collect()
+}
+
+fn generate_variant_iter(n: usize) -> proc_macro2::TokenStream {
+    let types = generate_variant_items(n);
+    quote! {
+        enum VariantIter<#(#types),*> {
+            #(
+                #types(#types),
+            )*
+        }
+
+        impl<Item, #(#types),*> Iterator for VariantIter<#(#types),*>
+        where
+            #(
+                #types: Iterator<Item = Item>,
+            )*
+        {
+            type Item = Item;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                match self {
+                    #(
+                        Self :: #types (iter) => iter.next(),
+                    )*
+                }
+            }
+        }
+
+        enum VariantIntoIter<#(#types),*> {
+            #(
+                #types(#types),
+            )*
+        }
+        impl<Item, #(#types),*> IntoIterator for VariantIntoIter<#(#types),*>
+        where
+            #(
+                #types: IntoIterator<Item = Item>,
+            )*
+        {
+            type Item = Item;
+            type IntoIter = VariantIter<#(#types::IntoIter),*>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                match self {
+                    #(
+                        Self :: #types (iter) => VariantIter::#types(iter.into_iter()),
+                    )*
+                }
+            }
+        }
     }
 }

@@ -1,7 +1,6 @@
 mod schema_cleaner;
 mod schema_collector;
 
-use qrs_finance::products::general::VariableTypesForParse;
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     visit::Visitor,
@@ -49,8 +48,7 @@ fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
         SchItem::<qrs_chrono::DateTime>::default() as _,
         SchItem::<qrs_chrono::Tz>::default() as _,
         SchItem::<qrs_chrono::Duration>::default() as _,
-        SchItem::<qrs_finance::products::general::GeneralProduct<VariableTypesForParse>>::default()
-            as _,
+        SchItem::<qrs_finance::products::general::ProductData>::default() as _,
         SchItem::<qrs_model::core::curve::ComponentCurve<f64>>::default() as _,
     ]
 }

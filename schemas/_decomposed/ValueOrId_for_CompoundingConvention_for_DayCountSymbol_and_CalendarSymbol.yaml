@@ -1,4 +1,0 @@
-title: ValueOrId_for_CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol
-anyOf:
-- $ref: ./CompoundingConvention_for_DayCountSymbol_and_CalendarSymbol.yaml
-- type: string

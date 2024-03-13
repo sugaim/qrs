@@ -9,13 +9,13 @@ required:
 - valid_to
 properties:
   extra_business_days:
-    description: The extra business days of the calendar. These days are business day weekends.
+    description: The extra business days of the calendar. These days are business day weekends. Must be empty if `treat_weekend_as_business_day` is `true`.
     type: array
     items:
       type: string
       format: date
   extra_holidays:
-    description: The extra holidays of the calendar. These days are non-business day weekdays.
+    description: The extra holidays of the calendar. These days are non-business day weekdays if `treat_weekend_as_business_day` is `false`.
     type: array
     items:
       type: string

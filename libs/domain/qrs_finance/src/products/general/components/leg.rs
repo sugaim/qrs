@@ -1,25 +1,32 @@
 mod straight;
 
-use crate::products::general::VariableTypes;
+use crate::products::general::core::VariableTypes;
 
+use derivative::Derivative;
 use qrs_finance_derive::Component;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 pub use straight::StraightLeg;
 
 // -----------------------------------------------------------------------------
 // Leg
 //
-#[derive(Debug, Clone, PartialEq, Component)]
+#[derive(Derivative, Component, Serialize, Deserialize, JsonSchema)]
 #[component(_use_from_qrs_finance)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema),
-    serde(tag = "type", rename_all = "snake_case"),
-    serde(bound(
-        serialize = "StraightLeg<Ts>: serde::Serialize",
-        deserialize = "StraightLeg<Ts>: serde::Deserialize<'de>"
-    )),
-    schemars(bound = "Ts: schemars::JsonSchema, StraightLeg<Ts>: schemars::JsonSchema")
+#[derivative(
+    Debug(bound = "StraightLeg<Ts>: std::fmt::Debug"),
+    Clone(bound = "StraightLeg<Ts>: Clone"),
+    PartialEq(bound = "StraightLeg<Ts>: PartialEq")
 )]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    bound(
+        serialize = "StraightLeg<Ts>: Serialize",
+        deserialize = "StraightLeg<Ts>: Deserialize<'de>"
+    )
+)]
+#[schemars(bound = "Ts: JsonSchema, StraightLeg<Ts>: JsonSchema")]
 pub enum Leg<Ts: VariableTypes> {
     Straight(StraightLeg<Ts>),
 }
