@@ -1,0 +1,9 @@
+title: RoundingStrategy
+type: string
+enum:
+- nearest_even
+- nearest_integer
+- to_zero
+- away_from_zero
+- to_negative_infinity
+- to_positive_infinity

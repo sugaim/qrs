@@ -2,57 +2,42 @@ use std::fmt::{Debug, Display};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::{Display, EnumString};
 
 // -----------------------------------------------------------------------------
 // Component
 //
-pub trait Component {
+pub(crate) trait Component {
     fn category(&self) -> ComponentCategory;
     fn depends_on(&self) -> impl IntoIterator<Item = (&str, ComponentCategory)>;
 }
 
 // -----------------------------------------------------------------------------
-// ValueType
-//
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, Display, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum ValueType {
-    #[strum(serialize = "number")]
-    Number,
-    #[strum(serialize = "integer")]
-    Integer,
-    #[strum(serialize = "boolean")]
-    Boolean,
-    #[strum(serialize = "object")]
-    Object,
-}
-
-// -----------------------------------------------------------------------------
 // ComponentCategory
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    strum::Display,
+    strum::EnumString,
+)]
 #[serde(rename_all = "snake_case", tag = "type", content = "value_type")]
 pub enum ComponentCategory {
-    Constant(ValueType),
+    #[strum(serialize = "constant")]
+    Constant,
+    #[strum(serialize = "market")]
     Market,
-    Process(ValueType),
+    #[strum(serialize = "process")]
+    Process,
+    #[strum(serialize = "cashflow")]
     Cashflow,
+    #[strum(serialize = "leg")]
     Leg,
-}
-
-impl Display for ComponentCategory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ComponentCategory::Constant(vt) => write!(f, "constant.{}", vt),
-            ComponentCategory::Market => write!(f, "market"),
-            ComponentCategory::Process(vt) => write!(f, "process.{}", vt),
-            ComponentCategory::Cashflow => write!(f, "cashflow"),
-            ComponentCategory::Leg => write!(f, "leg"),
-        }
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -84,11 +69,12 @@ pub trait VariableTypes {
     type DateTime;
     type DayCount;
     type Calendar;
+    type Rounding;
 
     type CashflowRef;
     type LegRef;
     type MarketRef;
     type ProcessRef;
 
-    type CompoundingConvention;
+    type InArrearsConvention;
 }

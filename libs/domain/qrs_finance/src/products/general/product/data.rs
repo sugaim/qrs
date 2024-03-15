@@ -4,15 +4,18 @@ use std::{
 };
 
 use qrs_chrono::{CalendarSymbol, DateWithTag};
+use qrs_math::rounding::Rounding;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::daycount::DayCountSymbol,
-    products::{
-        core::Collateral,
-        general::core::{Component, ComponentField, ComponentKey, VariableTypes},
+    daycount::DayCountSymbol,
+    products::general::{
+        cashflow::CashflowFixing,
+        core::{Component, ComponentKey, ValueOrId, VariableTypes},
     },
+    products::in_arrears::InArrears,
+    products::Collateral,
 };
 
 use super::super::{
@@ -23,7 +26,7 @@ use super::super::{
 // DependencyError
 //
 #[derive(Debug, Clone, PartialEq, Eq, Hash, thiserror::Error)]
-pub enum DependencyError {
+pub(crate) enum _DependencyError {
     #[error("{} is required by {} but not found", .required, .by)]
     MissingRequiredDependency {
         required: ComponentKey,
@@ -38,12 +41,10 @@ pub enum DependencyError {
 // -----------------------------------------------------------------------------
 // ComponentDependency
 //
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-pub struct ComponentDependency {
+pub(crate) struct _ComponentDependency {
     edges: HashMap<ComponentKey, HashSet<ComponentKey>>,
     order: Vec<ComponentKey>,
 }
@@ -51,62 +52,10 @@ pub struct ComponentDependency {
 //
 // display, serde
 //
-impl ComponentDependency {
-    /// Returns the edges of the dependency graph.
-    /// The key is the dependent component, and the value is the set of components which the key depends on.
+impl _ComponentDependency {
     #[inline]
-    pub fn edges(&self) -> &HashMap<ComponentKey, HashSet<ComponentKey>> {
-        &self.edges
-    }
-
-    /// Returns the components ordered by the number of components which depends on it.
-    /// So the first element is not depended by any other components
-    /// and the last element is depended by many other components, including indirect dependency.
-    #[inline]
-    pub fn ordered_nodes(&self) -> &[ComponentKey] {
+    pub fn topological_sorted(&self) -> &[ComponentKey] {
         &self.order
-    }
-}
-
-// -----------------------------------------------------------------------------
-// ValueOrId
-//
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
-)]
-pub enum ValueOrId<T> {
-    Value(T),
-    Id(String),
-}
-
-//
-// methods
-//
-impl<T> ComponentField for ValueOrId<T> {
-    #[inline]
-    fn depends_on(&self) -> impl IntoIterator<Item = &str> {
-        enum Either<L, R> {
-            Left(L),
-            Right(R),
-        }
-        impl<L, R> Iterator for Either<L, R>
-        where
-            L: Iterator,
-            R: Iterator<Item = L::Item>,
-        {
-            type Item = L::Item;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                match self {
-                    Either::Left(l) => l.next(),
-                    Either::Right(r) => r.next(),
-                }
-            }
-        }
-        match self {
-            ValueOrId::Value(_) => Either::Left([].into_iter()),
-            ValueOrId::Id(id) => Either::Right(id.depends_on().into_iter()),
-        }
     }
 }
 
@@ -121,23 +70,24 @@ impl<V> VariableTypes for VariableTypesForData<V> {
     type Integer = ValueOrId<i64>;
     type Boolean = ValueOrId<bool>;
 
-    type DateTime = DateWithTag;
-    type DayCount = DayCountSymbol;
-    type Calendar = CalendarSymbol;
+    type DateTime = ValueOrId<DateWithTag>;
+    type DayCount = ValueOrId<DayCountSymbol>;
+    type Calendar = ValueOrId<CalendarSymbol>;
 
     type CashflowRef = String;
     type LegRef = String;
     type MarketRef = String;
     type ProcessRef = String;
 
-    type CompoundingConvention = String;
+    type Rounding = ValueOrId<Rounding>;
+    type InArrearsConvention = ValueOrId<InArrears<DayCountSymbol, CalendarSymbol>>;
 }
 
 // -----------------------------------------------------------------------------
-// ProductData
+// ContractData
 //
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct ProductData<V = f64> {
+pub struct ContractData<V = f64> {
     pub collateral: Collateral,
     pub constants: HashMap<String, Constant>,
     pub markets: HashMap<String, Market>,
@@ -149,8 +99,8 @@ pub struct ProductData<V = f64> {
 //
 // methods
 //
-impl<V> ProductData<V> {
-    pub fn dependency(&self) -> Result<ComponentDependency, DependencyError> {
+impl<V> ContractData<V> {
+    pub(crate) fn _dependency(&self) -> Result<_ComponentDependency, _DependencyError> {
         // collect all the dependencies
         // key is dependent from, values are dependent to
         let edges = {
@@ -217,7 +167,7 @@ impl<V> ProductData<V> {
         for (from, tos) in &edges {
             for to in tos {
                 if !edges.contains_key(to) {
-                    return Err(DependencyError::MissingRequiredDependency {
+                    return Err(_DependencyError::MissingRequiredDependency {
                         required: to.clone(),
                         by: from.clone(),
                     });
@@ -240,7 +190,7 @@ impl<V> ProductData<V> {
             }
         }
         if no_required.is_empty() {
-            return Err(DependencyError::NoRootComponent);
+            return Err(_DependencyError::NoRootComponent);
         }
 
         // less depended components come first and push to the sorted list.
@@ -260,12 +210,31 @@ impl<V> ProductData<V> {
 
         if sorted.len() != edges.len() {
             let at = edges.into_keys().find(|k| !sorted.contains(k)).unwrap();
-            return Err(DependencyError::Circular { at });
+            return Err(_DependencyError::Circular { at });
         }
 
-        Ok(ComponentDependency {
+        Ok(_ComponentDependency {
             edges,
             order: sorted,
         })
     }
+}
+
+// -----------------------------------------------------------------------------
+// FixingData
+//
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FixingData {
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub cashflows: HashMap<String, CashflowFixing>,
+}
+
+// -----------------------------------------------------------------------------
+// ProductData
+//
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ProductData<V = f64> {
+    pub contract: ContractData<V>,
+    #[serde(default)]
+    pub fixing: FixingData,
 }

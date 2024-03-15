@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use qrs_chrono::DateTime;
-use qrs_finance::core::daycount::Act365fRate;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::Real;
 
 use crate::core::curve::{Bump, Shift, YieldCurve, YieldCurveAdjust};

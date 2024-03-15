@@ -2,14 +2,20 @@ title: Cashflow_for_VariableTypesForData_for_double
 oneOf:
 - type: object
   required:
+  - accrual
   - coupon_base
   - rate
   - type
   properties:
+    accrual:
+      $ref: ./ValueOrId_for_DayCountSymbol.yaml
     coupon_base:
       $ref: ./CouponBase_for_VariableTypesForData_for_double.yaml
     rate:
       $ref: ./ValueOrId_for_double.yaml
+    rounding:
+      description: rounding method for calculate coupon amount
+      $ref: ./ValueOrId_for_Rounding.yaml
     type:
       type: string
       const: fixed_coupon
@@ -21,13 +27,16 @@ oneOf:
   - type
   properties:
     convention:
-      type: string
+      $ref: ./ValueOrId_for_InArrears_for_DayCountSymbol_and_CalendarSymbol.yaml
     coupon_base:
       $ref: ./CouponBase_for_VariableTypesForData_for_double.yaml
     gearing:
       $ref: ./ValueOrId_for_double.yaml
     reference_rate:
       type: string
+    rounding:
+      description: rounding method for calculate coupon amount
+      $ref: ./ValueOrId_for_Rounding.yaml
     spread:
       $ref: ./ValueOrId_for_double.yaml
     type:

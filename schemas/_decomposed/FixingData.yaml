@@ -1,0 +1,7 @@
+title: FixingData
+type: object
+properties:
+  cashflows:
+    type: object
+    additionalProperties:
+      $ref: ./CashflowFixing.yaml

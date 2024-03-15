@@ -3,7 +3,7 @@ use std::{ops::Div, sync::Arc};
 use derivative::Derivative;
 use qrs_chrono::{DateTime, Duration, Velocity};
 use qrs_datasrc::{CacheableSrc, DataSrc, DebugTree, TakeSnapshot};
-use qrs_finance::core::daycount::Act365fRate;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::{Real, RelPos};
 
 use crate::core::curve::{AdjustedCurve, Curve, YieldCurve};

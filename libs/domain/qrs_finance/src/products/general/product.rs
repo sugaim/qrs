@@ -1,7 +1,7 @@
 mod data;
+
 #[allow(clippy::module_inception)]
 mod product;
 
-pub use data::{ProductData, VariableTypesForData};
-
-pub use product::{GeneralProduct, GeneralProductBuilder};
+pub use data::{ContractData, ProductData, VariableTypesForData};
+pub use product::{BuildProduct, Product, ProductBuilder, VariableTypesExpanded};

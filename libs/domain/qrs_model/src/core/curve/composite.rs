@@ -6,7 +6,7 @@ use std::{
 
 use qrs_chrono::DateTime;
 use qrs_datasrc::{CacheableSrc, DataSrc, DebugTree, TakeSnapshot};
-use qrs_finance::core::daycount::Act365fRate;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::{FloatBased, Zero};
 
 use super::YieldCurve;

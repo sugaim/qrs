@@ -2,35 +2,13 @@ $schema: http://json-schema.org/draft-07/schema#
 title: ProductData_for_double
 type: object
 required:
-- cashflows
-- collateral
-- constants
-- legs
-- markets
-- processes
+- contract
 properties:
-  cashflows:
-    type: object
-    additionalProperties:
-      $ref: '#/definitions/Cashflow_for_VariableTypesForData_for_double'
-  collateral:
-    $ref: '#/definitions/Collateral'
-  constants:
-    type: object
-    additionalProperties:
-      $ref: '#/definitions/Constant'
-  legs:
-    type: object
-    additionalProperties:
-      $ref: '#/definitions/Leg_for_VariableTypesForData_for_double'
-  markets:
-    type: object
-    additionalProperties:
-      $ref: '#/definitions/Market'
-  processes:
-    type: object
-    additionalProperties:
-      $ref: '#/definitions/Process_for_VariableTypesForData_for_double'
+  contract:
+    $ref: '#/definitions/ContractData_for_double'
+  fixing:
+    default: {}
+    $ref: '#/definitions/FixingData'
 definitions:
   CalendarSymbol:
     description: A symbol for a calendar. Combined calendars are available. As an atom, only alphanumeric characters or '_' are allowed.
@@ -40,18 +18,37 @@ definitions:
     - TK&NY
     - (TK|NY)&(LN|TK)
     type: string
+  CashflowFixing:
+    oneOf:
+    - type: object
+      required:
+      - rate
+      - type
+      properties:
+        rate:
+          type: number
+          format: double
+        type:
+          type: string
+          const: overnight_index_coupon
   Cashflow_for_VariableTypesForData_for_double:
     oneOf:
     - type: object
       required:
+      - accrual
       - coupon_base
       - rate
       - type
       properties:
+        accrual:
+          $ref: '#/definitions/ValueOrId_for_DayCountSymbol'
         coupon_base:
           $ref: '#/definitions/CouponBase_for_VariableTypesForData_for_double'
         rate:
           $ref: '#/definitions/ValueOrId_for_double'
+        rounding:
+          description: rounding method for calculate coupon amount
+          $ref: '#/definitions/ValueOrId_for_Rounding'
         type:
           type: string
           const: fixed_coupon
@@ -63,13 +60,16 @@ definitions:
       - type
       properties:
         convention:
-          type: string
+          $ref: '#/definitions/ValueOrId_for_InArrears_for_DayCountSymbol_and_CalendarSymbol'
         coupon_base:
           $ref: '#/definitions/CouponBase_for_VariableTypesForData_for_double'
         gearing:
           $ref: '#/definitions/ValueOrId_for_double'
         reference_rate:
           type: string
+        rounding:
+          description: rounding method for calculate coupon amount
+          $ref: '#/definitions/ValueOrId_for_Rounding'
         spread:
           $ref: '#/definitions/ValueOrId_for_double'
         type:
@@ -105,36 +105,46 @@ definitions:
           type: string
           const: share
   Constant:
-    oneOf:
-    - type: object
-      required:
-      - Number
-      properties:
-        Number:
-          type: number
-          format: double
-      additionalProperties: false
-    - type: object
-      required:
-      - Int
-      properties:
-        Int:
-          type: integer
-          format: int64
-      additionalProperties: false
-    - type: object
-      required:
-      - Boolean
-      properties:
-        Boolean:
-          type: boolean
-      additionalProperties: false
-    - type: object
-      required:
-      - Object
-      properties:
-        Object: true
-      additionalProperties: false
+    anyOf:
+    - type: number
+      format: double
+    - type: integer
+      format: int64
+    - type: boolean
+    - type: string
+    - true
+  ContractData_for_double:
+    type: object
+    required:
+    - cashflows
+    - collateral
+    - constants
+    - legs
+    - markets
+    - processes
+    properties:
+      cashflows:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Cashflow_for_VariableTypesForData_for_double'
+      collateral:
+        $ref: '#/definitions/Collateral'
+      constants:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Constant'
+      legs:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Leg_for_VariableTypesForData_for_double'
+      markets:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Market'
+      processes:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Process_for_VariableTypesForData_for_double'
   CouponBase_for_VariableTypesForData_for_double:
     type: object
     required:
@@ -146,17 +156,23 @@ definitions:
     - period_start
     properties:
       daycount:
-        $ref: '#/definitions/DayCountSymbol'
+        description: Day count convention to calculate dcf of accrual period
+        $ref: '#/definitions/ValueOrId_for_DayCountSymbol'
       entitle:
-        $ref: '#/definitions/DateWithTag_for_String'
+        description: A date which the right of the coupon is granted
+        $ref: '#/definitions/ValueOrId_for_DateWithTag_for_String'
       notional:
+        description: Notional amount
         $ref: '#/definitions/Money_for_ValueOrId_for_double'
       payment:
-        $ref: '#/definitions/DateWithTag_for_String'
+        description: Payment date
+        $ref: '#/definitions/ValueOrId_for_DateWithTag_for_String'
       period_end:
-        $ref: '#/definitions/DateWithTag_for_String'
+        description: Accrual period end date
+        $ref: '#/definitions/ValueOrId_for_DateWithTag_for_String'
       period_start:
-        $ref: '#/definitions/DateWithTag_for_String'
+        description: Accrual period start date
+        $ref: '#/definitions/ValueOrId_for_DateWithTag_for_String'
   DateWithTag_for_String:
     description: Date with a time cut tag. Format is 'yyyy-MM-dd@{tag}'
     type: string
@@ -179,15 +195,21 @@ definitions:
           const: act365f
     - type: object
       required:
+      - timezone
       - type
       properties:
+        timezone:
+          $ref: '#/definitions/TimeZone'
         type:
           type: string
           const: nl360
     - type: object
       required:
+      - timezone
       - type
       properties:
+        timezone:
+          $ref: '#/definitions/TimeZone'
         type:
           type: string
           const: nl365
@@ -204,6 +226,81 @@ definitions:
         type:
           type: string
           const: bd252
+  FixingData:
+    type: object
+    properties:
+      cashflows:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/CashflowFixing'
+  InArrears_for_DayCountSymbol_and_CalendarSymbol:
+    oneOf:
+    - type: object
+      required:
+      - calendar
+      - obsrate_daycount
+      - overall_daycount
+      - type
+      properties:
+        calendar:
+          description: Calendar for rate publication.
+          $ref: '#/definitions/CalendarSymbol'
+        lockout:
+          description: Lockout period
+          type: integer
+          format: int32
+        lookback:
+          description: Lookback convention
+          $ref: '#/definitions/Lookback'
+        obsrate_daycount:
+          description: Day count convention used to calculate dcf of each observation period.
+          $ref: '#/definitions/DayCountSymbol'
+        overall_daycount:
+          description: Day count convention used to calculate dcf of accrual period.
+          $ref: '#/definitions/DayCountSymbol'
+        rounding:
+          description: Rounding for compunded rate
+          $ref: '#/definitions/Rounding'
+        type:
+          type: string
+          const: straight
+        zero_interest_rate_method:
+          description: Apply zero floor on each observed rate.
+          default: false
+          type: boolean
+    - type: object
+      required:
+      - calendar
+      - obsrate_daycount
+      - overall_daycount
+      - type
+      properties:
+        calendar:
+          description: Calendar for rate publication.
+          $ref: '#/definitions/CalendarSymbol'
+        lockout:
+          description: Lockout period
+          type: integer
+          format: int32
+        lookback:
+          description: Lookback convention
+          $ref: '#/definitions/Lookback'
+        obsrate_daycount:
+          description: Day count convention used to calculate dcf of each observation period.
+          $ref: '#/definitions/DayCountSymbol'
+        overall_daycount:
+          description: Day count convention used to calculate dcf of accrual period.
+          $ref: '#/definitions/DayCountSymbol'
+        rounding:
+          description: Rounding for compunded rate
+          $ref: '#/definitions/Rounding'
+        type:
+          type: string
+          const: spread_exclusive
+        zero_interest_rate_method:
+          description: Apply zero floor on each observed rate.
+          default: false
+          type: boolean
   Leg_for_VariableTypesForData_for_double:
     oneOf:
     - type: object
@@ -218,6 +315,38 @@ definitions:
         type:
           type: string
           const: straight
+  Lookback:
+    description: |-
+      Lookback convention
+
+      With `n` day lookback, rate applied on today is a observed rate `n` days ago.
+
+      If tomorrow is Friday, the rate is applied three days(today, tomorrow, and the day after tomorrow). (For simplicity, we assume that we do not have any special holidays around today)
+
+      But with observation shift, this date counting is also shifted in addition to applied rate. That is, in 2 days lookback with days observation shift, the number of days is counted 1 because date counting is also started from Wednesday.
+    oneOf:
+    - type: object
+      required:
+      - days
+      - type
+      properties:
+        days:
+          type: integer
+          format: int32
+        type:
+          type: string
+          const: without_observation_shift
+    - type: object
+      required:
+      - days
+      - type
+      properties:
+        days:
+          type: integer
+          format: int32
+        type:
+          type: string
+          const: observation_shift
   Market:
     oneOf:
     - type: object
@@ -296,7 +425,28 @@ definitions:
           $ref: '#/definitions/MinSized1_for_Array_of_String'
         type:
           type: string
-          const: market
+          const: market_ref
+  Rounding:
+    type: object
+    required:
+    - scale
+    - strategy
+    properties:
+      scale:
+        type: integer
+        format: uint32
+        minimum: 0.0
+      strategy:
+        $ref: '#/definitions/RoundingStrategy'
+  RoundingStrategy:
+    type: string
+    enum:
+    - nearest_even
+    - nearest_integer
+    - to_zero
+    - away_from_zero
+    - to_negative_infinity
+    - to_positive_infinity
   TimeZone:
     description: String for timezone. Either of '+/-HH:mm', '+/-HH:mm:ss' or IANA timezone identifier is available
     examples:
@@ -307,20 +457,24 @@ definitions:
     - America/New_York
     - Etc/UTC
     type: string
+  ValueOrId_for_DateWithTag_for_String:
+    anyOf:
+    - $ref: '#/definitions/DateWithTag_for_String'
+    - type: string
+  ValueOrId_for_DayCountSymbol:
+    anyOf:
+    - $ref: '#/definitions/DayCountSymbol'
+    - type: string
+  ValueOrId_for_InArrears_for_DayCountSymbol_and_CalendarSymbol:
+    anyOf:
+    - $ref: '#/definitions/InArrears_for_DayCountSymbol_and_CalendarSymbol'
+    - type: string
+  ValueOrId_for_Rounding:
+    anyOf:
+    - $ref: '#/definitions/Rounding'
+    - type: string
   ValueOrId_for_double:
-    oneOf:
-    - type: object
-      required:
-      - Value
-      properties:
-        Value:
-          type: number
-          format: double
-      additionalProperties: false
-    - type: object
-      required:
-      - Id
-      properties:
-        Id:
-          type: string
-      additionalProperties: false
+    anyOf:
+    - type: number
+      format: double
+    - type: string

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use qrs_chrono::DateTime;
-use qrs_finance::core::daycount::{Act365fRate, InterestRate};
+use qrs_finance::daycount::{Act365fRate, InterestRate};
 use qrs_math::num::{Exp, Real};
 
 // -----------------------------------------------------------------------------

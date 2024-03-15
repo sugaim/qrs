@@ -2,7 +2,7 @@ use std::ops::Div;
 
 use derivative::Derivative;
 use qrs_chrono::{DateTime, Duration, Velocity};
-use qrs_finance::core::daycount::Act365fRate;
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::{
     interp1d::{CHermite1d, CatmullRomScheme, Lerp1d, PwConst1d},
     num::{Real, RelPos},

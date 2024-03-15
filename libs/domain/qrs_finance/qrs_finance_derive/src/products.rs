@@ -112,32 +112,19 @@ fn impl_for_struct(input: &DeriveInput) -> TokenStream {
     let Some(category) = &root_attrib.category else {
         abort!(input, "Category of the component is not specified. please set `category` attribute on the root struct");
     };
-    let category = if let Some(vt) = root_attrib.value_type {
-        quote!(#module_name ::ComponentCategory::#category (#module_name ::ValueType::#vt))
-    } else {
-        quote!(#module_name ::ComponentCategory::#category)
-    };
+    let category = quote!(#module_name ::ComponentCategory::#category);
 
     let mut field_names = Vec::default();
     let mut field_types = Vec::default();
     let mut categories = Vec::default();
     for (field, (ty, attrib)) in &fields {
-        let ParsedFieldAttribute {
-            category,
-            value_type,
-        } = &attrib;
+        let ParsedFieldAttribute { category } = &attrib;
         field_names.push(field);
         field_types.push(ty);
         categories.push(
             category
                 .as_ref()
-                .map(|c| {
-                    if let Some(vt) = value_type {
-                        quote!(#module_name ::ComponentCategory::#c (#module_name ::ValueType::#vt))
-                    } else {
-                        quote!(#module_name ::ComponentCategory::#c)
-                    }
-                })
+                .map(|c| quote!(#module_name ::ComponentCategory::#c))
                 .unwrap_or_else(|| abort!(field, "Category of the component is not specified. please set `category` attribute on the field"))
         );
     }
@@ -185,17 +172,11 @@ fn impl_for_struct(input: &DeriveInput) -> TokenStream {
 #[derive(Default)]
 struct ParsedRootAttribute {
     category: Option<syn::Ident>,
-    value_type: Option<syn::Ident>,
-    is_from_qrs_finance: bool,
 }
 
 impl ParsedRootAttribute {
     fn module_name(&self) -> proc_macro2::TokenStream {
-        if self.is_from_qrs_finance {
-            quote!(crate::products::general::core)
-        } else {
-            quote!(qrs_finance::products::general::core)
-        }
+        quote!(crate::products::general::core)
     }
 
     fn parse(attrs: &[Attribute]) -> Result<Self, syn::Error> {
@@ -217,21 +198,6 @@ impl ParsedRootAttribute {
                     };
                     res.category = Some(category.parse()?);
                 }
-                else if m.path.is_ident("value_type") {
-                    if res.value_type.is_some() {
-                        abort!(attr, "Multiple `value_type` attributes are not allowed");
-                    }
-                    let Ok(value_type) = m.value().and_then(|v| v.parse::<syn::LitStr>()) else {
-                        abort!(
-                            attr,
-                            "Format expected by `value_type` attribute is `value_type = \"...\""
-                        );
-                    };
-                    res.value_type = Some(value_type.parse()?);
-                }
-                else if m.path.is_ident("_use_from_qrs_finance") {
-                    res.is_from_qrs_finance = true;
-                }
                 else {
                     abort!(attr, "Unknown attribute. Expected `component(category = ...)` on the root struct")
                 }
@@ -244,7 +210,6 @@ impl ParsedRootAttribute {
 
 struct ParsedFieldAttribute {
     category: Option<syn::Ident>,
-    value_type: Option<syn::Ident>,
 }
 
 impl ParsedFieldAttribute {
@@ -271,24 +236,7 @@ impl ParsedFieldAttribute {
                                 *category = Some(cat.parse()?);
                             }
                             else {
-                                res = Some(ParsedFieldAttribute { category: Some(cat.parse()?), value_type: None });
-                            }
-                        }
-                        else if m.path.is_ident("value_type") {
-                            let Ok(vt) = m.value().and_then(|v| v.parse::<syn::LitStr>()) else {
-                                abort!(
-                                    attr,
-                                    "Format expected by `value_type` attribute is `value_type = \"...\""
-                                );
-                            };
-                            if let Some(ParsedFieldAttribute { value_type, .. }) = res.as_mut() {
-                                if value_type.is_some() {
-                                    abort!(attr, "Multiple `value_type` attributes are not allowed");
-                                }
-                                *value_type = Some(vt.parse()?);
-                            }
-                            else {
-                                res = Some(ParsedFieldAttribute { category: None, value_type: Some(vt.parse()?) });
+                                res = Some(ParsedFieldAttribute { category: Some(cat.parse()?) });
                             }
                         }
                         else {

@@ -12,6 +12,7 @@ serde = ["dep:serde", "dep:schemars", "qrs_collections/serde"]
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true, optional = true }
+rust_decimal = { workspace = true }
 derivative = { workspace = true }
 itertools = { workspace = true }
 num = { workspace = true }

@@ -1,5 +1,5 @@
 use qrs_chrono::{DateTime, Duration, Velocity};
-use qrs_finance::core::daycount::{Act365f, Act365fRate, RateDcf};
+use qrs_finance::daycount::{Act365f, Act365fRate, RateDcf};
 use qrs_math::{func1d::Func1dDer1, num::Real};
 
 use super::YieldCurve;

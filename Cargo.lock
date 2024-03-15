@@ -976,6 +976,7 @@ dependencies = [
  "qrs_collections",
  "rstest",
  "rstest_reuse",
+ "rust_decimal",
  "schemars",
  "serde",
  "serde_json",

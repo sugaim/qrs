@@ -1,0 +1,12 @@
+title: Rounding
+type: object
+required:
+- scale
+- strategy
+properties:
+  scale:
+    type: integer
+    format: uint32
+    minimum: 0.0
+  strategy:
+    $ref: ./RoundingStrategy.yaml

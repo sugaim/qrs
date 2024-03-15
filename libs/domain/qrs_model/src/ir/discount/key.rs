@@ -1,4 +1,4 @@
-use qrs_finance::{core::Ccy, products::core::Collateral};
+use qrs_finance::{products::Collateral, Ccy};
 
 // -----------------------------------------------------------------------------
 // DiscountKey

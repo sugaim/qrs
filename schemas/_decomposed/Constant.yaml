@@ -1,31 +1,9 @@
 title: Constant
-oneOf:
-- type: object
-  required:
-  - Number
-  properties:
-    Number:
-      type: number
-      format: double
-  additionalProperties: false
-- type: object
-  required:
-  - Int
-  properties:
-    Int:
-      type: integer
-      format: int64
-  additionalProperties: false
-- type: object
-  required:
-  - Boolean
-  properties:
-    Boolean:
-      type: boolean
-  additionalProperties: false
-- type: object
-  required:
-  - Object
-  properties:
-    Object: true
-  additionalProperties: false
+anyOf:
+- type: number
+  format: double
+- type: integer
+  format: int64
+- type: boolean
+- type: string
+- true

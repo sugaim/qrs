@@ -1,9 +1,12 @@
-#[cfg(feature = "derive")]
-pub use qrs_finance_derive::Component;
-
-mod components;
+pub mod cashflow;
+pub mod constant;
 pub mod core;
+pub mod leg;
+pub mod market;
+pub mod process;
 mod product;
 
-pub use components::{cashflow, constant, leg, market, process};
-pub use product::{GeneralProduct, GeneralProductBuilder, ProductData, VariableTypesForData};
+pub use product::{
+    BuildProduct, ContractData, Product, ProductBuilder, ProductData, VariableTypesExpanded,
+    VariableTypesForData,
+};

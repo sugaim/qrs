@@ -9,14 +9,20 @@ required:
 - period_start
 properties:
   daycount:
-    $ref: ./DayCountSymbol.yaml
+    description: Day count convention to calculate dcf of accrual period
+    $ref: ./ValueOrId_for_DayCountSymbol.yaml
   entitle:
-    $ref: ./DateWithTag_for_String.yaml
+    description: A date which the right of the coupon is granted
+    $ref: ./ValueOrId_for_DateWithTag_for_String.yaml
   notional:
+    description: Notional amount
     $ref: ./Money_for_ValueOrId_for_double.yaml
   payment:
-    $ref: ./DateWithTag_for_String.yaml
+    description: Payment date
+    $ref: ./ValueOrId_for_DateWithTag_for_String.yaml
   period_end:
-    $ref: ./DateWithTag_for_String.yaml
+    description: Accrual period end date
+    $ref: ./ValueOrId_for_DateWithTag_for_String.yaml
   period_start:
-    $ref: ./DateWithTag_for_String.yaml
+    description: Accrual period start date
+    $ref: ./ValueOrId_for_DateWithTag_for_String.yaml

@@ -1,0 +1,4 @@
+title: ValueOrId_for_DayCountSymbol
+anyOf:
+- $ref: ./DayCountSymbol.yaml
+- type: string

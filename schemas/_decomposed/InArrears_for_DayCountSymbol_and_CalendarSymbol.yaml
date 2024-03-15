@@ -1,0 +1,68 @@
+title: InArrears_for_DayCountSymbol_and_CalendarSymbol
+oneOf:
+- type: object
+  required:
+  - calendar
+  - obsrate_daycount
+  - overall_daycount
+  - type
+  properties:
+    calendar:
+      description: Calendar for rate publication.
+      $ref: ./CalendarSymbol.yaml
+    lockout:
+      description: Lockout period
+      type: integer
+      format: int32
+    lookback:
+      description: Lookback convention
+      $ref: ./Lookback.yaml
+    obsrate_daycount:
+      description: Day count convention used to calculate dcf of each observation period.
+      $ref: ./DayCountSymbol.yaml
+    overall_daycount:
+      description: Day count convention used to calculate dcf of accrual period.
+      $ref: ./DayCountSymbol.yaml
+    rounding:
+      description: Rounding for compunded rate
+      $ref: ./Rounding.yaml
+    type:
+      type: string
+      const: straight
+    zero_interest_rate_method:
+      description: Apply zero floor on each observed rate.
+      default: false
+      type: boolean
+- type: object
+  required:
+  - calendar
+  - obsrate_daycount
+  - overall_daycount
+  - type
+  properties:
+    calendar:
+      description: Calendar for rate publication.
+      $ref: ./CalendarSymbol.yaml
+    lockout:
+      description: Lockout period
+      type: integer
+      format: int32
+    lookback:
+      description: Lookback convention
+      $ref: ./Lookback.yaml
+    obsrate_daycount:
+      description: Day count convention used to calculate dcf of each observation period.
+      $ref: ./DayCountSymbol.yaml
+    overall_daycount:
+      description: Day count convention used to calculate dcf of accrual period.
+      $ref: ./DayCountSymbol.yaml
+    rounding:
+      description: Rounding for compunded rate
+      $ref: ./Rounding.yaml
+    type:
+      type: string
+      const: spread_exclusive
+    zero_interest_rate_method:
+      description: Apply zero floor on each observed rate.
+      default: false
+      type: boolean
