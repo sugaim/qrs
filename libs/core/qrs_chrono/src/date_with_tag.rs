@@ -165,164 +165,190 @@ impl<Sym> std::ops::Sub<Tenor> for DateWithTag<Sym> {
     }
 }
 
-// // =============================================================================
-// #[cfg(test)]
-// mod tests {
-//     use maplit::hashmap;
-//     use qrs_datasrc::InMemory;
-//     use rstest::{fixture, rstest};
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use mockall::mock;
+    use qrs_datasrc::{DebugTree, TreeInfo};
+    use rstest::rstest;
 
-//     use crate::{DateTimeBuilder, DateToDateTime};
+    use crate::{DateTimeBuilder, DateToDateTime};
 
-//     use super::*;
+    use super::*;
 
-//     #[fixture]
-//     fn datasrc() -> InMemory<String, DateToDateTime> {
-//         let data = hashmap! {
-//             "tky-close".to_owned() => DateTimeBuilder::new()
-//                 .with_hms(15, 30, 0)
-//                 .with_parsed_timezone("+09:00"),
-//             "nyk-close".to_owned() => DateTimeBuilder::new()
-//                 .with_hms(15, 30, 0)
-//                 .with_parsed_timezone("America/New_York"),
-//         };
-//         data.into()
-//     }
+    fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
 
-//     fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
-//         NaiveDate::from_ymd_opt(y, m, d).unwrap()
-//     }
+    mock! {
+        CutSrc {}
 
-//     #[test]
-//     fn test_display() {
-//         let dwtc = DateWithTag {
-//             date: ymd(2021, 1, 1),
-//             sym: "tky-close",
-//         };
-//         assert_eq!(format!("{}", dwtc), "2021-01-01@tky-close");
+        impl DebugTree for CutSrc {
+            fn desc(&self) -> String;
+            fn debug_tree(&self) -> TreeInfo;
+        }
 
-//         let dwtc = DateWithTag {
-//             date: ymd(2021, 1, 1),
-//             sym: "nyk-close",
-//         };
-//         assert_eq!(format!("{}", dwtc), "2021-01-01@nyk-close");
+        impl DataSrc<str> for CutSrc {
+            type Output = DateToDateTime;
 
-//         let dwtc = DateWithTag {
-//             date: ymd(2021, 1, 1),
-//             sym: 1,
-//         };
-//         assert_eq!(format!("{}", dwtc), "2021-01-01@1");
-//     }
+            fn get(&self, tag: &str) -> anyhow::Result<DateToDateTime>;
+        }
+    }
 
-//     #[test]
-//     fn test_from_str() {
-//         let s = "2021-01-01@tky-close";
-//         let dwtc: DateWithTag<String> = s.parse().unwrap();
-//         assert_eq!(dwtc.date, ymd(2021, 1, 1));
-//         assert_eq!(dwtc.sym, "tky-close");
+    #[rstest]
+    #[case(ymd(2021, 1, 1), "tokyo")]
+    #[case(ymd(2021, 1, 1), " tokyo@ close")]
+    #[case(ymd(2021, 1, 1), "")]
+    fn test_display_string(#[case] d: NaiveDate, #[case] tag: &str) {
+        let d = DateWithTag {
+            date: d,
+            tag: tag.to_string(),
+        };
 
-//         let s = "2021-01-01@nyk-close";
-//         let dwtc: DateWithTag<String> = s.parse().unwrap();
-//         assert_eq!(dwtc.date, ymd(2021, 1, 1));
-//         assert_eq!(dwtc.sym, "nyk-close");
+        let s = format!("{}", d);
 
-//         let s = "2021-01-01@1";
-//         let dwtc = s.parse::<DateWithTag<i32>>().unwrap();
-//         assert_eq!(dwtc.date, ymd(2021, 1, 1));
-//         assert_eq!(dwtc.sym, 1);
+        assert_eq!(s, format!("{}@{}", d.date, d.tag));
+    }
 
-//         // errors
-//         let s = "2021-01-01";
-//         assert!(s.parse::<DateWithTag<String>>().is_err());
+    #[rstest]
+    #[case(ymd(2021, 1, 1), 42)]
+    #[case(ymd(2021, 1, 1), 0)]
+    #[case(ymd(2021, 1, 1), -42)]
+    fn test_display_i64(#[case] d: NaiveDate, #[case] tag: i64) {
+        let d = DateWithTag { date: d, tag };
 
-//         let s = "2021@tky-close";
-//         assert!(s.parse::<DateWithTag<String>>().is_err());
-//     }
+        let s = format!("{}", d);
 
-//     #[rstest]
-//     fn test_to_datetime(datasrc: InMemory<String, DateToDateTime>) {
-//         let dwtc = DateWithTag {
-//             date: ymd(2021, 1, 1),
-//             sym: "tky-close".to_owned(),
-//         };
-//         let dt = dwtc.to_datetime(&datasrc).unwrap();
-//         assert_eq!(
-//             dt,
-//             datasrc
-//                 .get("tky-close")
-//                 .unwrap()
-//                 .data
-//                 .to_datetime(ymd(2021, 1, 1))
-//                 .unwrap()
-//         );
+        assert_eq!(s, format!("{}@{}", d.date, d.tag));
+    }
 
-//         let dwtc = DateWithTag {
-//             date: ymd(2021, 1, 1),
-//             sym: "nyk-close".to_owned(),
-//         };
-//         let dt = dwtc.to_datetime(&datasrc).unwrap();
-//         assert_eq!(
-//             dt,
-//             datasrc
-//                 .get("nyk-close")
-//                 .unwrap()
-//                 .data
-//                 .to_datetime(ymd(2021, 1, 1))
-//                 .unwrap()
-//         );
+    #[rstest]
+    #[case("2021-01-01@tokyo", Some(DateWithTag { date: ymd(2021, 1, 1), tag: "tokyo".to_string() }))]
+    #[case("2021-01-01@ tokyo@ close", Some(DateWithTag { date: ymd(2021, 1, 1), tag: " tokyo@ close".to_string() }))]
+    #[case("2021-01-01@", Some(DateWithTag { date: ymd(2021, 1, 1), tag: "".to_string() }))]
+    #[case("xx@tokyo", None)]
+    #[case("2021-01-01", None)]
+    fn test_from_str_string(#[case] s: &str, #[case] exp: Option<DateWithTag>) {
+        let res = s.parse::<DateWithTag<String>>();
 
-//         // errors
-//         let dwtc = DateWithTag {
-//             date: ymd(2021, 1, 1),
-//             sym: "unknown".to_owned(),
-//         };
-//         assert!(dwtc.to_datetime(&datasrc).is_err());
-//     }
+        if let Some(exp) = exp {
+            assert_eq!(res.ok(), Some(exp));
+        } else {
+            assert!(res.is_err());
+        }
+    }
 
-//     #[test]
-//     fn test_add_sub() {
-//         let bases = vec![
-//             DateWithTag {
-//                 date: ymd(2021, 1, 1),
-//                 sym: "tky-close",
-//             },
-//             DateWithTag {
-//                 date: ymd(2021, 1, 1),
-//                 sym: "nyk-close",
-//             },
-//             DateWithTag {
-//                 date: ymd(2020, 2, 29),
-//                 sym: "tky-close",
-//             },
-//             DateWithTag {
-//                 date: ymd(2021, 2, 28),
-//                 sym: "nyk-close",
-//             },
-//         ];
-//         let tenors = vec![
-//             Tenor::Days(0),
-//             Tenor::Days(1),
-//             Tenor::Days(2),
-//             Tenor::Weeks(0),
-//             Tenor::Weeks(1),
-//             Tenor::Weeks(2),
-//             Tenor::Months(0),
-//             Tenor::Months(1),
-//             Tenor::Months(2),
-//             Tenor::Years(0),
-//             Tenor::Years(1),
-//             Tenor::Years(2),
-//         ];
-//         for base in &bases {
-//             for tenor in &tenors {
-//                 let dwtc = *base + *tenor;
-//                 assert_eq!(dwtc.date, base.date + *tenor);
-//                 assert_eq!(dwtc.sym, base.sym);
+    #[rstest]
+    #[case("2021-01-01@42", Some(DateWithTag { date: ymd(2021, 1, 1), tag: 42 }))]
+    #[case("2021-01-01@42", Some(DateWithTag { date: ymd(2021, 1, 1), tag: 42 }))]
+    #[case("xx@42", None)]
+    #[case("2021-01-01", None)]
+    #[case("2021-01-01@tokyo", None)]
+    #[case("2021-01-01@", None)]
+    fn test_from_str_i64(#[case] s: &str, #[case] exp: Option<DateWithTag<i64>>) {
+        let res = s.parse::<DateWithTag<i64>>();
 
-//                 let dwtc = *base - *tenor;
-//                 assert_eq!(dwtc.date, base.date - *tenor);
-//                 assert_eq!(dwtc.sym, base.sym);
-//             }
-//         }
-//     }
-// }
+        if let Some(exp) = exp {
+            assert_eq!(res.ok(), Some(exp));
+        } else {
+            assert!(res.is_err());
+        }
+    }
+
+    #[test]
+    fn test_to_datetime() {
+        let mut src = MockCutSrc::new();
+        src.expect_get().once().returning(|s| {
+            Ok(DateTimeBuilder::default()
+                .with_hms(15, 42, 24)
+                .with_parsed_timezone(&format!("+{}:00", s)))
+        });
+        let d = DateWithTag {
+            date: ymd(2021, 1, 1),
+            tag: "09".to_string(),
+        };
+        let exp = DateTimeBuilder::default()
+            .with_ymd(2021, 1, 1)
+            .with_hms(15, 42, 24)
+            .with_parsed_timezone("+09:00")
+            .build()
+            .unwrap();
+
+        let dt = d.to_datetime(&src).unwrap();
+
+        src.checkpoint();
+        assert_eq!(dt, exp);
+    }
+
+    #[test]
+    fn test_to_datetime_propagate_err() {
+        let mut src = MockCutSrc::new();
+        src.expect_get()
+            .once()
+            .returning(|_| Err(anyhow!("test error")));
+        let d = DateWithTag {
+            date: ymd(2021, 1, 1),
+            tag: "09".to_string(),
+        };
+
+        let res = d.to_datetime(&src);
+
+        assert!(res.is_err());
+    }
+
+    #[rstest]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Days(42))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Days(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Days(-42))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Weeks(7))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Weeks(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Weeks(-7))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Months(15))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Months(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Months(-15))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Years(2))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Years(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Years(-2))]
+    fn test_add(#[case] d: NaiveDate, #[case] tag: &str, #[case] tenor: Tenor) {
+        let d = DateWithTag {
+            date: d,
+            tag: tag.to_string(),
+        };
+        let exp = DateWithTag {
+            date: d.date + tenor,
+            tag: tag.to_string(),
+        };
+
+        let d = d + tenor;
+
+        assert_eq!(d, exp);
+    }
+
+    #[rstest]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Days(42))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Days(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Days(-42))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Weeks(7))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Weeks(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Weeks(-7))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Months(15))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Months(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Months(-15))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Years(2))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Years(0))]
+    #[case(ymd(2021, 1, 1), "tokyo", Tenor::Years(-2))]
+    fn test_sub(#[case] d: NaiveDate, #[case] tag: &str, #[case] tenor: Tenor) {
+        let d = DateWithTag {
+            date: d,
+            tag: tag.to_string(),
+        };
+        let exp = DateWithTag {
+            date: d.date - tenor,
+            tag: tag.to_string(),
+        };
+
+        let d = d - tenor;
+
+        assert_eq!(d, exp);
+    }
+}
