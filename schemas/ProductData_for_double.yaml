@@ -19,18 +19,17 @@ definitions:
     - (TK|NY)&(LN|TK)
     type: string
   CashflowFixing:
-    oneOf:
-    - type: object
-      required:
-      - rate
-      - type
-      properties:
-        rate:
-          type: number
-          format: double
-        type:
-          type: string
-          const: overnight_index_coupon
+    type: object
+    required:
+    - rate
+    - type
+    properties:
+      rate:
+        type: number
+        format: double
+      type:
+        type: string
+        const: overnight_index_coupon
   Cashflow_for_VariableTypesForData_for_double:
     oneOf:
     - type: object
@@ -66,7 +65,7 @@ definitions:
         gearing:
           $ref: '#/definitions/ValueOrId_for_double'
         reference_rate:
-          type: string
+          $ref: '#/definitions/WithId'
         rounding:
           description: rounding method for calculate coupon amount
           $ref: '#/definitions/ValueOrId_for_Rounding'
@@ -105,23 +104,20 @@ definitions:
           type: string
           const: share
   Constant:
-    anyOf:
+    description: Constant value refered from contract data
+    oneOf:
     - type: number
       format: double
     - type: integer
       format: int64
     - type: boolean
     - type: string
-    - true
+    - type: object
+      additionalProperties: true
   ContractData_for_double:
     type: object
     required:
-    - cashflows
     - collateral
-    - constants
-    - legs
-    - markets
-    - processes
     properties:
       cashflows:
         type: object
@@ -302,19 +298,18 @@ definitions:
           default: false
           type: boolean
   Leg_for_VariableTypesForData_for_double:
-    oneOf:
-    - type: object
-      required:
-      - cashflows
-      - type
-      properties:
-        cashflows:
-          type: array
-          items:
-            type: string
-        type:
-          type: string
-          const: straight
+    type: object
+    required:
+    - cashflows
+    - type
+    properties:
+      cashflows:
+        type: array
+        items:
+          $ref: '#/definitions/WithId'
+      type:
+        type: string
+        const: straight
   Lookback:
     description: |-
       Lookback convention
@@ -348,31 +343,30 @@ definitions:
           type: string
           const: observation_shift
   Market:
-    oneOf:
-    - type: object
-      required:
-      - reference
-      - type
-      properties:
-        reference:
-          $ref: '#/definitions/OvernightRate'
-        type:
-          type: string
-          const: overnight_rate
+    type: object
+    required:
+    - reference
+    - type
+    properties:
+      reference:
+        $ref: '#/definitions/OvernightRate'
+      type:
+        type: string
+        const: overnight_rate
   MinSized1_for_Array_of_MinSized1_for_Map_of_ValueOrId_for_double:
     type: array
     items:
       $ref: '#/definitions/MinSized1_for_Map_of_ValueOrId_for_double'
     minItems: 1
-  MinSized1_for_Array_of_String:
-    type: array
-    items:
-      type: string
-    minItems: 1
   MinSized1_for_Array_of_ValueOrId_for_double:
     type: array
     items:
       $ref: '#/definitions/ValueOrId_for_double'
+    minItems: 1
+  MinSized1_for_Array_of_WithId:
+    type: array
+    items:
+      $ref: '#/definitions/WithId'
     minItems: 1
   MinSized1_for_Map_of_ValueOrId_for_double:
     type: object
@@ -422,7 +416,7 @@ definitions:
       - type
       properties:
         references:
-          $ref: '#/definitions/MinSized1_for_Array_of_String'
+          $ref: '#/definitions/MinSized1_for_Array_of_WithId'
         type:
           type: string
           const: market_ref
@@ -478,3 +472,6 @@ definitions:
     - type: number
       format: double
     - type: string
+  WithId:
+    description: Id of a component
+    type: string

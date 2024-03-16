@@ -33,7 +33,7 @@ oneOf:
     gearing:
       $ref: ./ValueOrId_for_double.yaml
     reference_rate:
-      type: string
+      $ref: ./WithId.yaml
     rounding:
       description: rounding method for calculate coupon amount
       $ref: ./ValueOrId_for_Rounding.yaml

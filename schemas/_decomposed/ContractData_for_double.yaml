@@ -1,12 +1,7 @@
 title: ContractData_for_double
 type: object
 required:
-- cashflows
 - collateral
-- constants
-- legs
-- markets
-- processes
 properties:
   cashflows:
     type: object

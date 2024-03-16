@@ -43,6 +43,38 @@ pub enum Cashflow<Ts: VariableTypes> {
     OvernightIndexCoupon(OvernightIndexCoupon<Ts>),
 }
 
+//
+// methods
+//
+impl<Ts: VariableTypes> Cashflow<Ts> {
+    #[inline]
+    pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> Cashflow<Ts2>
+    where
+        Ts::Number: Into<Ts2::Number>,
+        Ts::DateTime: Into<Ts2::DateTime>,
+        Ts::DayCount: Into<Ts2::DayCount>,
+        Ts::Rounding: Into<Ts2::Rounding>,
+        Ts::InArrearsConvention: Into<Ts2::InArrearsConvention>,
+        Ts::MarketRef: Into<Ts2::MarketRef>,
+    {
+        match self {
+            Cashflow::FixedCoupon(c) => Cashflow::FixedCoupon(c.change_variable_types_to()),
+            Cashflow::OvernightIndexCoupon(c) => {
+                Cashflow::OvernightIndexCoupon(c.change_variable_types_to())
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// CashflowFixing
+//
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CashflowFixing {
+    OvernightIndexCoupon(OvernightIndexFixing),
+}
+
 // -----------------------------------------------------------------------------
 // CashflowWithFixing
 //
@@ -61,28 +93,26 @@ pub enum CashflowWithFixing<Ts: VariableTypes> {
 }
 
 //
-// construction
+// methods
 //
 impl<Ts: VariableTypes> CashflowWithFixing<Ts> {
-    pub fn try_combine(cf: Cashflow<Ts>, fixing: Option<CashflowFixing>) -> Option<Self> {
-        use Cashflow as Cf;
-        use CashflowFixing as Fix;
-
-        match (cf, fixing) {
-            (Cf::FixedCoupon(c), None) => Some(Self::FixedCoupon(c)),
-            (Cf::OvernightIndexCoupon(c), Some(Fix::OvernightIndexCoupon(f))) => {
-                Some(Self::OvernightIndexCoupon(c, Some(f)))
+    #[inline]
+    pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> CashflowWithFixing<Ts2>
+    where
+        Ts::Number: Into<Ts2::Number>,
+        Ts::DateTime: Into<Ts2::DateTime>,
+        Ts::DayCount: Into<Ts2::DayCount>,
+        Ts::Rounding: Into<Ts2::Rounding>,
+        Ts::InArrearsConvention: Into<Ts2::InArrearsConvention>,
+        Ts::MarketRef: Into<Ts2::MarketRef>,
+    {
+        match self {
+            CashflowWithFixing::FixedCoupon(c) => {
+                CashflowWithFixing::FixedCoupon(c.change_variable_types_to())
             }
-            _ => None,
+            CashflowWithFixing::OvernightIndexCoupon(c, f) => {
+                CashflowWithFixing::OvernightIndexCoupon(c.change_variable_types_to(), f)
+            }
         }
     }
-}
-
-// -----------------------------------------------------------------------------
-// CashflowFixing
-//
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum CashflowFixing {
-    OvernightIndexCoupon(OvernightIndexFixing),
 }

@@ -4,4 +4,6 @@ mod data;
 mod product;
 
 pub use data::{ContractData, ProductData, VariableTypesForData};
-pub use product::{BuildProduct, Product, ProductBuilder, VariableTypesExpanded};
+pub use product::{
+    BuildProduct, ConvertProduct, DefaultProductBuilder, DefaultVariableTypes, Product,
+};

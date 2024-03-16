@@ -3,7 +3,7 @@ use qrs_finance_derive::Component;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::products::general::core::VariableTypes;
+use crate::products::general::core::{VariableTypes, WithId};
 
 // -----------------------------------------------------------------------------
 // MarketRef
@@ -11,12 +11,12 @@ use crate::products::general::core::VariableTypes;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Serialize, Deserialize, JsonSchema)]
 #[component(category = "Process")]
 #[serde(bound(
-    serialize = "Ts::MarketRef: Serialize",
-    deserialize = "Ts::MarketRef: Deserialize<'de>"
+    serialize = "WithId<Ts::MarketRef>: Serialize",
+    deserialize = "WithId<Ts::MarketRef>: Deserialize<'de>"
 ))]
-#[schemars(bound = "Ts: JsonSchema, Ts::MarketRef: JsonSchema")]
+#[schemars(bound = "Ts: JsonSchema, WithId<Ts::MarketRef>: JsonSchema")]
 pub struct MarketRef<Ts: VariableTypes> {
     #[component(field(category = "Market"))]
     #[serde(rename = "references")]
-    pub refs: NonEmpty<Vec<Ts::MarketRef>>,
+    pub refs: NonEmpty<Vec<WithId<Ts::MarketRef>>>,
 }

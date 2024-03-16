@@ -2,7 +2,7 @@ use qrs_finance_derive::Component;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::products::general::core::VariableTypes;
+use crate::products::general::core::{VariableTypes, WithId};
 
 // -----------------------------------------------------------------------------
 // StraightLeg
@@ -13,12 +13,12 @@ use crate::products::general::core::VariableTypes;
     tag = "type",
     rename_all = "snake_case",
     bound(
-        serialize = "Ts::CashflowRef: Serialize",
-        deserialize = "Ts::CashflowRef: Deserialize<'de>"
+        serialize = "WithId<Ts::CashflowRef>: Serialize",
+        deserialize = "WithId<Ts::CashflowRef>: Deserialize<'de>"
     )
 )]
-#[schemars(bound = "Ts: JsonSchema, Ts::CashflowRef: JsonSchema")]
+#[schemars(bound = "Ts: JsonSchema, WithId<Ts::CashflowRef>: JsonSchema")]
 pub struct StraightLeg<Ts: VariableTypes> {
     #[component(field(category = "Cashflow"))]
-    pub cashflows: Vec<Ts::CashflowRef>,
+    pub cashflows: Vec<WithId<Ts::CashflowRef>>,
 }

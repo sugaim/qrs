@@ -1,9 +1,11 @@
 title: Constant
-anyOf:
+description: Constant value refered from contract data
+oneOf:
 - type: number
   format: double
 - type: integer
   format: int64
 - type: boolean
 - type: string
-- true
+- type: object
+  additionalProperties: true

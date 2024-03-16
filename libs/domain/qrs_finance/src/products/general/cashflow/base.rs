@@ -28,3 +28,28 @@ pub struct CouponBase<Ts: VariableTypes> {
     /// Payment date
     pub payment: Ts::DateTime,
 }
+
+//
+// methods
+//
+impl<Ts: VariableTypes> CouponBase<Ts> {
+    #[inline]
+    pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> CouponBase<Ts2>
+    where
+        Ts::Number: Into<Ts2::Number>,
+        Ts::DateTime: Into<Ts2::DateTime>,
+        Ts::DayCount: Into<Ts2::DayCount>,
+    {
+        CouponBase {
+            notional: Money {
+                amount: self.notional.amount.into(),
+                ccy: self.notional.ccy,
+            },
+            entitle: self.entitle.into(),
+            period_start: self.period_start.into(),
+            period_end: self.period_end.into(),
+            daycount: self.daycount.into(),
+            payment: self.payment.into(),
+        }
+    }
+}

@@ -46,7 +46,7 @@ fn single_subsch_to_ref(obj: &mut SchemaObject) {
         let Schema::Object(o) = &all_of[0] else {
             return;
         };
-        o.reference.clone()
+        o
     } else if let Some(any_of) = ss.any_of.as_ref() {
         if ss.one_of.is_some() || any_of.len() != 1 {
             return;
@@ -54,7 +54,7 @@ fn single_subsch_to_ref(obj: &mut SchemaObject) {
         let Schema::Object(o) = &any_of[0] else {
             return;
         };
-        o.reference.clone()
+        o
     } else if let Some(one_of) = ss.one_of.as_ref() {
         if one_of.len() != 1 {
             return;
@@ -62,13 +62,14 @@ fn single_subsch_to_ref(obj: &mut SchemaObject) {
         let Schema::Object(o) = &one_of[0] else {
             return;
         };
-        o.reference.clone()
+        o
     } else {
         return;
     };
-    if let Some(s) = subsch {
-        obj.subschemas = None;
-        obj.reference = Some(s);
+    let md = obj.metadata.clone();
+    *obj = subsch.clone();
+    if md.is_some() {
+        obj.metadata = md;
     }
 }
 fn one_of_strings_to_enum(obj: &mut SchemaObject) {

@@ -10,12 +10,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     daycount::DayCountSymbol,
-    products::general::{
-        cashflow::CashflowFixing,
-        core::{Component, ComponentKey, ValueOrId, VariableTypes},
+    products::{
+        general::{
+            cashflow::CashflowFixing,
+            core::{Component, ComponentKey, ValueLess, ValueOrId, VariableTypes},
+        },
+        in_arrears::InArrears,
+        Collateral,
     },
-    products::in_arrears::InArrears,
-    products::Collateral,
 };
 
 use super::super::{
@@ -74,10 +76,10 @@ impl<V> VariableTypes for VariableTypesForData<V> {
     type DayCount = ValueOrId<DayCountSymbol>;
     type Calendar = ValueOrId<CalendarSymbol>;
 
-    type CashflowRef = String;
-    type LegRef = String;
-    type MarketRef = String;
-    type ProcessRef = String;
+    type CashflowRef = ValueLess;
+    type LegRef = ValueLess;
+    type MarketRef = ValueLess;
+    type ProcessRef = ValueLess;
 
     type Rounding = ValueOrId<Rounding>;
     type InArrearsConvention = ValueOrId<InArrears<DayCountSymbol, CalendarSymbol>>;
@@ -89,10 +91,35 @@ impl<V> VariableTypes for VariableTypesForData<V> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ContractData<V = f64> {
     pub collateral: Collateral,
+
+    #[serde(
+        default = "HashMap::<String, Constant>::new",
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub constants: HashMap<String, Constant>,
+
+    #[serde(
+        default = "HashMap::<String, Market>::new",
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub markets: HashMap<String, Market>,
+
+    #[serde(
+        default = "HashMap::<String, Process<VariableTypesForData<V>>>::new",
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub processes: HashMap<String, Process<VariableTypesForData<V>>>,
+
+    #[serde(
+        default = "HashMap::<String, Cashflow<VariableTypesForData<V>>>::new",
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub cashflows: HashMap<String, Cashflow<VariableTypesForData<V>>>,
+
+    #[serde(
+        default = "HashMap::<String, Leg<VariableTypesForData<V>>>::new",
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub legs: HashMap<String, Leg<VariableTypesForData<V>>>,
 }
 

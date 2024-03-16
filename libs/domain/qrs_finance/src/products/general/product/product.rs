@@ -22,7 +22,7 @@ use crate::{
                 OvernightIndexCoupon, OvernightIndexFixing,
             },
             constant::Constant,
-            core::{ComponentCategory, ComponentKey, ValueOrId, VariableTypes},
+            core::{ComponentCategory, ComponentKey, ValueOrId, VariableTypes, WithId},
             leg::{Leg, StraightLeg},
             market::{Market, OvernightRate},
             process::{ConstantFloat, DeterministicFloat, MarketRef, Process},
@@ -33,13 +33,17 @@ use crate::{
     Money,
 };
 
-use super::{data::ProductData, VariableTypesForData};
+use super::{
+    data::{ProductData, _ComponentDependency},
+    VariableTypesForData,
+};
 
 // -----------------------------------------------------------------------------
 // Product
 //
 #[derive(Debug, Clone, PartialEq)]
-pub struct Product<Ts: VariableTypes = VariableTypesExpanded> {
+pub struct Product<Ts: VariableTypes = DefaultVariableTypes> {
+    dep: _ComponentDependency,
     col: Collateral,
     mkts: HashMap<String, Ts::MarketRef>,
     procs: HashMap<String, Ts::ProcessRef>,
@@ -78,6 +82,84 @@ impl<Ts: VariableTypes> Product<Ts> {
 }
 
 // -----------------------------------------------------------------------------
+// ConvertProduct
+//
+pub trait ConvertProduct<From: VariableTypes, To: VariableTypes> {
+    fn initialize(&mut self);
+    fn post_validation(&self, result: &Product<To>) -> anyhow::Result<()>;
+
+    fn convert_mkt(&self, cmp: From::MarketRef) -> anyhow::Result<To::MarketRef>;
+
+    fn convert_proc(
+        &self,
+        cmp: From::ProcessRef,
+        mkts: &HashMap<String, To::MarketRef>,
+    ) -> anyhow::Result<To::ProcessRef>;
+
+    fn convert_cf(
+        &self,
+        cmp: From::CashflowRef,
+        mkts: &HashMap<String, To::MarketRef>,
+        procs: &HashMap<String, To::ProcessRef>,
+    ) -> anyhow::Result<To::CashflowRef>;
+
+    fn convert_leg(
+        &self,
+        cmp: From::LegRef,
+        procs: &HashMap<String, To::ProcessRef>,
+        cfs: &HashMap<String, To::CashflowRef>,
+    ) -> anyhow::Result<To::LegRef>;
+
+    fn convert_product(&self, mut product: Product<From>) -> anyhow::Result<Product<To>> {
+        let mut mkts = HashMap::new();
+        let mut procs = HashMap::new();
+        let mut cfs = HashMap::new();
+        let mut legs = HashMap::new();
+
+        let dep = product.dep;
+        for ComponentKey { cat, name } in dep.topological_sorted().iter().rev() {
+            match cat {
+                ComponentCategory::Constant => {}
+                ComponentCategory::Market => {
+                    if let Some(cmp) = product.mkts.remove(name) {
+                        let mkt = self.convert_mkt(cmp)?;
+                        mkts.insert(name.clone(), mkt);
+                    }
+                }
+                ComponentCategory::Process => {
+                    if let Some(cmp) = product.procs.remove(name) {
+                        let proc = self.convert_proc(cmp, &mkts)?;
+                        procs.insert(name.clone(), proc);
+                    }
+                }
+                ComponentCategory::Cashflow => {
+                    if let Some(cmp) = product.cfs.remove(name) {
+                        let cf = self.convert_cf(cmp, &mkts, &procs)?;
+                        cfs.insert(name.clone(), cf);
+                    }
+                }
+                ComponentCategory::Leg => {
+                    if let Some(cmp) = product.legs.remove(name) {
+                        let leg = self.convert_leg(cmp, &procs, &cfs)?;
+                        legs.insert(name.clone(), leg);
+                    }
+                }
+            }
+        }
+        let res = Product {
+            dep,
+            col: product.col,
+            mkts,
+            procs,
+            cfs,
+            legs,
+        };
+        self.post_validation(&res)?;
+        Ok(res)
+    }
+}
+
+// -----------------------------------------------------------------------------
 // BuildProduct
 //
 pub trait BuildProduct<V>: Sized {
@@ -98,24 +180,18 @@ pub trait BuildProduct<V>: Sized {
         &self,
         cmp: &ConstantFloat<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
-        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     fn parse_proc_deternministic_float(
         &self,
         cmp: &DeterministicFloat<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
-        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     fn parse_proc_market_ref(
         &self,
         cmp: &MarketRef<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     // cashflow
@@ -123,9 +199,6 @@ pub trait BuildProduct<V>: Sized {
         &self,
         cmp: &FixedCoupon<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
-        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
-        cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef>;
 
     fn parse_cf_overnight_index_coupon(
@@ -134,19 +207,13 @@ pub trait BuildProduct<V>: Sized {
         fixing: Option<&OvernightIndexFixing>,
         consts: &HashMap<String, Constant>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
-        cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef>;
 
     // leg
     fn parse_leg_straight(
         &self,
         leg: &StraightLeg<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
-        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
-        legs: &HashMap<String, <Self::Variables as VariableTypes>::LegRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::LegRef>;
 
     // build
@@ -172,24 +239,13 @@ pub trait BuildProduct<V>: Sized {
                 ComponentCategory::Process => {
                     let cmp = data.contract.processes.get(name).unwrap();
                     let proc = match cmp {
-                        Process::ConstantFloat(cmp) => self.parse_proc_constant_float(
-                            cmp,
-                            &data.contract.constants,
-                            &mkts,
-                            &procs,
-                        )?,
-                        Process::DeterministicFloat(cmp) => self.parse_proc_deternministic_float(
-                            cmp,
-                            &data.contract.constants,
-                            &mkts,
-                            &procs,
-                        )?,
-                        Process::MarketRef(cmp) => self.parse_proc_market_ref(
-                            cmp,
-                            &data.contract.constants,
-                            &mkts,
-                            &procs,
-                        )?,
+                        Process::ConstantFloat(cmp) => {
+                            self.parse_proc_constant_float(cmp, &data.contract.constants)?
+                        }
+                        Process::DeterministicFloat(cmp) => {
+                            self.parse_proc_deternministic_float(cmp, &data.contract.constants)?
+                        }
+                        Process::MarketRef(cmp) => self.parse_proc_market_ref(cmp, &mkts)?,
                     };
                     procs.insert(name.clone(), proc);
                 }
@@ -197,21 +253,15 @@ pub trait BuildProduct<V>: Sized {
                     let cmp = data.contract.cashflows.get(name).unwrap();
                     let fixing = data.fixing.cashflows.get(name);
                     let cf = match (cmp, fixing) {
-                        (Cashflow::FixedCoupon(cmp), None) => self.parse_cf_fixed_coupon(
-                            cmp,
-                            &data.contract.constants,
-                            &mkts,
-                            &procs,
-                            &cfs,
-                        )?,
+                        (Cashflow::FixedCoupon(cmp), None) => {
+                            self.parse_cf_fixed_coupon(cmp, &data.contract.constants)?
+                        }
                         (Cashflow::OvernightIndexCoupon(cmp), None) => self
                             .parse_cf_overnight_index_coupon(
                                 cmp,
                                 None,
                                 &data.contract.constants,
                                 &mkts,
-                                &procs,
-                                &cfs,
                             )?,
                         (
                             Cashflow::OvernightIndexCoupon(cmp),
@@ -221,8 +271,6 @@ pub trait BuildProduct<V>: Sized {
                             Some(fixing),
                             &data.contract.constants,
                             &mkts,
-                            &procs,
-                            &cfs,
                         )?,
                         _ => bail!("unsupported cashflow type"),
                     };
@@ -231,20 +279,14 @@ pub trait BuildProduct<V>: Sized {
                 ComponentCategory::Leg => {
                     let cmp = data.contract.legs.get(name).unwrap();
                     let leg = match cmp {
-                        Leg::Straight(cmp) => self.parse_leg_straight(
-                            cmp,
-                            &data.contract.constants,
-                            &mkts,
-                            &procs,
-                            &cfs,
-                            &legs,
-                        )?,
+                        Leg::Straight(cmp) => self.parse_leg_straight(cmp, &cfs)?,
                     };
                     legs.insert(name.clone(), leg);
                 }
             }
         }
         let res = Product {
+            dep,
             col: data.contract.collateral.clone(),
             mkts,
             procs,
@@ -257,15 +299,15 @@ pub trait BuildProduct<V>: Sized {
 }
 
 // -----------------------------------------------------------------------------
-// VariableTypesExpanded
+// DefaultVariableTypes
 //
 #[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
-pub struct VariableTypesExpanded<V = f64>(std::marker::PhantomData<V>);
+pub struct DefaultVariableTypes<V = f64>(std::marker::PhantomData<V>);
 
 //
 // methods
 //
-impl<V> VariableTypes for VariableTypesExpanded<V> {
+impl<V> VariableTypes for DefaultVariableTypes<V> {
     type Boolean = bool;
     type Integer = i64;
     type Number = V;
@@ -284,10 +326,10 @@ impl<V> VariableTypes for VariableTypesExpanded<V> {
 }
 
 // -----------------------------------------------------------------------------
-//  ProductBuilder
+//  DefaultProductBuilder
 //
 #[derive(Debug)]
-pub struct ProductBuilder<DayCnt = (), Cal = (), TimeCut = ()> {
+pub struct DefaultProductBuilder<DayCnt = (), Cal = (), TimeCut = ()> {
     daycnt_src: DayCnt,
     cal_src: Cal,
     time_cut: TimeCut,
@@ -298,14 +340,14 @@ pub struct ProductBuilder<DayCnt = (), Cal = (), TimeCut = ()> {
 //
 // construction
 //
-impl ProductBuilder {
+impl DefaultProductBuilder {
     #[inline]
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<DayCnt, Cal, TimeCut> Clone for ProductBuilder<DayCnt, Cal, TimeCut>
+impl<DayCnt, Cal, TimeCut> Clone for DefaultProductBuilder<DayCnt, Cal, TimeCut>
 where
     DayCnt: Clone,
     Cal: Clone,
@@ -322,7 +364,7 @@ where
     }
 }
 
-impl Default for ProductBuilder {
+impl Default for DefaultProductBuilder {
     fn default() -> Self {
         Self {
             daycnt_src: (),
@@ -334,16 +376,16 @@ impl Default for ProductBuilder {
     }
 }
 
-impl<Cal, TimeCut> ProductBuilder<(), Cal, TimeCut> {
+impl<Cal, TimeCut> DefaultProductBuilder<(), Cal, TimeCut> {
     #[inline]
     pub fn with_daycount_src<DayCnt>(
         self,
         daycnt_src: DayCnt,
-    ) -> ProductBuilder<DayCnt, Cal, TimeCut>
+    ) -> DefaultProductBuilder<DayCnt, Cal, TimeCut>
     where
         DayCnt: DataSrc<str, Output = DayCount>,
     {
-        ProductBuilder {
+        DefaultProductBuilder {
             daycnt_src,
             cal_src: self.cal_src,
             time_cut: self.time_cut,
@@ -353,13 +395,13 @@ impl<Cal, TimeCut> ProductBuilder<(), Cal, TimeCut> {
     }
 }
 
-impl<DayCnt, TimeCut> ProductBuilder<DayCnt, (), TimeCut> {
+impl<DayCnt, TimeCut> DefaultProductBuilder<DayCnt, (), TimeCut> {
     #[inline]
-    pub fn with_calendar_src<Cal>(self, cal_src: Cal) -> ProductBuilder<DayCnt, Cal, TimeCut>
+    pub fn with_calendar_src<Cal>(self, cal_src: Cal) -> DefaultProductBuilder<DayCnt, Cal, TimeCut>
     where
         Cal: DataSrc<CalendarSymbol, Output = Calendar>,
     {
-        ProductBuilder {
+        DefaultProductBuilder {
             daycnt_src: self.daycnt_src,
             cal_src,
             time_cut: self.time_cut,
@@ -369,13 +411,16 @@ impl<DayCnt, TimeCut> ProductBuilder<DayCnt, (), TimeCut> {
     }
 }
 
-impl<DayCnt, Cal> ProductBuilder<DayCnt, Cal, ()> {
+impl<DayCnt, Cal> DefaultProductBuilder<DayCnt, Cal, ()> {
     #[inline]
-    pub fn with_time_cut<TimeCut>(self, time_cut: TimeCut) -> ProductBuilder<DayCnt, Cal, TimeCut>
+    pub fn with_time_cut<TimeCut>(
+        self,
+        time_cut: TimeCut,
+    ) -> DefaultProductBuilder<DayCnt, Cal, TimeCut>
     where
         TimeCut: DataSrc<str, Output = DateToDateTime>,
     {
-        ProductBuilder {
+        DefaultProductBuilder {
             daycnt_src: self.daycnt_src,
             cal_src: self.cal_src,
             time_cut,
@@ -388,14 +433,14 @@ impl<DayCnt, Cal> ProductBuilder<DayCnt, Cal, ()> {
 //
 // methods
 //
-impl<D, C, T, V> BuildProduct<V> for ProductBuilder<D, C, T>
+impl<D, C, T, V> BuildProduct<V> for DefaultProductBuilder<D, C, T>
 where
     D: DataSrc<DayCountSymbol, Output = DayCount>,
     C: DataSrc<CalendarSymbol, Output = Calendar>,
     T: DataSrc<str, Output = DateToDateTime>,
     V: Real,
 {
-    type Variables = VariableTypesExpanded<V>;
+    type Variables = DefaultVariableTypes<V>;
 
     #[inline]
     fn initialize(&mut self) {
@@ -421,8 +466,6 @@ where
         &self,
         cmp: &ConstantFloat<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "constant_float";
         let values = cmp.values.iter();
@@ -437,8 +480,6 @@ where
         &self,
         cmp: &DeterministicFloat<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "deterministic_float";
         let mut series = Vec::default();
@@ -460,16 +501,18 @@ where
     fn parse_proc_market_ref(
         &self,
         cmp: &MarketRef<VariableTypesForData<V>>,
-        _: &HashMap<String, Constant>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "market_ref";
         let refs = cmp.refs.iter();
         let refs = refs.map(|m| {
-            mkts.get(m)
-                .ok_or_else(|| anyhow!("market `{m}` is not found which is required by {NAME}",))
-                .cloned()
+            let id = &m.id;
+            mkts.get(id)
+                .map(|m| WithId {
+                    id: id.clone(),
+                    value: m.clone(),
+                })
+                .ok_or_else(|| anyhow!("market `{id}` is not found which is required by {NAME}"))
         });
         let refs = refs
             .collect::<anyhow::Result<Vec<_>>>()?
@@ -482,9 +525,6 @@ where
         &self,
         cmp: &FixedCoupon<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef> {
         const NAME: &str = "fixed_coupon";
         Ok(Arc::new(CashflowWithFixing::FixedCoupon(FixedCoupon {
@@ -505,27 +545,28 @@ where
         fixing: Option<&OvernightIndexFixing>,
         consts: &HashMap<String, Constant>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef> {
         const NAME: &str = "overnight_index_coupon";
-        let ref_rate = mkts.get(&cmp.reference_rate).ok_or_else(|| {
+        let ref_rate = mkts.get(&cmp.reference_rate.id).ok_or_else(|| {
             anyhow!(
                 "market `{}` is not found which is required by {NAME}",
-                cmp.reference_rate
+                cmp.reference_rate.id
             )
         })?;
         if !matches!(ref_rate.as_ref(), Market::OvernightRate(_)) {
             bail!(
                 "{NAME} requires market `{}` is an overnight rate",
-                cmp.reference_rate
+                cmp.reference_rate.id
             );
         }
         Ok(Arc::new(CashflowWithFixing::OvernightIndexCoupon(
             OvernightIndexCoupon {
                 base: self._unwrap_cpnbase(&cmp.base, consts, NAME)?,
                 convention: self._unwrap_inarrears(&cmp.convention, consts, NAME)?,
-                reference_rate: ref_rate.clone(),
+                reference_rate: WithId {
+                    id: cmp.reference_rate.id.clone(),
+                    value: ref_rate.clone(),
+                },
                 gearing: cmp
                     .gearing
                     .as_ref()
@@ -550,25 +591,25 @@ where
     fn parse_leg_straight(
         &self,
         leg: &StraightLeg<VariableTypesForData<V>>,
-        _: &HashMap<String, Constant>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
-        _: &HashMap<String, <Self::Variables as VariableTypes>::LegRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::LegRef> {
         const NAME: &str = "straight_leg";
         let cashflows = leg.cashflows.iter();
         let cashflows = cashflows.map(|cf| {
-            cfs.get(cf)
-                .ok_or_else(|| anyhow!("cashflow `{cf}` is not found which is required by {NAME}",))
-                .cloned()
+            let id = &cf.id;
+            cfs.get(id)
+                .map(|cf| WithId {
+                    id: id.clone(),
+                    value: cf.clone(),
+                })
+                .ok_or_else(|| anyhow!("cashflow `{id}` is not found which is required by {NAME}"))
         });
         let cashflows = cashflows.collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Arc::new(Leg::Straight(StraightLeg { cashflows })))
     }
 }
 
-impl<D, C, T> ProductBuilder<D, C, T>
+impl<D, C, T> DefaultProductBuilder<D, C, T>
 where
     D: DataSrc<DayCountSymbol, Output = DayCount>,
     C: DataSrc<CalendarSymbol, Output = Calendar>,
@@ -686,7 +727,7 @@ where
         v: &CouponBase<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
         required_by: &str,
-    ) -> anyhow::Result<CouponBase<VariableTypesExpanded<V>>> {
+    ) -> anyhow::Result<CouponBase<DefaultVariableTypes<V>>> {
         let base = CouponBase {
             notional: Money {
                 amount: self._unwrap_float(&v.notional.amount, consts, required_by)?,

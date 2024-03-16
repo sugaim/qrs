@@ -7,6 +7,6 @@ pub mod process;
 mod product;
 
 pub use product::{
-    BuildProduct, ContractData, Product, ProductBuilder, ProductData, VariableTypesExpanded,
-    VariableTypesForData,
+    BuildProduct, ContractData, ConvertProduct, DefaultProductBuilder, DefaultVariableTypes,
+    Product, ProductData, VariableTypesForData,
 };

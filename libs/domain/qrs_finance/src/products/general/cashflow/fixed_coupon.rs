@@ -51,3 +51,24 @@ pub struct FixedCoupon<Ts: VariableTypes> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rounding: Option<Ts::Rounding>,
 }
+
+//
+// methods
+//
+impl<Ts: VariableTypes> FixedCoupon<Ts> {
+    #[inline]
+    pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> FixedCoupon<Ts2>
+    where
+        Ts::Number: Into<Ts2::Number>,
+        Ts::DateTime: Into<Ts2::DateTime>,
+        Ts::DayCount: Into<Ts2::DayCount>,
+        Ts::Rounding: Into<Ts2::Rounding>,
+    {
+        FixedCoupon {
+            base: self.base.change_variable_types_to(),
+            rate: self.rate.into(),
+            accrual: self.accrual.into(),
+            rounding: self.rounding.map(|x| x.into()),
+        }
+    }
+}

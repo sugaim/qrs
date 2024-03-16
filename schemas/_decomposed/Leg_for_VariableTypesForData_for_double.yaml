@@ -1,14 +1,13 @@
 title: Leg_for_VariableTypesForData_for_double
-oneOf:
-- type: object
-  required:
-  - cashflows
-  - type
-  properties:
-    cashflows:
-      type: array
-      items:
-        type: string
-    type:
-      type: string
-      const: straight
+type: object
+required:
+- cashflows
+- type
+properties:
+  cashflows:
+    type: array
+    items:
+      $ref: ./WithId.yaml
+  type:
+    type: string
+    const: straight
