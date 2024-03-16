@@ -912,6 +912,16 @@ mod tests {
             false,
         );
         assert!(cal.is_err());
+
+        // extra holidays and business days are not allowed when treat_weekend_as_business_day is true
+        let cal = Calendar::_new(
+            vec![ymd(2021, 1, 1)],
+            vec![ymd(2021, 1, 2)],
+            ymd(2021, 1, 1),
+            ymd(2021, 1, 10),
+            true,
+        );
+        assert!(cal.is_err());
     }
 
     #[cfg(feature = "serde")]
