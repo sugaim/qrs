@@ -1,1 +1,1 @@
-pub mod discount;
+pub mod curve;

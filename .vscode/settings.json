@@ -11,5 +11,8 @@
   },
   "rust-analyzer.checkOnSave": true,
   "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.cargo.features": "all"
+  "rust-analyzer.cargo.features": "all",
+  "rust-analyzer.linkedProjects": [
+    ".\\libs\\domain\\qrs_model\\Cargo.toml"
+  ]
 }

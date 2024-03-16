@@ -3,19 +3,36 @@ use std::{ops::Div, sync::Arc};
 use derivative::Derivative;
 use qrs_chrono::{DateTime, Duration, Velocity};
 use qrs_datasrc::{CacheableSrc, DataSrc, DebugTree, TakeSnapshot};
-use qrs_finance::daycount::Act365fRate;
+use qrs_finance::{daycount::Act365fRate, products::Collateral, Ccy};
 use qrs_math::num::{Real, RelPos};
 
 use crate::core::curve::{AdjustedCurve, Curve, YieldCurve};
 
-use super::{DiscountAdjust, DiscountKey};
+use super::IrCurveAdjust;
+
+// -----------------------------------------------------------------------------
+// DiscountKey
+//
+/// Key for discount curve
+///
+/// Discount curve is specified by currency and collateral.
+/// `collateral` is [`None`] for uncollateralized products.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
+)]
+pub struct DiscountKey {
+    pub ccy: Ccy,
+    pub collateral: Option<Collateral>,
+}
 
 // -----------------------------------------------------------------------------
 // DiscountCurve
 //
 #[derive(Debug, Clone)]
 pub struct DiscountCurve<V> {
-    crv: AdjustedCurve<Arc<Curve<V>>, DiscountAdjust<V>>,
+    crv: AdjustedCurve<Arc<Curve<V>>, IrCurveAdjust<V>>,
 }
 
 //
@@ -27,6 +44,7 @@ where
 {
     type Value = V;
 
+    #[inline]
     fn forward_rate(
         &self,
         from: &DateTime,
@@ -38,8 +56,9 @@ where
 
 impl<V: Real> DiscountCurve<V> {
     /// Returns the adjustments applied to the curve.
+    /// Adjustments are applied in the order of the list.
     #[inline]
-    pub fn adjustments(&self) -> &Vec<DiscountAdjust<V>> {
+    pub fn adjustments(&self) -> &Vec<IrCurveAdjust<V>> {
         &self.crv.adjustments
     }
 
@@ -73,13 +92,14 @@ impl<V: Real> DiscountCurve<V> {
 ///
 /// In addition to [`DiscountKey`], this request includes a list of adjustments to apply to the curve,
 /// for example, to bump for IR-delta calculations, to shift for theta calculations, etc.
+/// When multiple adjustments are specified, they are applied in the order of the list.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq(
     bound = "V: PartialOrd + qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat>"
 ))]
 pub struct DiscountReq<V> {
     pub key: DiscountKey,
-    pub adjustments: Vec<DiscountAdjust<V>>,
+    pub adjustments: Vec<IrCurveAdjust<V>>,
 }
 
 // -----------------------------------------------------------------------------

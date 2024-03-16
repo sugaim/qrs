@@ -6,7 +6,7 @@ use qrs_math::num::Real;
 use crate::core::curve::{Bump, Shift, YieldCurve, YieldCurveAdjust};
 
 // -----------------------------------------------------------------------------
-// DiscountAdjust
+// IrCurveAdjust
 //
 #[derive(Debug, Clone, Derivative)]
 #[cfg_attr(
@@ -21,7 +21,7 @@ use crate::core::curve::{Bump, Shift, YieldCurve, YieldCurveAdjust};
 #[derivative(PartialEq(
     bound = "V: PartialOrd + qrs_math::num::FloatBased + qrs_math::num::Vector<V::BaseFloat>"
 ))]
-pub enum DiscountAdjust<V> {
+pub enum IrCurveAdjust<V> {
     Bump(Bump<V>),
     Shift(Shift),
 }
@@ -29,7 +29,7 @@ pub enum DiscountAdjust<V> {
 //
 // methods
 //
-impl<V: Real> YieldCurveAdjust<V> for DiscountAdjust<V> {
+impl<V: Real> YieldCurveAdjust<V> for IrCurveAdjust<V> {
     #[inline]
     fn adjusted_forward_rate<C: YieldCurve<Value = V>>(
         &self,
@@ -38,8 +38,8 @@ impl<V: Real> YieldCurveAdjust<V> for DiscountAdjust<V> {
         to: &DateTime,
     ) -> anyhow::Result<Act365fRate<C::Value>> {
         match self {
-            DiscountAdjust::Bump(bump) => bump.adjusted_forward_rate(curve, from, to),
-            DiscountAdjust::Shift(shift) => shift.adjusted_forward_rate(curve, from, to),
+            IrCurveAdjust::Bump(bump) => bump.adjusted_forward_rate(curve, from, to),
+            IrCurveAdjust::Shift(shift) => shift.adjusted_forward_rate(curve, from, to),
         }
     }
 }

@@ -1,5 +1,4 @@
 mod adjusted;
-mod any;
 mod bump;
 mod composite;
 #[allow(clippy::module_inception)]
@@ -13,7 +12,6 @@ mod yield_curve;
 mod zero_rate;
 
 pub use adjusted::AdjustedCurve;
-pub use any::DynYieldCurve;
 pub use bump::Bump;
 pub use composite::{CompositeCurve, CompositeCurveSrc, WeightedCurve};
 pub use curve::{AdjustedComponentCurve, ComponentAdjust, ComponentCurve, Curve};
