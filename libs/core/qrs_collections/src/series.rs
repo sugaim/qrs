@@ -1,4 +1,5 @@
-use std::{cmp::Ordering, iter::FusedIterator};
+use core::slice;
+use std::{cmp::Ordering, iter::FusedIterator, vec};
 
 use itertools::Itertools;
 
@@ -197,14 +198,14 @@ impl<G, V> Series<G, V> {
 
     /// Get the iterator iterating over the pairs of grid and value.
     #[inline]
-    pub fn iter(&self) -> SeriesIter<'_, G, V> {
+    pub fn iter(&self) -> SeriesIter<slice::Iter<G>, slice::Iter<V>> {
         self.into_iter()
     }
 
     /// Get the mutable iterator iterating over the pairs of grid and value.
     /// Note that only the values can be modified.
     #[inline]
-    pub fn iter_mut(&mut self) -> SeriesIterMut<'_, G, V> {
+    pub fn iter_mut(&mut self) -> SeriesIter<slice::Iter<G>, slice::IterMut<V>> {
         self.into_iter()
     }
 
@@ -336,10 +337,10 @@ impl<G, V> Series<G, V> {
 
 impl<G, V> IntoIterator for Series<G, V> {
     type Item = (G, V);
-    type IntoIter = SeriesIntoIter<G, V>;
+    type IntoIter = SeriesIter<vec::IntoIter<G>, vec::IntoIter<V>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        SeriesIntoIter {
+        SeriesIter {
             gs: self.gs.into_iter(),
             vs: self.vs.into_iter(),
         }
@@ -348,7 +349,7 @@ impl<G, V> IntoIterator for Series<G, V> {
 
 impl<'a, G, V> IntoIterator for &'a Series<G, V> {
     type Item = (&'a G, &'a V);
-    type IntoIter = SeriesIter<'a, G, V>;
+    type IntoIter = SeriesIter<slice::Iter<'a, G>, slice::Iter<'a, V>>;
 
     fn into_iter(self) -> Self::IntoIter {
         SeriesIter {
@@ -360,10 +361,10 @@ impl<'a, G, V> IntoIterator for &'a Series<G, V> {
 
 impl<'a, G, V> IntoIterator for &'a mut Series<G, V> {
     type Item = (&'a G, &'a mut V);
-    type IntoIter = SeriesIterMut<'a, G, V>;
+    type IntoIter = SeriesIter<slice::Iter<'a, G>, slice::IterMut<'a, V>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        SeriesIterMut {
+        SeriesIter {
             gs: self.gs.iter(),
             vs: self.vs.iter_mut(),
         }
@@ -374,13 +375,17 @@ impl<'a, G, V> IntoIterator for &'a mut Series<G, V> {
 // SeriesIter
 //
 #[derive(Debug, Clone)]
-pub struct SeriesIter<'a, G, V> {
-    gs: std::slice::Iter<'a, G>,
-    vs: std::slice::Iter<'a, V>,
+pub struct SeriesIter<G, V> {
+    gs: G,
+    vs: V,
 }
 
-impl<'a, G, V> Iterator for SeriesIter<'a, G, V> {
-    type Item = (&'a G, &'a V);
+impl<G, V> Iterator for SeriesIter<G, V>
+where
+    G: Iterator,
+    V: Iterator,
+{
+    type Item = (G::Item, V::Item);
 
     fn next(&mut self) -> Option<Self::Item> {
         match (self.gs.next(), self.vs.next()) {
@@ -390,13 +395,21 @@ impl<'a, G, V> Iterator for SeriesIter<'a, G, V> {
     }
 }
 
-impl<'a, G, V> ExactSizeIterator for SeriesIter<'a, G, V> {
+impl<G, V> ExactSizeIterator for SeriesIter<G, V>
+where
+    G: ExactSizeIterator,
+    V: Iterator,
+{
     fn len(&self) -> usize {
         self.gs.len()
     }
 }
 
-impl<'a, G, V> DoubleEndedIterator for SeriesIter<'a, G, V> {
+impl<G, V> DoubleEndedIterator for SeriesIter<G, V>
+where
+    G: DoubleEndedIterator,
+    V: DoubleEndedIterator,
+{
     fn next_back(&mut self) -> Option<Self::Item> {
         match (self.gs.next_back(), self.vs.next_back()) {
             (Some(g), Some(v)) => Some((g, v)),
@@ -404,81 +417,12 @@ impl<'a, G, V> DoubleEndedIterator for SeriesIter<'a, G, V> {
         }
     }
 }
-impl<'a, G, V> FusedIterator for SeriesIter<'a, G, V> {}
-
-// -----------------------------------------------------------------------------
-// SeriesIntoIter
-//
-#[derive(Debug, Clone)]
-pub struct SeriesIntoIter<G, V> {
-    gs: std::vec::IntoIter<G>,
-    vs: std::vec::IntoIter<V>,
+impl<G, V> FusedIterator for SeriesIter<G, V>
+where
+    G: FusedIterator,
+    V: FusedIterator,
+{
 }
-
-impl<G, V> Iterator for SeriesIntoIter<G, V> {
-    type Item = (G, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (self.gs.next(), self.vs.next()) {
-            (Some(g), Some(v)) => Some((g, v)),
-            _ => None,
-        }
-    }
-}
-
-impl<G, V> ExactSizeIterator for SeriesIntoIter<G, V> {
-    fn len(&self) -> usize {
-        self.gs.len()
-    }
-}
-
-impl<G, V> DoubleEndedIterator for SeriesIntoIter<G, V> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match (self.gs.next_back(), self.vs.next_back()) {
-            (Some(g), Some(v)) => Some((g, v)),
-            _ => None,
-        }
-    }
-}
-
-impl<G, V> FusedIterator for SeriesIntoIter<G, V> {}
-
-// -----------------------------------------------------------------------------
-// SeriesIterMut
-//
-#[derive(Debug)]
-pub struct SeriesIterMut<'a, G, V> {
-    gs: std::slice::Iter<'a, G>,
-    vs: std::slice::IterMut<'a, V>,
-}
-
-impl<'a, G, V> Iterator for SeriesIterMut<'a, G, V> {
-    type Item = (&'a G, &'a mut V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (self.gs.next(), self.vs.next()) {
-            (Some(g), Some(v)) => Some((g, v)),
-            _ => None,
-        }
-    }
-}
-
-impl<'a, G, V> ExactSizeIterator for SeriesIterMut<'a, G, V> {
-    fn len(&self) -> usize {
-        self.gs.len()
-    }
-}
-
-impl<'a, G, V> DoubleEndedIterator for SeriesIterMut<'a, G, V> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match (self.gs.next_back(), self.vs.next_back()) {
-            (Some(g), Some(v)) => Some((g, v)),
-            _ => None,
-        }
-    }
-}
-
-impl<'a, G, V> FusedIterator for SeriesIterMut<'a, G, V> {}
 
 #[cfg(test)]
 mod tests {
@@ -601,5 +545,17 @@ mod tests {
         let res = series.interval_index_of(&grid).unwrap();
 
         assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn test_iter() {
+        let series = Series::new(vec![0, 10, 20], vec![0, 1, 2]).unwrap();
+
+        let mut iter = series.iter();
+
+        assert_eq!(iter.next(), Some((&0, &0)));
+        assert_eq!(iter.next(), Some((&10, &1)));
+        assert_eq!(iter.next(), Some((&20, &2)));
+        assert_eq!(iter.next(), None);
     }
 }
