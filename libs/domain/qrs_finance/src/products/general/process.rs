@@ -14,6 +14,16 @@ pub use deterministic::DeterministicFloat;
 pub use market_ref::MarketRef;
 
 // -----------------------------------------------------------------------------
+// ValueType
+//
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub enum ValueType {
+    Number { dim: usize },
+    Boolean { dim: usize },
+    Integer { dim: usize },
+}
+
+// -----------------------------------------------------------------------------
 // Process
 //
 #[derive(Derivative, Component, Serialize, Deserialize, JsonSchema)]
@@ -48,4 +58,25 @@ pub enum Process<Ts: VariableTypes> {
     DeterministicFloat(DeterministicFloat<Ts>),
     ConstantFloat(ConstantFloat<Ts>),
     MarketRef(MarketRef<Ts>),
+}
+
+//
+// methods
+//
+impl<Ts: VariableTypes> Process<Ts> {
+    #[inline]
+    pub fn value_type(&self) -> ValueType
+    where
+        Ts::ProcessRef: AsRef<Self>,
+    {
+        match self {
+            Process::ConstantFloat(c) => ValueType::Number {
+                dim: c.values.len(),
+            },
+            Process::DeterministicFloat(d) => ValueType::Number {
+                dim: d.series.len(),
+            },
+            Process::MarketRef(m) => ValueType::Number { dim: m.refs.len() },
+        }
+    }
 }

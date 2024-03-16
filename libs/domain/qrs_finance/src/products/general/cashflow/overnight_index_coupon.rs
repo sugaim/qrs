@@ -13,17 +13,17 @@ use super::CouponBase;
 #[derive(Derivative, Component, Serialize, Deserialize, JsonSchema)]
 #[derivative(
     Debug(bound = "CouponBase<Ts>: std::fmt::Debug,
-        Ts::ProcessRef: std::fmt::Debug,
+        Ts::MarketRef: std::fmt::Debug,
         Ts::Number: std::fmt::Debug,
         Ts::InArrearsConvention: std::fmt::Debug,
         Ts::Rounding: std::fmt::Debug"),
     Clone(bound = "CouponBase<Ts>: Clone,
-        Ts::ProcessRef: Clone,
+        Ts::MarketRef: Clone,
         Ts::Number: Clone,
         Ts::InArrearsConvention: Clone,
         Ts::Rounding: Clone"),
     PartialEq(bound = "CouponBase<Ts>: PartialEq,
-        Ts::ProcessRef: PartialEq,
+        Ts::MarketRef: PartialEq,
         Ts::Number: PartialEq,
         Ts::InArrearsConvention: PartialEq,
         Ts::Rounding: PartialEq")
@@ -32,19 +32,19 @@ use super::CouponBase;
 #[serde(bound(
     serialize = "CouponBase<Ts>: Serialize,
             Ts::Number: Serialize,
-            Ts::ProcessRef: Serialize,
+            Ts::MarketRef: Serialize,
             Ts::InArrearsConvention: Serialize,
             Ts::Rounding: Serialize",
     deserialize = "CouponBase<Ts>: Deserialize<'de>,
             Ts::Number: Deserialize<'de>,
-            Ts::ProcessRef: Deserialize<'de>,
+            Ts::MarketRef: Deserialize<'de>,
             Ts::InArrearsConvention: Deserialize<'de>,
             Ts::Rounding: Deserialize<'de>"
 ))]
 #[schemars(bound = "Ts: JsonSchema,
             CouponBase<Ts>: JsonSchema,
             Ts::Number: JsonSchema,
-            Ts::ProcessRef: JsonSchema,
+            Ts::MarketRef: JsonSchema,
             Ts::InArrearsConvention: JsonSchema,
             Ts::Rounding: JsonSchema")]
 pub struct OvernightIndexCoupon<Ts: VariableTypes> {
@@ -53,8 +53,8 @@ pub struct OvernightIndexCoupon<Ts: VariableTypes> {
 
     pub convention: Ts::InArrearsConvention,
 
-    #[component(field(category = "Process"))]
-    pub reference_rate: Ts::ProcessRef,
+    #[component(field(category = "Market"))]
+    pub reference_rate: Ts::MarketRef,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spread: Option<Ts::Number>,

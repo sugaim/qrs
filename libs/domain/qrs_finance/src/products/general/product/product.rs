@@ -15,18 +15,21 @@ use serde::Deserialize;
 
 use crate::{
     daycount::{DayCount, DayCountSymbol},
-    products::general::{
-        cashflow::{
-            Cashflow, CashflowFixing, CashflowWithFixing, CouponBase, FixedCoupon,
-            OvernightIndexCoupon, OvernightIndexFixing,
+    products::{
+        general::{
+            cashflow::{
+                Cashflow, CashflowFixing, CashflowWithFixing, CouponBase, FixedCoupon,
+                OvernightIndexCoupon, OvernightIndexFixing,
+            },
+            constant::Constant,
+            core::{ComponentCategory, ComponentKey, ValueOrId, VariableTypes},
+            leg::{Leg, StraightLeg},
+            market::{Market, OvernightRate},
+            process::{ConstantFloat, DeterministicFloat, MarketRef, Process},
         },
-        constant::Constant,
-        core::{ComponentCategory, ComponentKey, ValueOrId, VariableTypes},
-        leg::{Leg, StraightLeg},
-        market::{Market, OvernightRate},
-        process::{ConstantFloat, DeterministicFloat, MarketRef, Process},
+        in_arrears::{InArrears, SpreadExclusiveCompounding, StraightCompounding},
+        Collateral,
     },
-    products::in_arrears::{InArrears, SpreadExclusiveCompounding, StraightCompounding},
     Money,
 };
 
@@ -37,6 +40,7 @@ use super::{data::ProductData, VariableTypesForData};
 //
 #[derive(Debug, Clone, PartialEq)]
 pub struct Product<Ts: VariableTypes = VariableTypesExpanded> {
+    col: Collateral,
     mkts: HashMap<String, Ts::MarketRef>,
     procs: HashMap<String, Ts::ProcessRef>,
     cfs: HashMap<String, Ts::CashflowRef>,
@@ -47,6 +51,11 @@ pub struct Product<Ts: VariableTypes = VariableTypesExpanded> {
 // methods
 //
 impl<Ts: VariableTypes> Product<Ts> {
+    #[inline]
+    pub fn collateral(&self) -> &Collateral {
+        &self.col
+    }
+
     #[inline]
     pub fn markets(&self) -> &HashMap<String, Ts::MarketRef> {
         &self.mkts
@@ -75,6 +84,7 @@ pub trait BuildProduct<V>: Sized {
     type Variables: VariableTypes;
 
     fn initialize(&mut self);
+    fn post_validation(&self, result: &Product<Self::Variables>) -> anyhow::Result<()>;
 
     // market
     fn parse_mkt_overnight_rate(
@@ -113,6 +123,7 @@ pub trait BuildProduct<V>: Sized {
         &self,
         cmp: &FixedCoupon<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
+        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef>;
@@ -122,6 +133,7 @@ pub trait BuildProduct<V>: Sized {
         cmp: &OvernightIndexCoupon<VariableTypesForData<V>>,
         fixing: Option<&OvernightIndexFixing>,
         consts: &HashMap<String, Constant>,
+        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef>;
@@ -131,6 +143,7 @@ pub trait BuildProduct<V>: Sized {
         &self,
         leg: &StraightLeg<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
+        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
         legs: &HashMap<String, <Self::Variables as VariableTypes>::LegRef>,
@@ -184,14 +197,19 @@ pub trait BuildProduct<V>: Sized {
                     let cmp = data.contract.cashflows.get(name).unwrap();
                     let fixing = data.fixing.cashflows.get(name);
                     let cf = match (cmp, fixing) {
-                        (Cashflow::FixedCoupon(cmp), None) => {
-                            self.parse_cf_fixed_coupon(cmp, &data.contract.constants, &procs, &cfs)?
-                        }
+                        (Cashflow::FixedCoupon(cmp), None) => self.parse_cf_fixed_coupon(
+                            cmp,
+                            &data.contract.constants,
+                            &mkts,
+                            &procs,
+                            &cfs,
+                        )?,
                         (Cashflow::OvernightIndexCoupon(cmp), None) => self
                             .parse_cf_overnight_index_coupon(
                                 cmp,
                                 None,
                                 &data.contract.constants,
+                                &mkts,
                                 &procs,
                                 &cfs,
                             )?,
@@ -202,6 +220,7 @@ pub trait BuildProduct<V>: Sized {
                             cmp,
                             Some(fixing),
                             &data.contract.constants,
+                            &mkts,
                             &procs,
                             &cfs,
                         )?,
@@ -215,6 +234,7 @@ pub trait BuildProduct<V>: Sized {
                         Leg::Straight(cmp) => self.parse_leg_straight(
                             cmp,
                             &data.contract.constants,
+                            &mkts,
                             &procs,
                             &cfs,
                             &legs,
@@ -224,12 +244,15 @@ pub trait BuildProduct<V>: Sized {
                 }
             }
         }
-        Ok(Product {
+        let res = Product {
+            col: data.contract.collateral.clone(),
             mkts,
             procs,
             cfs,
             legs,
-        })
+        };
+        self.post_validation(&res)?;
+        Ok(res)
     }
 }
 
@@ -378,6 +401,10 @@ where
     fn initialize(&mut self) {
         self.conv.lock().unwrap().clear();
     }
+    #[inline]
+    fn post_validation(&self, _: &Product<Self::Variables>) -> anyhow::Result<()> {
+        Ok(())
+    }
 
     // market
     #[inline]
@@ -397,8 +424,9 @@ where
         _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
+        const NAME: &str = "constant_float";
         let values = cmp.values.iter();
-        let values = values.map(|v| _unwrap_float(v, consts, "constant_float"));
+        let values = values.map(|v| self._unwrap_float(v, consts, NAME));
         let values = values
             .collect::<anyhow::Result<Vec<_>>>()?
             .require_min_size()?;
@@ -412,11 +440,12 @@ where
         _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
+        const NAME: &str = "deterministic_float";
         let mut series = Vec::default();
         for ser in cmp.series.iter() {
             let ts = ser.iter().map(|(dt, v)| {
-                let dt = _unwrap_dt(dt, consts, "deterministic_float", &self.time_cut)?;
-                let v = _unwrap_float(v, consts, "deterministic_float")?;
+                let dt = self._unwrap_dt(dt, consts, NAME)?;
+                let v = self._unwrap_float(v, consts, NAME)?;
                 Ok((dt, v))
             });
             let ts = ts.collect::<anyhow::Result<HashMap<_, _>>>()?;
@@ -435,12 +464,11 @@ where
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
+        const NAME: &str = "market_ref";
         let refs = cmp.refs.iter();
         let refs = refs.map(|m| {
             mkts.get(m)
-                .ok_or_else(
-                    || anyhow!("market `{m}` is not found which is required by market_ref",),
-                )
+                .ok_or_else(|| anyhow!("market `{m}` is not found which is required by {NAME}",))
                 .cloned()
         });
         let refs = refs
@@ -454,23 +482,19 @@ where
         &self,
         cmp: &FixedCoupon<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
+        _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef> {
+        const NAME: &str = "fixed_coupon";
         Ok(Arc::new(CashflowWithFixing::FixedCoupon(FixedCoupon {
-            base: _unwrap_cpnbase(
-                &cmp.base,
-                consts,
-                "fixed_coupon",
-                &self.time_cut,
-                &self.daycnt_src,
-            )?,
-            rate: _unwrap_float(&cmp.rate, consts, "fixed_coupon")?,
-            accrual: _unwrap_dcnt(&cmp.accrual, consts, "fixed_coupon", &self.daycnt_src)?,
+            base: self._unwrap_cpnbase(&cmp.base, consts, NAME)?,
+            rate: self._unwrap_float(&cmp.rate, consts, NAME)?,
+            accrual: self._unwrap_dcnt(&cmp.accrual, consts, NAME)?,
             rounding: cmp
                 .rounding
                 .as_ref()
-                .map(|r| _unwrap_rounding(r, consts, "fixed_coupon", &self.rounding))
+                .map(|r| self._unwrap_rounding(r, consts, NAME))
                 .transpose()?,
         })))
     }
@@ -480,49 +504,42 @@ where
         cmp: &OvernightIndexCoupon<VariableTypesForData<V>>,
         fixing: Option<&OvernightIndexFixing>,
         consts: &HashMap<String, Constant>,
-        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
+        mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
+        _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef> {
+        const NAME: &str = "overnight_index_coupon";
+        let ref_rate = mkts.get(&cmp.reference_rate).ok_or_else(|| {
+            anyhow!(
+                "market `{}` is not found which is required by {NAME}",
+                cmp.reference_rate
+            )
+        })?;
+        if !matches!(ref_rate.as_ref(), Market::OvernightRate(_)) {
+            bail!(
+                "{NAME} requires market `{}` is an overnight rate",
+                cmp.reference_rate
+            );
+        }
         Ok(Arc::new(CashflowWithFixing::OvernightIndexCoupon(
             OvernightIndexCoupon {
-                base: _unwrap_cpnbase(
-                    &cmp.base,
-                    consts,
-                    "overnight_index_coupon",
-                    &self.time_cut,
-                    &self.daycnt_src,
-                )?,
-                convention: _unwrap_inarrears(
-                    &cmp.convention,
-                    consts,
-                    "overnight_index_coupon",
-                    &self.daycnt_src,
-                    &self.cal_src,
-                    &self.conv,
-                )?,
-                reference_rate: procs
-                    .get(&cmp.reference_rate)
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "process `{}` is not found which is required by overnight_index_coupon",
-                            cmp.reference_rate
-                        )
-                    })?
-                    .clone(),
+                base: self._unwrap_cpnbase(&cmp.base, consts, NAME)?,
+                convention: self._unwrap_inarrears(&cmp.convention, consts, NAME)?,
+                reference_rate: ref_rate.clone(),
                 gearing: cmp
                     .gearing
                     .as_ref()
-                    .map(|v| _unwrap_float(v, consts, "overnight_index_coupon"))
+                    .map(|v| self._unwrap_float(v, consts, NAME))
                     .transpose()?,
                 spread: cmp
                     .spread
                     .as_ref()
-                    .map(|v| _unwrap_float(v, consts, "overnight_index_coupon"))
+                    .map(|v| self._unwrap_float(v, consts, NAME))
                     .transpose()?,
                 rounding: cmp
                     .rounding
                     .as_ref()
-                    .map(|r| _unwrap_rounding(r, consts, "overnight_index_coupon", &self.rounding))
+                    .map(|r| self._unwrap_rounding(r, consts, NAME))
                     .transpose()?,
             },
             fixing.cloned(),
@@ -534,16 +551,16 @@ where
         &self,
         leg: &StraightLeg<VariableTypesForData<V>>,
         _: &HashMap<String, Constant>,
+        _: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
         cfs: &HashMap<String, <Self::Variables as VariableTypes>::CashflowRef>,
         _: &HashMap<String, <Self::Variables as VariableTypes>::LegRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::LegRef> {
+        const NAME: &str = "straight_leg";
         let cashflows = leg.cashflows.iter();
         let cashflows = cashflows.map(|cf| {
             cfs.get(cf)
-                .ok_or_else(|| {
-                    anyhow!("cashflow `{cf}` is not found which is required by straight_leg",)
-                })
+                .ok_or_else(|| anyhow!("cashflow `{cf}` is not found which is required by {NAME}",))
                 .cloned()
         });
         let cashflows = cashflows.collect::<anyhow::Result<Vec<_>>>()?;
@@ -551,183 +568,190 @@ where
     }
 }
 
-fn _unwrap_float<V: Real>(
-    v: &ValueOrId<V>,
-    consts: &HashMap<String, Constant>,
-    required_by: &str,
-) -> anyhow::Result<V> {
-    let id = match v {
-        ValueOrId::Value(v) => return Ok(v.clone()),
-        ValueOrId::Id(id) => id,
-    };
-    consts
-        .get(id)
-        .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
-        .and_then(|c| match c {
-            Constant::Number(v) => Ok(*v),
-            _ => bail!("constant `{id}` is not a number."),
-        })
-        .map(V::nearest_base_float_of)
-        .map(Into::into)
-}
-
-fn _unwrap_dt<T>(
-    v: &ValueOrId<DateWithTag>,
-    consts: &HashMap<String, Constant>,
-    required_by: &str,
-    src: &T,
-) -> anyhow::Result<DateTime>
-where
-    T: DataSrc<str, Output = DateToDateTime>,
-{
-    let id = match v {
-        ValueOrId::Value(v) => {
-            return v
-                .to_datetime(src)
-                .context("Converting ProductData to Product")
-        }
-        ValueOrId::Id(id) => id,
-    };
-    consts
-        .get(id)
-        .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
-        .and_then(|c| match c {
-            Constant::String(s) => DateWithTag::<String>::from_str(s).map_err(Into::into),
-            _ => bail!("constant `{id}` is not a string, which is expected a `DateWithTag`."),
-        })
-        .and_then(|dt| dt.to_datetime(src))
-}
-
-fn _unwrap_dcnt<D>(
-    v: &ValueOrId<DayCountSymbol>,
-    consts: &HashMap<String, Constant>,
-    required_by: &str,
-    src: &D,
-) -> anyhow::Result<DayCount>
+impl<D, C, T> ProductBuilder<D, C, T>
 where
     D: DataSrc<DayCountSymbol, Output = DayCount>,
+    C: DataSrc<CalendarSymbol, Output = Calendar>,
+    T: DataSrc<str, Output = DateToDateTime>,
 {
-    let id = match v {
-        ValueOrId::Value(v) => return src.get(v).context("Converting ProductData to Product"),
-        ValueOrId::Id(id) => id,
-    };
-    consts
-        .get(id)
-        .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
-        .and_then(|c| match c {
-            Constant::Object(v) => DayCountSymbol::deserialize(v).map_err(Into::into),
-            _ => bail!("constant `{id}` is not an object, which is expected a `DayCountSymbol`."),
-        })
-        .and_then(|s| src.get(&s).context("Converting ProductData to Product"))
-}
-
-fn _unwrap_rounding(
-    v: &ValueOrId<Rounding>,
-    consts: &HashMap<String, Constant>,
-    required_by: &str,
-    cache: &Mutex<HashMap<String, Rounding>>,
-) -> anyhow::Result<Rounding> {
-    let id = match v {
-        ValueOrId::Value(v) => return Ok(*v),
-        ValueOrId::Id(id) => id,
-    };
-    let mut cache = cache.lock().unwrap();
-    if let Some(res) = cache.get(id) {
-        return Ok(*res);
+    fn _ctx_msg(&self, cmp: &str) -> String {
+        format!("Parse {cmp} to convert `ProductData` to `Product`")
     }
-    let res = consts
-        .get(id)
-        .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
-        .and_then(|c| match c {
-            Constant::Object(v) => Rounding::deserialize(v)
-                .map_err(Into::<anyhow::Error>::into)
-                .context("Converting ProductData to Product"),
-            _ => bail!("constant `{id}` is not an object, which is expected a `Rounding`."),
-        })?;
-    cache.insert(id.clone(), res);
-    Ok(res)
-}
-
-fn _unwrap_cpnbase<V, T, D>(
-    v: &CouponBase<VariableTypesForData<V>>,
-    consts: &HashMap<String, Constant>,
-    required_by: &str,
-    tcut_src: &T,
-    dcnt_src: &D,
-) -> anyhow::Result<CouponBase<VariableTypesExpanded<V>>>
-where
-    V: Real,
-    T: DataSrc<str, Output = DateToDateTime>,
-    D: DataSrc<DayCountSymbol, Output = DayCount>,
-{
-    let base = CouponBase {
-        notional: Money {
-            amount: _unwrap_float(&v.notional.amount, consts, required_by)?,
-            ccy: v.notional.ccy,
-        },
-        period_start: _unwrap_dt(&v.period_start, consts, required_by, tcut_src)?,
-        period_end: _unwrap_dt(&v.period_end, consts, required_by, tcut_src)?,
-        entitle: _unwrap_dt(&v.entitle, consts, required_by, tcut_src)?,
-        payment: _unwrap_dt(&v.payment, consts, required_by, tcut_src)?,
-        daycount: _unwrap_dcnt(&v.daycount, consts, required_by, dcnt_src)?,
-    };
-    Ok(base)
-}
-
-fn _unwrap_inarrears<T, D>(
-    v: &ValueOrId<InArrears<DayCountSymbol, CalendarSymbol>>,
-    consts: &HashMap<String, Constant>,
-    required_by: &str,
-    dcnt_src: &D,
-    cal_src: &T,
-    cache: &Mutex<HashMap<String, Arc<InArrears<DayCount, Calendar>>>>,
-) -> anyhow::Result<Arc<InArrears<DayCount, Calendar>>>
-where
-    T: DataSrc<CalendarSymbol, Output = Calendar>,
-    D: DataSrc<DayCountSymbol, Output = DayCount>,
-{
-    let parse = |v: &InArrears<DayCountSymbol, CalendarSymbol>| {
-        use InArrears::*;
-        let res = match v {
-            Straight(v) => Straight(StraightCompounding {
-                calendar: cal_src.get(&v.calendar)?,
-                obsrate_daycount: dcnt_src.get(&v.obsrate_daycount)?,
-                overall_daycount: dcnt_src.get(&v.overall_daycount)?,
-                lockout: v.lockout,
-                lookback: v.lookback,
-                rounding: v.rounding,
-                zero_interest_rate_method: v.zero_interest_rate_method,
-            }),
-            SpreadExclusive(v) => SpreadExclusive(SpreadExclusiveCompounding {
-                calendar: cal_src.get(&v.calendar)?,
-                obsrate_daycount: dcnt_src.get(&v.obsrate_daycount)?,
-                overall_daycount: dcnt_src.get(&v.overall_daycount)?,
-                lockout: v.lockout,
-                lookback: v.lookback,
-                rounding: v.rounding,
-                zero_interest_rate_method: v.zero_interest_rate_method,
-            }),
+    fn _unwrap_float<V: Real>(
+        &self,
+        v: &ValueOrId<V>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<V> {
+        let id = match v {
+            ValueOrId::Value(v) => return Ok(v.clone()),
+            ValueOrId::Id(id) => id,
         };
-        anyhow::Ok(Arc::new(res))
-    };
-    let id = match v {
-        ValueOrId::Value(v) => return parse(v).context("Converting ProductData to Product"),
-        ValueOrId::Id(id) => id,
-    };
-    let mut cache = cache.lock().unwrap();
-    if let Some(res) = cache.get(id) {
-        return Ok(res.clone());
+        consts
+            .get(id)
+            .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
+            .and_then(|c| match c {
+                Constant::Number(v) => Ok(V::nearest_base_float_of(*v).into()),
+                _ => bail!("constant `{id}` is not a number."),
+            })
     }
-    let res = consts
-        .get(id)
-        .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
-        .and_then(|c| match c {
-            Constant::Object(v) => InArrears::<DayCountSymbol, CalendarSymbol>::deserialize(v)
-                .map_err(Into::<anyhow::Error>::into)
-                .context("Converting ProductData to Product"),
-            _ => bail!("constant `{id}` is not an object, which is expected a `InArrears`."),
-        })
-        .and_then(|s| parse(&s).context("Converting ProductData to Product"))?;
-    cache.insert(id.clone(), res.clone());
-    Ok(res)
+
+    fn _unwrap_dt(
+        &self,
+        v: &ValueOrId<DateWithTag>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<DateTime> {
+        let id = match v {
+            ValueOrId::Value(v) => {
+                return v
+                    .to_datetime(&self.time_cut)
+                    .with_context(|| self._ctx_msg(required_by))
+            }
+            ValueOrId::Id(id) => id,
+        };
+        consts
+            .get(id)
+            .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
+            .and_then(|c| match c {
+                Constant::String(s) => DateWithTag::<String>::from_str(s).map_err(Into::into),
+                _ => bail!("constant `{id}` is not a string, which is expected a `DateWithTag`."),
+            })
+            .and_then(|dt| {
+                dt.to_datetime(&self.time_cut)
+                    .with_context(|| self._ctx_msg(required_by))
+            })
+    }
+
+    fn _unwrap_dcnt(
+        &self,
+        v: &ValueOrId<DayCountSymbol>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<DayCount> {
+        let id = match v {
+            ValueOrId::Value(v) => {
+                return self
+                    .daycnt_src
+                    .get(v)
+                    .with_context(|| self._ctx_msg(required_by))
+            }
+            ValueOrId::Id(id) => id,
+        };
+        consts
+            .get(id)
+            .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
+            .and_then(|c| match c {
+                Constant::Object(v) => DayCountSymbol::deserialize(v).map_err(Into::into),
+                _ => {
+                    bail!("constant `{id}` is not an object, which is expected a `DayCountSymbol`.")
+                }
+            })
+            .and_then(|s| {
+                self.daycnt_src
+                    .get(&s)
+                    .with_context(|| self._ctx_msg(required_by))
+            })
+    }
+
+    fn _unwrap_rounding(
+        &self,
+        v: &ValueOrId<Rounding>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<Rounding> {
+        let id = match v {
+            ValueOrId::Value(v) => return Ok(*v),
+            ValueOrId::Id(id) => id,
+        };
+        let mut cache = self.rounding.lock().unwrap();
+        if let Some(res) = cache.get(id) {
+            return Ok(*res);
+        }
+        let res = consts
+            .get(id)
+            .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
+            .and_then(|c| match c {
+                Constant::Object(v) => Rounding::deserialize(v)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("Converting ProductData to Product"),
+                _ => bail!("constant `{id}` is not an object, which is expected a `Rounding`."),
+            })?;
+        cache.insert(id.clone(), res);
+        Ok(res)
+    }
+
+    fn _unwrap_cpnbase<V: Real>(
+        &self,
+        v: &CouponBase<VariableTypesForData<V>>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<CouponBase<VariableTypesExpanded<V>>> {
+        let base = CouponBase {
+            notional: Money {
+                amount: self._unwrap_float(&v.notional.amount, consts, required_by)?,
+                ccy: v.notional.ccy,
+            },
+            period_start: self._unwrap_dt(&v.period_start, consts, required_by)?,
+            period_end: self._unwrap_dt(&v.period_end, consts, required_by)?,
+            entitle: self._unwrap_dt(&v.entitle, consts, required_by)?,
+            payment: self._unwrap_dt(&v.payment, consts, required_by)?,
+            daycount: self._unwrap_dcnt(&v.daycount, consts, required_by)?,
+        };
+        Ok(base)
+    }
+
+    fn _unwrap_inarrears(
+        &self,
+        v: &ValueOrId<InArrears<DayCountSymbol, CalendarSymbol>>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<Arc<InArrears<DayCount, Calendar>>> {
+        let parse = |v: &InArrears<DayCountSymbol, CalendarSymbol>| {
+            use InArrears::*;
+            let cal_src = &self.cal_src;
+            let dcnt_src = &self.daycnt_src;
+            let res = match v {
+                Straight(v) => Straight(StraightCompounding {
+                    calendar: cal_src.get(&v.calendar)?,
+                    obsrate_daycount: dcnt_src.get(&v.obsrate_daycount)?,
+                    overall_daycount: dcnt_src.get(&v.overall_daycount)?,
+                    lockout: v.lockout,
+                    lookback: v.lookback,
+                    rounding: v.rounding,
+                    zero_interest_rate_method: v.zero_interest_rate_method,
+                }),
+                SpreadExclusive(v) => SpreadExclusive(SpreadExclusiveCompounding {
+                    calendar: cal_src.get(&v.calendar)?,
+                    obsrate_daycount: dcnt_src.get(&v.obsrate_daycount)?,
+                    overall_daycount: dcnt_src.get(&v.overall_daycount)?,
+                    lockout: v.lockout,
+                    lookback: v.lookback,
+                    rounding: v.rounding,
+                    zero_interest_rate_method: v.zero_interest_rate_method,
+                }),
+            };
+            anyhow::Ok(Arc::new(res))
+        };
+        let id = match v {
+            ValueOrId::Value(v) => return parse(v).context("Converting ProductData to Product"),
+            ValueOrId::Id(id) => id,
+        };
+        let mut cache = self.conv.lock().unwrap();
+        if let Some(res) = cache.get(id) {
+            return Ok(res.clone());
+        }
+        let res = consts
+            .get(id)
+            .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
+            .and_then(|c| match c {
+                Constant::Object(v) => InArrears::<DayCountSymbol, CalendarSymbol>::deserialize(v)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("Converting ProductData to Product"),
+                _ => bail!("constant `{id}` is not an object, which is expected a `InArrears`."),
+            })
+            .and_then(|s| parse(&s).context("Converting ProductData to Product"))?;
+        cache.insert(id.clone(), res.clone());
+        Ok(res)
+    }
 }
