@@ -532,6 +532,24 @@ mod tests {
     }
 
     #[test]
+    fn test_zero() {
+        let vel = Velocity::<f64>::zero();
+        let dur = Duration::with_secs(1);
+
+        assert_eq!(vel.to_change(dur), 0.0);
+    }
+
+    #[rstest]
+    #[case(Zero::zero(), true)]
+    #[case(Velocity::new(0., Duration::with_mins(1)), true)]
+    #[case(Velocity::new(10.0, Duration::with_secs(1)), false)]
+    #[case(Velocity::new(10.0, Duration::zero()), false)]
+    #[case(Velocity::new(0.0, Duration::with_secs(0)), false)]
+    fn test_is_zero(#[case] vel: Velocity<f64>, #[case] exp: bool) {
+        assert_eq!(vel.is_zero(), exp);
+    }
+
+    #[test]
     fn test_new() {
         let vel = Velocity::new(10.0, Duration::with_secs(1));
         match vel.0 {

@@ -1,0 +1,13 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: Velocity_for_double
+description: A change per given duration.
+type: object
+required:
+- change
+- duration
+properties:
+  change:
+    type: number
+    format: double
+  duration:
+    $ref: ./Duration.yaml
