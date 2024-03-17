@@ -1,5 +1,5 @@
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::{Act365f, Act365fRate, RateDcf};
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::{func1d::Func1dIntegrable, num::Real};
 
 use super::YieldCurve;
@@ -42,8 +42,6 @@ where
             return Ok(self.inst_fwd.eval(from));
         }
         let exponent = self.inst_fwd.integrate(from, to);
-        Ok(Act365f
-            .ratio_to_rate(exponent, from, to)
-            .expect("zero-division does not occur"))
+        Ok(Act365fRate::from_ratio(exponent, to - from))
     }
 }

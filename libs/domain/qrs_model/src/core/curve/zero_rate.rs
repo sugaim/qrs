@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use qrs_chrono::{DateTime, Duration};
-use qrs_finance::daycount::{Act365f, Act365fRate, InterestRate, RateDcf};
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::{func1d::Func1dDer1, num::Real};
 
 use super::YieldCurve;
@@ -53,13 +53,11 @@ where
         let zf = self.zero_rate.eval(from);
         let zt = self.zero_rate.eval(to);
 
-        let ef = zf.into_ratio_between(&self.base_date, from);
-        let et = zt.into_ratio_between(&self.base_date, to);
+        let ef = zf * (from - self.base_date);
+        let et = zt * (to - self.base_date);
 
         // (zt * t - zf * f) / (t - f)
-        Ok(Act365f
-            .ratio_to_rate(et - &ef, from, to)
-            .expect("zero-division does not occur"))
+        Ok(Act365fRate::from_ratio(et - &ef, to - from))
     }
 }
 
@@ -70,6 +68,7 @@ mod tests {
 
     use approx::assert_abs_diff_eq;
     use qrs_collections::{RequireMinSize, Series};
+    use qrs_finance::daycount::InterestRate;
 
     #[test]
     fn test_forward_rate() {

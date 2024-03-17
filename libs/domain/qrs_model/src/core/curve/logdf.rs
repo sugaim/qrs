@@ -39,8 +39,6 @@ where
             return Ok(Act365f.to_rate(rate));
         }
         let log_df = self.logdf.eval(from) - &self.logdf.eval(to);
-        Ok(Act365f
-            .ratio_to_rate(log_df, from, to)
-            .expect("zero-division does not occur"))
+        Ok(Act365fRate::from_ratio(log_df, to - from))
     }
 }

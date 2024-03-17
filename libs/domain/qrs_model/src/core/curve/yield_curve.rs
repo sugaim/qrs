@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::{Act365fRate, InterestRate};
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::{Exp, Real};
 
 // -----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ pub trait YieldCurve {
     #[inline]
     fn discount(&self, from: &DateTime, to: &DateTime) -> anyhow::Result<Self::Value> {
         let rate = self.forward_rate(from, to)?;
-        let exponent = -rate.into_ratio_between(from, to);
+        let exponent = -rate * (to - from);
         Ok(exponent.exp())
     }
 }

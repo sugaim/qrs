@@ -1,5 +1,5 @@
 use qrs_chrono::DateTime;
-use qrs_finance::daycount::{Act365f, Act365fRate, RateDcf};
+use qrs_finance::daycount::Act365fRate;
 use qrs_math::num::Real;
 
 use super::YieldCurve;
@@ -48,8 +48,6 @@ where
         let short = self.short.forward_rate(from, &self.sep)?;
         let long = self.long.forward_rate(&self.sep, to)?;
         let exponent = short * (self.sep - from) + long * (to - self.sep);
-        Ok(Act365f
-            .ratio_to_rate(exponent, from, to)
-            .expect("zero-division does not occur"))
+        Ok(Act365fRate::from_ratio(exponent, to - from))
     }
 }

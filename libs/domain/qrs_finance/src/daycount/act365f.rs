@@ -1,22 +1,17 @@
 use std::ops::{Div, Mul, MulAssign};
 
-use qrs_chrono::{Duration, Velocity};
+use qrs_chrono::{Duration, NaiveDate, Velocity};
 use qrs_math::num::{FloatBased, Real, RelPos, Vector};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // Act365f
 //
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Act365f;
-
-impl Default for Act365f {
-    #[inline]
-    fn default() -> Self {
-        Self
-    }
-}
 
 //
 // display, serde
@@ -32,9 +27,9 @@ impl std::fmt::Display for Act365f {
 //
 impl Dcf for Act365f {
     #[inline]
-    fn dcf(&self, from: &qrs_chrono::DateTime, to: &qrs_chrono::DateTime) -> f64 {
-        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 365.0;
-        (to - from).millsecs() as f64 / MILSEC_PER_YEAR
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+        const DAYS_PER_YEAR: f64 = 365.;
+        Some((to - from).num_days() as f64 / DAYS_PER_YEAR)
     }
 }
 
@@ -52,30 +47,8 @@ impl RateDcf for Act365f {
 // -----------------------------------------------------------------------------
 // Act365fRate
 //
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize, JsonSchema)]
 pub struct Act365fRate<V>(V);
-
-//
-// display, serde
-//
-impl<V: schemars::JsonSchema> schemars::JsonSchema for Act365fRate<V> {
-    fn schema_name() -> String {
-        format!("Act365fRate_for_{}", V::schema_name())
-    }
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_finance::daycount::Act365fRate<{}>", V::schema_id()).into()
-    }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let mut schema = V::json_schema(gen);
-        if let schemars::schema::Schema::Object(ref mut schema) = schema {
-            schema.metadata().description = Some(
-                "Annual rate with Act/365 fixed convention. Unit is 1. Not percentage nor bps."
-                    .to_string(),
-            );
-        }
-        schema
-    }
-}
 
 //
 // methods
@@ -88,6 +61,16 @@ impl<V> Act365fRate<V> {
     #[inline]
     pub fn from_rate(value: V) -> Self {
         Self(value)
+    }
+
+    #[inline]
+    pub fn from_ratio(ratio: V, dur: Duration) -> Self
+    where
+        V: Real,
+    {
+        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 365.0;
+        let dcf = V::nearest_value_of(dur.millsecs() as f64 / MILSEC_PER_YEAR);
+        Self(ratio / &dcf)
     }
 }
 
@@ -116,9 +99,7 @@ impl<V: Real> RelPos for Act365fRate<V> {
 
     #[inline]
     fn relpos_between(&self, left: &Self, right: &Self) -> Self::Output {
-        let denom = right.0.clone() - &left.0;
-        let nume = self.0.clone() - &left.0;
-        nume / &denom
+        self.0.relpos_between(&left.0, &right.0)
     }
 }
 
@@ -131,5 +112,55 @@ impl<V: FloatBased + Vector<V::BaseFloat>> Mul<Duration> for Act365fRate<V> {
         let milsec = rhs.millsecs() as f64;
         let dcf = V::nearest_base_float_of(milsec / MILSEC_PER_YEAR);
         self.0 * &dcf
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use approx::assert_abs_diff_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_dcf() {
+        let from = NaiveDate::from_ymd_opt(2021, 1, 1).unwrap();
+        let to = NaiveDate::from_ymd_opt(2021, 1, 31).unwrap();
+
+        let dcf = Act365f.dcf(from, to).unwrap();
+
+        assert_eq!(dcf, 30. / 365.);
+    }
+
+    #[test]
+    fn test_rate_from_ratio() {
+        let rate = Act365fRate::from_ratio(0.05, Duration::with_days(730));
+        assert_eq!(rate.into_value(), 0.025);
+    }
+
+    #[test]
+    fn test_rate_relpos() {
+        let left = Act365fRate::from_rate(0.02);
+        let right = Act365fRate::from_rate(0.03);
+        let rate = Act365fRate::from_rate(0.025);
+
+        let pos = rate.relpos_between(&left, &right);
+
+        assert_abs_diff_eq!(
+            pos,
+            rate.into_value()
+                .relpos_between(&left.into_value(), &right.into_value()),
+            epsilon = 1e-10
+        );
+    }
+
+    #[test]
+    fn test_rate_mul_duration() {
+        let rate = Act365fRate::from_rate(0.025);
+        let dur = Duration::with_days(730);
+
+        let ratio = rate * dur;
+
+        assert_abs_diff_eq!(ratio, 0.05, epsilon = 1e-10);
     }
 }

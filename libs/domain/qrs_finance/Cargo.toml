@@ -10,7 +10,6 @@ default = []
 
 [dependencies]
 anyhow = { workspace = true }
-chrono = { workspace = true }
 derivative = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -23,7 +22,9 @@ qrs_collections = { workspace = true }
 qrs_chrono = { workspace = true, features = ["serde"] }
 qrs_datasrc = { workspace = true }
 qrs_finance_derive = { path = "./qrs_finance_derive" }
-qrs_math = { workspace = true }
+qrs_math = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
+approx = { workspace = true }
 maplit = { workspace = true }
+rstest = { workspace = true }

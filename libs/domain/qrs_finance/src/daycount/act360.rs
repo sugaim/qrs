@@ -1,22 +1,17 @@
 use std::ops::{Div, Mul, MulAssign};
 
-use qrs_chrono::{Duration, Velocity};
-use qrs_math::num::{FloatBased, Real, RelPos, Vector};
+use qrs_chrono::{Duration, NaiveDate, Velocity};
+use qrs_math::num::Real;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // Act360
 //
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Act360;
-
-impl Default for Act360 {
-    #[inline]
-    fn default() -> Self {
-        Self
-    }
-}
 
 //
 // display, serde
@@ -32,9 +27,9 @@ impl std::fmt::Display for Act360 {
 //
 impl Dcf for Act360 {
     #[inline]
-    fn dcf(&self, from: &qrs_chrono::DateTime, to: &qrs_chrono::DateTime) -> f64 {
-        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
-        (to - from).millsecs() as f64 / MILSEC_PER_YEAR
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+        const DAYS_PER_YEAR: f64 = 365.;
+        Some((to - from).num_days() as f64 / DAYS_PER_YEAR)
     }
 }
 
@@ -52,30 +47,8 @@ impl RateDcf for Act360 {
 // -----------------------------------------------------------------------------
 // RateAct360
 //
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize, JsonSchema)]
 pub struct Act360Rate<V>(V);
-
-//
-// display, serde
-//
-impl<V: schemars::JsonSchema> schemars::JsonSchema for Act360Rate<V> {
-    fn schema_name() -> String {
-        format!("RateAct360_for_{}", V::schema_name())
-    }
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_finance::daycount::RateAct360<{}>", V::schema_id()).into()
-    }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let mut schema = V::json_schema(gen);
-        if let schemars::schema::Schema::Object(ref mut schema) = schema {
-            schema.metadata().description = Some(
-                "Annual rate with Act/360 convention. Unit is 1. Not percentage nor bps."
-                    .to_string(),
-            );
-        }
-        schema
-    }
-}
 
 //
 // construction
@@ -88,6 +61,16 @@ impl<V> Act360Rate<V> {
     #[inline]
     pub fn from_rate(value: V) -> Self {
         Self(value)
+    }
+
+    #[inline]
+    pub fn from_ratio(ratio: V, dur: Duration) -> Self
+    where
+        V: Real,
+    {
+        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
+        let dcf = V::nearest_value_of(dur.millsecs() as f64 / MILSEC_PER_YEAR);
+        Self(ratio / &dcf)
     }
 }
 
@@ -113,25 +96,18 @@ impl<V: Real> InterestRate for Act360Rate<V> {
 //
 define_vector_behavior!(Act360Rate);
 
-impl<V: Real> RelPos for Act360Rate<V> {
-    type Output = V;
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    #[inline]
-    fn relpos_between(&self, left: &Self, right: &Self) -> Self::Output {
-        let denom = right.0.clone() - &left.0;
-        let nume = self.0.clone() - &left.0;
-        nume / &denom
-    }
-}
+    #[test]
+    fn test_dcf() {
+        let from = NaiveDate::from_ymd_opt(2021, 1, 1).unwrap();
+        let to = NaiveDate::from_ymd_opt(2021, 1, 31).unwrap();
 
-impl<V: FloatBased + Vector<V::BaseFloat>> Mul<Duration> for Act360Rate<V> {
-    type Output = V;
+        let dcf = Act360.dcf(from, to).unwrap();
 
-    #[inline]
-    fn mul(self, rhs: Duration) -> Self::Output {
-        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
-        let milsec = rhs.millsecs() as f64;
-        let dcf = V::nearest_base_float_of(milsec / MILSEC_PER_YEAR);
-        self.0 * &dcf
+        assert_eq!(dcf, 30. / 360.);
     }
 }

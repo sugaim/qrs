@@ -1,4 +1,4 @@
-use qrs_chrono::DateTime;
+use qrs_chrono::NaiveDate;
 use qrs_math::num::{Real, Scalar};
 
 // -----------------------------------------------------------------------------
@@ -6,7 +6,9 @@ use qrs_math::num::{Real, Scalar};
 //
 /// Day count convention
 pub trait Dcf: Sized {
-    fn dcf(&self, from: &DateTime, to: &DateTime) -> f64;
+    /// Calculate day count fraction between two dates.
+    /// If the either of the two dates is out of supported range, return [None].
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64>;
 }
 
 // -----------------------------------------------------------------------------
@@ -16,22 +18,8 @@ pub trait Dcf: Sized {
 pub trait RateDcf: Dcf {
     type Rate<V: Real>;
 
+    /// Create a rate object from the given annual rate value.
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V>;
-
-    #[inline]
-    fn ratio_to_rate<V: Real>(
-        &self,
-        ratio: V,
-        from: &DateTime,
-        to: &DateTime,
-    ) -> Option<Self::Rate<V>> {
-        if from == to {
-            return None;
-        }
-        let dcf = self.dcf(from, to);
-        let dcf = <V as Scalar>::nearest_value_of(dcf);
-        Some(self.to_rate(ratio / &dcf))
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -66,13 +54,5 @@ pub trait InterestRate: Sized {
         const MULT: f64 = 1e4;
         let mult = <Self::Value as Scalar>::nearest_value_of(MULT);
         self.into_value() * &mult
-    }
-
-    /// Calculate change ratio between two dates.
-    #[inline]
-    fn into_ratio_between(self, from: &DateTime, to: &DateTime) -> Self::Value {
-        let dcf = self.convention().dcf(from, to);
-        let dcf = <Self::Value as Scalar>::nearest_value_of(dcf);
-        self.into_value() * &dcf
     }
 }

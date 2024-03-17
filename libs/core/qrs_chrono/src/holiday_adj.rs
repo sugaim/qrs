@@ -99,13 +99,13 @@ impl HolidayAdj {
     pub fn adjust(&self, d: NaiveDate, cal: &Calendar) -> Option<NaiveDate> {
         match self {
             HolidayAdj::Unadjust => {
-                if cal.is_supported(&d) {
+                if cal.is_valid_for(d) {
                     Some(d)
                 } else {
                     None
                 }
             }
-            HolidayAdj::Following => cal.is_holiday(&d).and_then(|is_hol| {
+            HolidayAdj::Following => cal.is_holiday(d).and_then(|is_hol| {
                 if is_hol {
                     d.checked_add_days(Days::new(1))
                         .and_then(|d| self.adjust(d, cal))
@@ -113,7 +113,7 @@ impl HolidayAdj {
                     Some(d)
                 }
             }),
-            HolidayAdj::ModifiedFollowing => cal.is_holiday(&d).and_then(|is_hol| {
+            HolidayAdj::ModifiedFollowing => cal.is_holiday(d).and_then(|is_hol| {
                 if is_hol {
                     let raw = d
                         .checked_add_days(Days::new(1))
@@ -127,7 +127,7 @@ impl HolidayAdj {
                     Some(d)
                 }
             }),
-            HolidayAdj::Preceding => cal.is_holiday(&d).and_then(|is_hol| {
+            HolidayAdj::Preceding => cal.is_holiday(d).and_then(|is_hol| {
                 if is_hol {
                     d.checked_sub_days(Days::new(1))
                         .and_then(|d| self.adjust(d, cal))
@@ -135,7 +135,7 @@ impl HolidayAdj {
                     Some(d)
                 }
             }),
-            HolidayAdj::ModifiedPreceding => cal.is_holiday(&d).and_then(|is_hol| {
+            HolidayAdj::ModifiedPreceding => cal.is_holiday(d).and_then(|is_hol| {
                 if is_hol {
                     let raw = d
                         .checked_sub_days(Days::new(1))

@@ -1,5 +1,6 @@
-use chrono::{Datelike, NaiveDate};
-use qrs_chrono::DateExtensions;
+use std::ops::Neg;
+
+use qrs_chrono::{DateExtensions, Datelike, NaiveDate};
 use qrs_math::num::Real;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -10,10 +11,7 @@ use super::{Dcf, InterestRate, RateDcf};
 // Nl360
 //
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub struct Nl360 {
-    #[serde(rename = "timezone")]
-    pub tz: qrs_chrono::Tz,
-}
+pub struct Nl360;
 
 //
 // display, serde
@@ -28,15 +26,12 @@ impl std::fmt::Display for Nl360 {
 // methods
 //
 impl Dcf for Nl360 {
-    fn dcf(&self, from: &qrs_chrono::DateTime, to: &qrs_chrono::DateTime) -> f64 {
-        match from.cmp(to) {
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+        match from.cmp(&to) {
             std::cmp::Ordering::Less => {}
-            std::cmp::Ordering::Equal => return 0.0,
-            std::cmp::Ordering::Greater => return -self.dcf(to, from),
+            std::cmp::Ordering::Equal => return Some(0.0),
+            std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
         };
-        let from = from.with_timezone(&self.tz);
-        let to = to.with_timezone(&self.tz);
-
         let mut leap_days = ((from.year() + 1)..to.year())
             .filter(|y| NaiveDate::from_ymd_opt(*y, 1, 1).unwrap().is_leap_year())
             .count();
@@ -52,9 +47,8 @@ impl Dcf for Nl360 {
                 leap_days += 1;
             }
         }
-        const MILSEC_PER_DAY: f64 = 1000.0 * 60.0 * 60.0 * 24.0;
-        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
-        ((to - from).millsecs() as f64 - leap_days as f64 * MILSEC_PER_DAY) / MILSEC_PER_YEAR
+        const DAYS_PER_YEAR: f64 = 360.;
+        Some(((to - from).num_days() as f64 - leap_days as f64) / DAYS_PER_YEAR)
     }
 }
 
@@ -75,32 +69,10 @@ impl RateDcf for Nl360 {
 // -----------------------------------------------------------------------------
 // Nl360Rate
 //
-#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Nl360Rate<V> {
     rate: V,
     cnv: Nl360,
-}
-
-//
-// display, serde
-//
-impl<V: schemars::JsonSchema> schemars::JsonSchema for Nl360Rate<V> {
-    fn schema_name() -> String {
-        format!("Nl360Rate_for_{}", V::schema_name())
-    }
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        format!("qrs_finance::daycount::Nl360Rate<{}>", V::schema_id()).into()
-    }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let mut schema = V::json_schema(gen);
-        if let schemars::schema::Schema::Object(ref mut schema) = schema {
-            schema.metadata().description = Some(
-                "Annual rate with NL/360 convention. Unit is 1. Not percentage nor bps."
-                    .to_string(),
-            );
-        }
-        schema
-    }
 }
 
 //
@@ -171,5 +143,43 @@ where
     #[inline]
     fn div_assign(&mut self, rhs: K) {
         self.rate /= rhs;
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use approx::assert_abs_diff_eq;
+    use rstest::rstest;
+
+    use super::*;
+
+    fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    #[rstest]
+    #[case(ymd(2021, 1, 1), ymd(2021, 1, 31), 30. / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2020, 2, 28), 27. / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2020, 2, 29), 28. / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2020, 3, 1), 28. / 360.)]
+    #[case(ymd(2020, 2, 28), ymd(2020, 3, 1), 1. / 360.)]
+    #[case(ymd(2020, 2, 29), ymd(2020, 3, 1), 0. / 360.)]
+    #[case(ymd(2020, 3, 1), ymd(2020, 3, 31), 30. / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2024, 4, 1), (4. * 365. + 28. + 31.) / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2024, 3, 1), (4. * 365. + 28.) / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2024, 2, 29), (4. * 365. + 28.) / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2024, 2, 28), (4. * 365. + 27.) / 360.)]
+    #[case(ymd(2020, 2, 1), ymd(2024, 2, 1), (4. * 365.) / 360.)]
+    #[case(ymd(2020, 2, 28), ymd(2024, 2, 1), (4. * 365. - 27.) / 360.)]
+    #[case(ymd(2020, 2, 29), ymd(2024, 2, 1), (4. * 365. - 28.) / 360.)]
+    #[case(ymd(2020, 3, 1), ymd(2024, 2, 1), (4. * 365. - 28.) / 360.)]
+    #[case(ymd(2020, 3, 1), ymd(2024, 2, 28), (4. * 365. - 1.) / 360.)]
+    #[case(ymd(2020, 3, 1), ymd(2024, 2, 29), (4. * 365.) / 360.)]
+    #[case(ymd(2020, 3, 1), ymd(2024, 3, 1), (4. * 365.) / 360.)]
+    fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate, #[case] expected: f64) {
+        let dcf = Nl360.dcf(from, to).unwrap();
+
+        assert_abs_diff_eq!(dcf, expected);
     }
 }

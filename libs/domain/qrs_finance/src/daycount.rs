@@ -6,7 +6,7 @@ mod nl360;
 mod nl365;
 mod traits;
 
-use qrs_chrono::{Calendar, CalendarSymbol, DateTime, Tz};
+use qrs_chrono::{Calendar, CalendarSymbol, NaiveDate};
 use qrs_datasrc::{DataSrc, DebugTree};
 use qrs_math::num::Real;
 
@@ -78,7 +78,7 @@ pub enum DayCount {
 //
 impl Dcf for DayCount {
     #[inline]
-    fn dcf(&self, from: &DateTime, to: &DateTime) -> f64 {
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
         match self {
             DayCount::Act360(dcf) => dcf.dcf(from, to),
             DayCount::Act365f(dcf) => dcf.dcf(from, to),
@@ -118,23 +118,15 @@ pub enum DayCountSymbol {
     Act365f,
     #[serde(rename = "nl360")]
     #[strum(serialize = "nl360")]
-    Nl360 {
-        #[serde(rename = "timezone")]
-        tz: Tz,
-    },
+    Nl360,
     #[serde(rename = "nl365")]
     #[strum(serialize = "nl365")]
-    Nl365 {
-        #[serde(rename = "timezone")]
-        tz: Tz,
-    },
+    Nl365,
     #[serde(rename = "bd252")]
     #[strum(serialize = "bd252")]
     Bd252 {
         #[serde(rename = "calendar")]
         cal: CalendarSymbol,
-        #[serde(rename = "timezone")]
-        tz: Tz,
     },
 }
 
@@ -172,11 +164,10 @@ where
         match req {
             DayCountSymbol::Act360 => Ok(DayCount::Act360(Act360)),
             DayCountSymbol::Act365f => Ok(DayCount::Act365f(Act365f)),
-            DayCountSymbol::Nl360 { tz } => Ok(DayCount::Nl360(Nl360 { tz: *tz })),
-            DayCountSymbol::Nl365 { tz } => Ok(DayCount::Nl365(Nl365 { tz: *tz })),
-            DayCountSymbol::Bd252 { cal, tz } => Ok(DayCount::Bd252(Bd252 {
+            DayCountSymbol::Nl360 => Ok(DayCount::Nl360(Nl360)),
+            DayCountSymbol::Nl365 => Ok(DayCount::Nl365(Nl365)),
+            DayCountSymbol::Bd252 { cal } => Ok(DayCount::Bd252(Bd252 {
                 cal: self.cal.get(cal)?,
-                tz: *tz,
             })),
         }
     }

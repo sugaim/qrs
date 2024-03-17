@@ -1,5 +1,6 @@
-use chrono::Timelike;
-use qrs_chrono::{Calendar, DateTime, Tz};
+use std::ops::Neg;
+
+use qrs_chrono::{Calendar, NaiveDate};
 use qrs_math::num::Real;
 
 use super::{Dcf, InterestRate, RateDcf};
@@ -10,35 +11,27 @@ use super::{Dcf, InterestRate, RateDcf};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Bd252 {
     pub cal: Calendar,
-    pub tz: Tz,
 }
 
 //
 // methods
 //
 impl Dcf for Bd252 {
-    fn dcf(&self, from: &DateTime, to: &DateTime) -> f64 {
-        match from.cmp(to) {
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+        match from.cmp(&to) {
             std::cmp::Ordering::Less => {}
-            std::cmp::Ordering::Equal => return 0.0,
-            std::cmp::Ordering::Greater => return -self.dcf(to, from),
+            std::cmp::Ordering::Equal => {
+                if !self.cal.is_valid_for(from) || !self.cal.is_valid_for(to) {
+                    return None;
+                } else {
+                    return Some(0.0);
+                }
+            }
+            std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
         };
-        let from = from.with_timezone(&self.tz);
-        let to = to.with_timezone(&self.tz);
-
-        let time_in_millsec_of = |dt: &DateTime| {
-            let t = dt.time();
-            t.num_seconds_from_midnight() as f64 * 1000.0
-                + (t.nanosecond() % 1_000_000 / 1_000) as f64
-        };
-
-        let num_bds = self.cal.num_bizdays(from.date(), to.date());
-        let to_t = time_in_millsec_of(&to);
-        let from_t = time_in_millsec_of(&from);
-
-        const MILLSECS_PER_DAY: f64 = 1000.0 * 60.0 * 60.0 * 24.0;
-        const MILLSECS_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 252.0;
-        (num_bds as f64 * MILLSECS_PER_DAY + to_t - from_t) / MILLSECS_PER_YEAR
+        let num_bds = self.cal.num_bizdays(from, to)?;
+        const DAYS_PER_YEAR: f64 = 252.;
+        Some(num_bds as f64 / DAYS_PER_YEAR)
     }
 }
 
@@ -47,7 +40,7 @@ impl RateDcf for Bd252 {
 
     #[inline]
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V> {
-        Bd252Rate::from_rate(annual_rate, self.cal.clone(), self.tz)
+        Bd252Rate::from_rate(annual_rate, self.cal.clone())
     }
 }
 
@@ -58,7 +51,6 @@ impl RateDcf for Bd252 {
 pub struct Bd252Rate<V> {
     rate: V,
     cal: Calendar,
-    tz: Tz,
 }
 
 //
@@ -66,8 +58,8 @@ pub struct Bd252Rate<V> {
 //
 impl<V> Bd252Rate<V> {
     #[inline]
-    pub fn from_rate(rate: V, cal: Calendar, tz: Tz) -> Self {
-        Self { rate, cal, tz }
+    pub fn from_rate(rate: V, cal: Calendar) -> Self {
+        Self { rate, cal }
     }
 }
 
@@ -79,7 +71,6 @@ impl<V: Real> InterestRate for Bd252Rate<V> {
     fn convention(&self) -> Self::Convention {
         Bd252 {
             cal: self.cal.clone(),
-            tz: self.tz,
         }
     }
 
@@ -100,7 +91,7 @@ where
 
     #[inline]
     fn mul(self, rhs: K) -> Self::Output {
-        Self::from_rate(self.rate * rhs, self.cal, self.tz)
+        Self::from_rate(self.rate * rhs, self.cal)
     }
 }
 
@@ -122,7 +113,7 @@ where
 
     #[inline]
     fn div(self, rhs: K) -> Self::Output {
-        Self::from_rate(self.rate / rhs, self.cal, self.tz)
+        Self::from_rate(self.rate / rhs, self.cal)
     }
 }
 
@@ -133,5 +124,57 @@ where
     #[inline]
     fn div_assign(&mut self, rhs: K) {
         self.rate /= rhs;
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    fn cal() -> Calendar {
+        Calendar::builder()
+            .with_valid_period(ymd(2000, 1, 1), ymd(2100, 12, 31))
+            .with_extra_business_days(Default::default())
+            .with_extra_holidays(vec![ymd(2021, 2, 3), ymd(2021, 2, 5)])
+            .build()
+            .unwrap()
+    }
+
+    fn cnv() -> Bd252 {
+        Bd252 { cal: cal() }
+    }
+
+    #[test]
+    fn test_dcf() {
+        let cnv = cnv();
+
+        // only weekdays
+        let from = ymd(2021, 1, 19);
+        let to = ymd(2021, 1, 22);
+
+        let dcf = cnv.dcf(from, to).unwrap();
+
+        assert_eq!(dcf, 3.0 / 252.0);
+
+        // over weekends
+        let from = ymd(2021, 1, 22);
+        let to = ymd(2021, 1, 25);
+
+        let dcf = cnv.dcf(from, to).unwrap();
+
+        assert_eq!(dcf, 1.0 / 252.0);
+
+        // over holidays
+        let from = ymd(2021, 2, 1);
+        let to = ymd(2021, 2, 8);
+
+        let dcf = cnv.dcf(from, to).unwrap();
+
+        assert_eq!(dcf, 3.0 / 252.0); // Feb 3rd and 5th are holidays
     }
 }
