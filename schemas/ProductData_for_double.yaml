@@ -191,34 +191,25 @@ definitions:
           const: act365f
     - type: object
       required:
-      - timezone
       - type
       properties:
-        timezone:
-          $ref: '#/definitions/TimeZone'
         type:
           type: string
           const: nl360
     - type: object
       required:
-      - timezone
       - type
       properties:
-        timezone:
-          $ref: '#/definitions/TimeZone'
         type:
           type: string
           const: nl365
     - type: object
       required:
       - calendar
-      - timezone
       - type
       properties:
         calendar:
           $ref: '#/definitions/CalendarSymbol'
-        timezone:
-          $ref: '#/definitions/TimeZone'
         type:
           type: string
           const: bd252
@@ -441,16 +432,6 @@ definitions:
     - away_from_zero
     - to_negative_infinity
     - to_positive_infinity
-  TimeZone:
-    description: String for timezone. Either of '+/-HH:mm', '+/-HH:mm:ss' or IANA timezone identifier is available
-    examples:
-    - +09:00
-    - -05:00
-    - +09:00:00
-    - Asia/Tokyo
-    - America/New_York
-    - Etc/UTC
-    type: string
   ValueOrId_for_DateWithTag_for_String:
     anyOf:
     - $ref: '#/definitions/DateWithTag_for_String'

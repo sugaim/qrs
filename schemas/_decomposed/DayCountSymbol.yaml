@@ -16,34 +16,25 @@ oneOf:
       const: act365f
 - type: object
   required:
-  - timezone
   - type
   properties:
-    timezone:
-      $ref: ./TimeZone.yaml
     type:
       type: string
       const: nl360
 - type: object
   required:
-  - timezone
   - type
   properties:
-    timezone:
-      $ref: ./TimeZone.yaml
     type:
       type: string
       const: nl365
 - type: object
   required:
   - calendar
-  - timezone
   - type
   properties:
     calendar:
       $ref: ./CalendarSymbol.yaml
-    timezone:
-      $ref: ./TimeZone.yaml
     type:
       type: string
       const: bd252

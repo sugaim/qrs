@@ -49,8 +49,6 @@ fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
         SchItem::<qrs_chrono::Tz>::default() as _,
         SchItem::<qrs_chrono::Duration>::default() as _,
         SchItem::<qrs_chrono::Velocity<f64>>::default() as _,
-        SchItem::<qrs_finance::daycount::Act365fRate<f64>>::default() as _,
-        SchItem::<qrs_finance::daycount::Act360Rate<f64>>::default() as _,
         SchItem::<qrs_finance::products::general::ProductData>::default() as _,
         SchItem::<qrs_model::core::curve::ComponentCurve<f64>>::default() as _,
     ]

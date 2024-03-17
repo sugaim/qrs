@@ -2,8 +2,6 @@ use std::ops::{Div, Mul, MulAssign};
 
 use qrs_chrono::{Duration, NaiveDate, Velocity};
 use qrs_math::num::Real;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 
@@ -18,7 +16,7 @@ pub struct Act360;
 //
 impl std::fmt::Display for Act360 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Act/365f")
+        write!(f, "Act/360")
     }
 }
 
@@ -28,7 +26,7 @@ impl std::fmt::Display for Act360 {
 impl Dcf for Act360 {
     #[inline]
     fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
-        const DAYS_PER_YEAR: f64 = 365.;
+        const DAYS_PER_YEAR: f64 = 360.;
         Some((to - from).num_days() as f64 / DAYS_PER_YEAR)
     }
 }
@@ -47,7 +45,7 @@ impl RateDcf for Act360 {
 // -----------------------------------------------------------------------------
 // RateAct360
 //
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Act360Rate<V>(V);
 
 //
