@@ -1,9 +1,7 @@
-use std::ops::Neg;
-
 use qrs_chrono::{DateExtensions, Datelike, NaiveDate};
 use qrs_math::num::Real;
 
-use super::{Dcf, InterestRate, RateDcf};
+use super::{Dcf, DcfError, InterestRate, RateDcf};
 
 // -----------------------------------------------------------------------------
 // Nl360
@@ -15,11 +13,11 @@ pub struct Nl360;
 // methods
 //
 impl Dcf for Nl360 {
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
-        match from.cmp(&to) {
-            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {}
-            std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
-        };
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
+        if to < from {
+            let rev_dcf = self.dcf(to, from)?;
+            return Err(DcfError::ReverseOrder { from, to, rev_dcf });
+        }
         let mut leap_days = ((from.year() + 1)..to.year())
             .filter(|y| NaiveDate::from_ymd_opt(*y, 1, 1).unwrap().is_leap_year())
             .count();
@@ -36,7 +34,7 @@ impl Dcf for Nl360 {
             }
         }
         const DAYS_PER_YEAR: f64 = 360.;
-        Some(((to - from).num_days() as f64 - leap_days as f64) / DAYS_PER_YEAR)
+        Ok(((to - from).num_days() as f64 - leap_days as f64) / DAYS_PER_YEAR)
     }
 }
 
@@ -147,29 +145,46 @@ mod tests {
     }
 
     #[rstest]
-    #[case(ymd(2021, 1, 1), ymd(2021, 1, 31), 30. / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2020, 2, 28), 27. / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2020, 2, 29), 28. / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2020, 3, 1), 28. / 360.)]
-    #[case(ymd(2020, 2, 28), ymd(2020, 3, 1), 1. / 360.)]
-    #[case(ymd(2020, 2, 29), ymd(2020, 3, 1), 0. / 360.)]
-    #[case(ymd(2020, 3, 1), ymd(2020, 3, 31), 30. / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2024, 4, 1), (4. * 365. + 28. + 31.) / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2024, 3, 1), (4. * 365. + 28.) / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2024, 2, 29), (4. * 365. + 28.) / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2024, 2, 28), (4. * 365. + 27.) / 360.)]
-    #[case(ymd(2020, 2, 1), ymd(2024, 2, 1), (4. * 365.) / 360.)]
-    #[case(ymd(2020, 2, 28), ymd(2024, 2, 1), (4. * 365. - 27.) / 360.)]
-    #[case(ymd(2020, 2, 29), ymd(2024, 2, 1), (4. * 365. - 28.) / 360.)]
-    #[case(ymd(2020, 3, 1), ymd(2024, 2, 1), (4. * 365. - 28.) / 360.)]
-    #[case(ymd(2020, 3, 1), ymd(2024, 2, 28), (4. * 365. - 1.) / 360.)]
-    #[case(ymd(2020, 3, 1), ymd(2024, 2, 29), (4. * 365.) / 360.)]
-    #[case(ymd(2020, 3, 1), ymd(2024, 3, 1), (4. * 365.) / 360.)]
-    fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate, #[case] expected: f64) {
-        let dcf = Nl360.dcf(from, to).unwrap();
-        let rev_dcf = Nl360.dcf(to, from).unwrap();
+    #[case(ymd(2021, 1, 1), ymd(2021, 1, 31))]
+    #[case(ymd(2020, 2, 1), ymd(2020, 2, 28))]
+    #[case(ymd(2020, 2, 1), ymd(2020, 2, 29))]
+    #[case(ymd(2020, 2, 1), ymd(2020, 3, 1))]
+    #[case(ymd(2020, 2, 28), ymd(2020, 3, 1))]
+    #[case(ymd(2020, 2, 29), ymd(2020, 3, 1))]
+    #[case(ymd(2020, 3, 1), ymd(2020, 3, 31))]
+    #[case(ymd(2020, 2, 1), ymd(2024, 4, 1))]
+    #[case(ymd(2020, 2, 1), ymd(2024, 3, 1))]
+    #[case(ymd(2020, 2, 1), ymd(2024, 2, 29))]
+    #[case(ymd(2020, 2, 1), ymd(2024, 2, 28))]
+    #[case(ymd(2020, 2, 1), ymd(2024, 2, 1))]
+    #[case(ymd(2020, 2, 28), ymd(2024, 2, 1))]
+    #[case(ymd(2020, 2, 29), ymd(2024, 2, 1))]
+    #[case(ymd(2020, 3, 1), ymd(2024, 2, 1))]
+    #[case(ymd(2020, 3, 1), ymd(2024, 2, 28))]
+    #[case(ymd(2020, 3, 1), ymd(2024, 2, 29))]
+    #[case(ymd(2020, 3, 1), ymd(2024, 3, 1))]
+    fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate) {
+        let expected = from
+            .iter_days()
+            .take_while(|d| *d < to)
+            .filter(|d| !d.is_leap_day())
+            .count() as f64
+            / 360.;
 
-        assert_abs_diff_eq!(dcf, expected);
-        assert_abs_diff_eq!(dcf, -rev_dcf);
+        let dcf = Nl360.dcf(from, to).unwrap();
+        let rev_dcf = Nl360.dcf(to, from).unwrap_err();
+
+        assert_abs_diff_eq!(dcf, expected, epsilon = 1e-10);
+        let DcfError::ReverseOrder {
+            from: f,
+            to: t,
+            rev_dcf,
+        } = rev_dcf
+        else {
+            panic!("unexpected result: {:?}", rev_dcf);
+        };
+        assert_eq!(f, to);
+        assert_eq!(t, from);
+        assert_abs_diff_eq!(rev_dcf, expected, epsilon = 1e-10);
     }
 }

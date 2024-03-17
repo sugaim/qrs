@@ -5,7 +5,7 @@ use qrs_math::num::{FloatBased, Real, RelPos, Vector};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
+use super::{Dcf, DcfError, InterestRate, RateDcf, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // Act365f
@@ -18,9 +18,13 @@ pub struct Act365f;
 //
 impl Dcf for Act365f {
     #[inline]
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
+        if to < from {
+            let rev_dcf = self.dcf(to, from)?;
+            return Err(DcfError::ReverseOrder { from, to, rev_dcf });
+        }
         const DAYS_PER_YEAR: f64 = 365.;
-        Some((to - from).num_days() as f64 / DAYS_PER_YEAR)
+        Ok((to - from).num_days() as f64 / DAYS_PER_YEAR)
     }
 }
 
@@ -119,10 +123,20 @@ mod tests {
         let to = NaiveDate::from_ymd_opt(2021, 1, 31).unwrap();
 
         let dcf = Act365f.dcf(from, to).unwrap();
-        let rev_dcf = Act365f.dcf(to, from).unwrap();
+        let rev_dcf = Act365f.dcf(to, from).unwrap_err();
 
         assert_eq!(dcf, 30. / 365.);
-        assert_eq!(dcf, -rev_dcf);
+        let DcfError::ReverseOrder {
+            from: f,
+            to: t,
+            rev_dcf,
+        } = rev_dcf
+        else {
+            panic!("Unexpected error type.")
+        };
+        assert_eq!(f, to);
+        assert_eq!(t, from);
+        assert_eq!(rev_dcf, 30. / 365.);
     }
 
     #[test]

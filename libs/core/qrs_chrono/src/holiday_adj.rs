@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use chrono::Days;
 
 use crate::{Calendar, Datelike, NaiveDate};
@@ -27,13 +28,12 @@ use strum::{Display, EnumIter, EnumString};
 ///
 /// // Following: Subday is shifted to the next business day.
 /// let rule = HolidayAdj::Following;
-/// assert_eq!(Some(Date::from_ymd_opt(2024, 1, 1).unwrap()), rule.adjust(d, &cal));
+/// assert_eq!(Date::from_ymd_opt(2024, 1, 1).unwrap(), rule.adjust(d, &cal).unwrap());
 ///
 /// // Modified following: Shifted with following rule reaches the next month and shifted bask
 /// let rule = HolidayAdj::ModifiedFollowing;
-/// assert_eq!(Some(Date::from_ymd_opt(2023, 12, 29).unwrap()), rule.adjust(d, &cal));
+/// assert_eq!(Date::from_ymd_opt(2023, 12, 29).unwrap(), rule.adjust(d, &cal).unwrap());
 /// ```
-///
 #[derive(
     Debug,
     Clone,
@@ -91,64 +91,52 @@ impl HolidayAdj {
     /// let d = Date::from_ymd_opt(2023, 12, 31).unwrap();
     ///
     /// // Following: Subday is shifted to the next business day.
-    /// assert_eq!(Some(Date::from_ymd_opt(2024, 1, 1).unwrap()), HolidayAdj::Following.adjust(d, &cal));
+    /// assert_eq!(Date::from_ymd_opt(2024, 1, 1).unwrap(), HolidayAdj::Following.adjust(d, &cal).unwrap());
     ///
     /// // Modified following: Shifted with following rule reaches the next month and shifted bask
-    /// assert_eq!(Some(Date::from_ymd_opt(2023, 12, 29).unwrap()), HolidayAdj::ModifiedFollowing.adjust(d, &cal));
+    /// assert_eq!(Date::from_ymd_opt(2023, 12, 29).unwrap(), HolidayAdj::ModifiedFollowing.adjust(d, &cal).unwrap());
     /// ```
-    pub fn adjust(&self, d: NaiveDate, cal: &Calendar) -> Option<NaiveDate> {
+    pub fn adjust(&self, d: NaiveDate, cal: &Calendar) -> anyhow::Result<NaiveDate> {
         match self {
-            HolidayAdj::Unadjust => {
-                if cal.is_valid_for(d) {
-                    Some(d)
+            HolidayAdj::Unadjust => cal.validate(d).map_err(Into::into),
+            HolidayAdj::Following => {
+                let mut d = d;
+                while cal.is_holiday(d).map_err(Into::<anyhow::Error>::into)? {
+                    d = d
+                        .checked_add_days(Days::new(1))
+                        .ok_or_else(|| anyhow!("date is overflow"))?;
+                }
+                Ok(d)
+            }
+            HolidayAdj::Preceding => {
+                let mut d = d;
+                while cal.is_holiday(d).map_err(Into::<anyhow::Error>::into)? {
+                    d = d
+                        .checked_sub_days(Days::new(1))
+                        .ok_or_else(|| anyhow!("date is underflow"))?;
+                }
+                Ok(d)
+            }
+            HolidayAdj::ModifiedFollowing => {
+                let adjusted = Self::Following.adjust(d, cal)?;
+                if adjusted.month() != d.month() {
+                    d.checked_sub_days(Days::new(1))
+                        .ok_or_else(|| anyhow!("date is underflow"))
+                        .and_then(|d| Self::Preceding.adjust(d, cal))
                 } else {
-                    None
+                    Ok(adjusted)
                 }
             }
-            HolidayAdj::Following => cal.is_holiday(d).and_then(|is_hol| {
-                if is_hol {
+            HolidayAdj::ModifiedPreceding => {
+                let adjusted = Self::Preceding.adjust(d, cal)?;
+                if adjusted.month() != d.month() {
                     d.checked_add_days(Days::new(1))
-                        .and_then(|d| self.adjust(d, cal))
+                        .ok_or_else(|| anyhow!("date is overflow"))
+                        .and_then(|d| Self::Following.adjust(d, cal))
                 } else {
-                    Some(d)
+                    Ok(adjusted)
                 }
-            }),
-            HolidayAdj::ModifiedFollowing => cal.is_holiday(d).and_then(|is_hol| {
-                if is_hol {
-                    let raw = d
-                        .checked_add_days(Days::new(1))
-                        .and_then(|d| self.adjust(d, cal))?;
-                    if raw.month() != d.month() {
-                        Self::Preceding.adjust(d.checked_sub_days(Days::new(1))?, cal)
-                    } else {
-                        Some(raw)
-                    }
-                } else {
-                    Some(d)
-                }
-            }),
-            HolidayAdj::Preceding => cal.is_holiday(d).and_then(|is_hol| {
-                if is_hol {
-                    d.checked_sub_days(Days::new(1))
-                        .and_then(|d| self.adjust(d, cal))
-                } else {
-                    Some(d)
-                }
-            }),
-            HolidayAdj::ModifiedPreceding => cal.is_holiday(d).and_then(|is_hol| {
-                if is_hol {
-                    let raw = d
-                        .checked_sub_days(Days::new(1))
-                        .and_then(|d| self.adjust(d, cal))?;
-                    if raw.month() != d.month() {
-                        Self::Following.adjust(d.checked_add_days(Days::new(1))?, cal)
-                    } else {
-                        Some(raw)
-                    }
-                } else {
-                    Some(d)
-                }
-            }),
+            }
         }
     }
 }
@@ -200,9 +188,9 @@ mod tests {
         // unadjust
         for day in days.iter() {
             if day < &ymd(2023, 12, 28) || &ymd(2024, 1, 10) <= day {
-                assert_eq!(None, Unadjust.adjust(*day, &cal));
+                assert!(Unadjust.adjust(*day, &cal).is_err());
             } else {
-                assert_eq!(Some(*day), Unadjust.adjust(*day, &cal));
+                assert_eq!(day, &Unadjust.adjust(*day, &cal).unwrap());
             }
         }
 
@@ -220,10 +208,14 @@ mod tests {
             ymd(2024, 1, 11) => None,
         };
         for day in days.iter() {
+            let tested = Following.adjust(*day, &cal);
             if let Some(d) = exp.get(day) {
-                assert_eq!(*d, Following.adjust(*day, &cal));
+                match d {
+                    Some(d) => assert_eq!(*d, tested.unwrap()),
+                    None => assert!(tested.is_err()),
+                }
             } else {
-                assert_eq!(Some(*day), Following.adjust(*day, &cal));
+                assert_eq!(*day, tested.unwrap());
             }
         }
 
@@ -241,10 +233,14 @@ mod tests {
             ymd(2024, 1, 11) => None,
         };
         for day in days.iter() {
+            let tested = ModifiedFollowing.adjust(*day, &cal);
             if let Some(d) = exp.get(day) {
-                assert_eq!(*d, ModifiedFollowing.adjust(*day, &cal));
+                match d {
+                    Some(d) => assert_eq!(*d, tested.unwrap()),
+                    None => assert!(tested.is_err()),
+                }
             } else {
-                assert_eq!(Some(*day), ModifiedFollowing.adjust(*day, &cal));
+                assert_eq!(*day, tested.unwrap());
             }
         }
 
@@ -262,10 +258,14 @@ mod tests {
             ymd(2024, 1, 11) => None,
         };
         for day in days.iter() {
+            let tested = Preceding.adjust(*day, &cal);
             if let Some(d) = exp.get(day) {
-                assert_eq!(*d, Preceding.adjust(*day, &cal));
+                match d {
+                    Some(d) => assert_eq!(*d, tested.unwrap()),
+                    None => assert!(tested.is_err()),
+                }
             } else {
-                assert_eq!(Some(*day), Preceding.adjust(*day, &cal));
+                assert_eq!(*day, tested.unwrap());
             }
         }
 
@@ -283,10 +283,14 @@ mod tests {
             ymd(2024, 1, 11) => None,
         };
         for day in days.iter() {
+            let tested = ModifiedPreceding.adjust(*day, &cal);
             if let Some(d) = exp.get(day) {
-                assert_eq!(*d, ModifiedPreceding.adjust(*day, &cal));
+                match d {
+                    Some(d) => assert_eq!(*d, tested.unwrap()),
+                    None => assert!(tested.is_err()),
+                }
             } else {
-                assert_eq!(Some(*day), ModifiedPreceding.adjust(*day, &cal));
+                assert_eq!(*day, tested.unwrap());
             }
         }
     }

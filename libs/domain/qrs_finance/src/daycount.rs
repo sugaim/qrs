@@ -17,7 +17,7 @@ pub use nl360::{Nl360, Nl360Rate};
 pub use nl365::{Nl365, Nl365Rate};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-pub use traits::{Dcf, InterestRate, RateDcf};
+pub use traits::{Dcf, DcfError, InterestRate, RateDcf};
 
 // -----------------------------------------------------------------------------
 // Rate
@@ -78,7 +78,7 @@ pub enum DayCount {
 //
 impl Dcf for DayCount {
     #[inline]
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
         match self {
             DayCount::Act360(dcf) => dcf.dcf(from, to),
             DayCount::Act365f(dcf) => dcf.dcf(from, to),

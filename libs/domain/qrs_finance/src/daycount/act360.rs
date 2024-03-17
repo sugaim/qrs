@@ -3,7 +3,7 @@ use std::ops::{Div, Mul, MulAssign};
 use qrs_chrono::{Duration, NaiveDate, Velocity};
 use qrs_math::num::Real;
 
-use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
+use super::{Dcf, DcfError, InterestRate, RateDcf, _ops::define_vector_behavior};
 
 // -----------------------------------------------------------------------------
 // Act360
@@ -16,9 +16,13 @@ pub struct Act360;
 //
 impl Dcf for Act360 {
     #[inline]
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
+        if to < from {
+            let rev_dcf = self.dcf(to, from)?;
+            return Err(DcfError::ReverseOrder { from, to, rev_dcf });
+        }
         const DAYS_PER_YEAR: f64 = 360.;
-        Some((to - from).num_days() as f64 / DAYS_PER_YEAR)
+        Ok((to - from).num_days() as f64 / DAYS_PER_YEAR)
     }
 }
 
@@ -86,9 +90,19 @@ mod tests {
         let to = NaiveDate::from_ymd_opt(2021, 1, 31).unwrap();
 
         let dcf = Act360.dcf(from, to).unwrap();
-        let rev_dcf = Act360.dcf(to, from).unwrap();
+        let rev_dcf = Act360.dcf(to, from).unwrap_err();
 
         assert_eq!(dcf, 30. / 360.);
-        assert_eq!(rev_dcf, -30. / 360.);
+        let DcfError::ReverseOrder {
+            from: f,
+            to: t,
+            rev_dcf,
+        } = rev_dcf
+        else {
+            panic!("Unexpected error type.")
+        };
+        assert_eq!(f, to);
+        assert_eq!(t, from);
+        assert_eq!(rev_dcf, 30. / 360.);
     }
 }

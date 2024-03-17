@@ -1,9 +1,7 @@
-use std::ops::Neg;
-
 use qrs_chrono::{Calendar, NaiveDate};
 use qrs_math::num::Real;
 
-use super::{Dcf, InterestRate, RateDcf};
+use super::{Dcf, DcfError, InterestRate, RateDcf};
 
 // -----------------------------------------------------------------------------
 // Bd252
@@ -17,14 +15,14 @@ pub struct Bd252 {
 // methods
 //
 impl Dcf for Bd252 {
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
-        match from.cmp(&to) {
-            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {}
-            std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
-        };
-        let num_bds = self.cal.num_bizdays(from, to)?;
+    #[inline]
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
+        if to < from {
+            let rev_dcf = self.dcf(to, from)?;
+            return Err(DcfError::ReverseOrder { from, to, rev_dcf });
+        }
         const DAYS_PER_YEAR: f64 = 252.;
-        Some(num_bds as f64 / DAYS_PER_YEAR)
+        Ok(self.cal.num_bizdays(from..to)? as f64 / DAYS_PER_YEAR)
     }
 }
 
@@ -148,15 +146,33 @@ mod tests {
     #[case(ymd(2021, 1, 19), ymd(2021, 1, 22), Some(3. / 252.))] // only weekdays
     #[case(ymd(2021, 1, 22), ymd(2021, 1, 25), Some(1. / 252.))] // over weekends
     #[case(ymd(2021, 2, 1), ymd(2021, 2, 8), Some(3. / 252.))] // over holidays
-    #[case(ymd(1999, 12, 31), ymd(2000, 1, 3), None)] // out of valid period
-    #[case(ymd(1999, 12, 31), ymd(1999, 12, 31), None)] // out of valid period
+    #[case(ymd(2021, 2, 3), ymd(2021, 2, 4), Some(0.))] // holiday
+    #[case(ymd(1999, 12, 30), ymd(2000, 1, 3), None)] // out of valid period
     fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate, #[case] expected: Option<f64>) {
         let cnv = cnv();
 
         let dcf = cnv.dcf(from, to);
         let rev_dcf = cnv.dcf(to, from);
 
-        assert_eq!(dcf, expected);
-        assert_eq!(rev_dcf, expected.map(Neg::neg));
+        match expected {
+            Some(expected) => {
+                assert_eq!(dcf.unwrap(), expected);
+                let DcfError::ReverseOrder {
+                    from: f,
+                    to: t,
+                    rev_dcf,
+                } = rev_dcf.unwrap_err()
+                else {
+                    panic!("unexpected result");
+                };
+                assert_eq!(f, to);
+                assert_eq!(t, from);
+                assert_eq!(rev_dcf, expected);
+            }
+            None => {
+                assert!(dcf.is_err());
+                assert!(rev_dcf.is_err());
+            }
+        }
     }
 }

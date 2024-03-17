@@ -16,9 +16,9 @@ mod timecut;
 mod timezone;
 mod velocity;
 
-pub use ::chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Timelike};
+pub use ::chrono::{Datelike, Days, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Timelike};
 
-pub use calendar::{Calendar, CalendarBuilder};
+pub use calendar::{Calendar, CalendarBuilder, CalendarOutOfRangeError};
 pub use calendar_src::CalendarSrc;
 pub use calendar_sym::{CalendarSymVariant, CalendarSymbol};
 pub use date_ext::DateExtensions;

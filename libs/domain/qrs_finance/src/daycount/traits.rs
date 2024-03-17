@@ -1,5 +1,22 @@
-use qrs_chrono::NaiveDate;
+use qrs_chrono::{CalendarOutOfRangeError, NaiveDate};
 use qrs_math::num::{Real, Scalar};
+
+// -----------------------------------------------------------------------------
+// DcfError
+//
+#[derive(Debug, thiserror::Error)]
+pub enum DcfError {
+    #[error("`from`({}) is later than `to`({}). `dcf(to, from)` is {}", .from, .to, .rev_dcf)]
+    ReverseOrder {
+        from: NaiveDate,
+        to: NaiveDate,
+        rev_dcf: f64,
+    },
+    #[error(transparent)]
+    CalendarError(#[from] CalendarOutOfRangeError),
+    #[error(transparent)]
+    Any(#[from] anyhow::Error),
+}
 
 // -----------------------------------------------------------------------------
 // Dcf
@@ -7,8 +24,10 @@ use qrs_math::num::{Real, Scalar};
 /// Day count convention
 pub trait Dcf: Sized {
     /// Calculate day count fraction between two dates.
-    /// If the either of the two dates is out of supported range, return [None].
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64>;
+    /// `from` is included, but `to` is not included.
+    ///
+    /// If `from` is later than `to`, it returns an error [`DcfError::ReverseOrder`].
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError>;
 }
 
 // -----------------------------------------------------------------------------

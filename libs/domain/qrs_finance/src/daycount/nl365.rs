@@ -1,9 +1,7 @@
-use std::ops::Neg;
-
 use qrs_chrono::{DateExtensions, Datelike, NaiveDate};
 use qrs_math::num::Real;
 
-use super::{Dcf, InterestRate, RateDcf};
+use super::{Dcf, DcfError, InterestRate, RateDcf};
 
 // -----------------------------------------------------------------------------
 // Nl365
@@ -15,11 +13,11 @@ pub struct Nl365;
 // methods
 //
 impl Dcf for Nl365 {
-    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
-        match from.cmp(&to) {
-            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {}
-            std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
-        };
+    fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
+        if to < from {
+            let rev_dcf = self.dcf(to, from)?;
+            return Err(DcfError::ReverseOrder { from, to, rev_dcf });
+        }
         let mut leap_days = ((from.year() + 1)..to.year())
             .filter(|y| NaiveDate::from_ymd_opt(*y, 1, 1).unwrap().is_leap_year())
             .count();
@@ -36,7 +34,7 @@ impl Dcf for Nl365 {
             }
         }
         const DAYS_PER_YEAR: f64 = 365.;
-        Some(((to - from).num_days() as f64 - leap_days as f64) / DAYS_PER_YEAR)
+        Ok(((to - from).num_days() as f64 - leap_days as f64) / DAYS_PER_YEAR)
     }
 }
 
@@ -167,7 +165,19 @@ mod tests {
     #[case(ymd(2020, 3, 1), ymd(2024, 3, 1), (4. * 365.) / 365.)]
     fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate, #[case] expected: f64) {
         let dcf = Nl365.dcf(from, to).unwrap();
+        let rev_dcf = Nl365.dcf(to, from).unwrap_err();
 
         assert_abs_diff_eq!(dcf, expected);
+        let DcfError::ReverseOrder {
+            from: f,
+            to: t,
+            rev_dcf,
+        } = rev_dcf
+        else {
+            panic!("Unexpected result: {:?}", rev_dcf);
+        };
+        assert_eq!(f, to);
+        assert_eq!(t, from);
+        assert_abs_diff_eq!(rev_dcf, expected);
     }
 }

@@ -1,12 +1,12 @@
 use std::{
     borrow::Cow,
     collections::HashSet,
-    ops::{BitAnd, BitOr, Range},
+    ops::{BitAnd, BitOr, Bound, Range, RangeBounds},
     sync::Arc,
 };
 
 use anyhow::ensure;
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Days, NaiveDate};
 
 // -----------------------------------------------------------------------------
 // _CalendarData
@@ -116,6 +116,21 @@ impl _CalendarData {
             treat_weekend_as_business_day,
         })
     }
+}
+
+// -----------------------------------------------------------------------------
+// CalendarOutOfRangeError
+//
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq, Hash)]
+pub enum CalendarOutOfRangeError {
+    #[error("Unbounded operation is not supported by `Calendar`")]
+    Unbounded,
+    #[error("The date {} is out of the valid period [{}, {})", .date, .valid_from, .valid_to)]
+    Specific {
+        date: NaiveDate,
+        valid_from: NaiveDate,
+        valid_to: NaiveDate,
+    },
 }
 
 // -----------------------------------------------------------------------------
@@ -424,8 +439,16 @@ impl Calendar {
     ///
     /// This is equivalent to `self.valid_period().contains(date)`.
     #[inline]
-    pub fn is_valid_for(&self, date: NaiveDate) -> bool {
-        self.valid_period().contains(&date)
+    pub fn validate(&self, date: NaiveDate) -> Result<NaiveDate, CalendarOutOfRangeError> {
+        if !self.valid_period().contains(&date) {
+            Err(CalendarOutOfRangeError::Specific {
+                date,
+                valid_from: self.0.valid_from,
+                valid_to: self.0.valid_to,
+            })
+        } else {
+            Ok(date)
+        }
     }
 
     /// Get the extra holidays of the calendar.
@@ -449,27 +472,84 @@ impl Calendar {
         self.0.treat_weekend_as_business_day
     }
 
-    /// Count the business days between the given dates (the first date is included but the end date is excluded).
-    /// Dates passed to this method must be ordered and valid in the calendar.
-    /// Otherwise, this method returns [`None`].
-    pub fn num_bizdays(&self, start: NaiveDate, end: NaiveDate) -> Option<usize> {
-        if end <= start {
-            return None;
-        }
-        if !self.is_valid_for(start) || !self.is_valid_for(end) {
-            return None;
-        }
-        if self.treat_weekend_as_bizday() {
-            let hol_stt = self.extra_holidays().partition_point(|d| *d < start);
-            let hol_end = self.extra_holidays().partition_point(|d| *d < end);
-            return Some(((end - start).num_days() - (hol_end - hol_stt) as i64) as usize);
-        }
-        let prev_stt_mon = start - chrono::Days::new(start.weekday().num_days_from_monday() as _);
-        let prev_end_mon = end - chrono::Days::new(end.weekday().num_days_from_monday() as _);
-        let naive_count = (prev_end_mon - prev_stt_mon).num_days() / 7 * 5
-            - start.weekday().num_days_from_monday().min(5) as i64
-            + end.weekday().num_days_from_monday().min(5) as i64;
+    /// Count the business days between the given range
+    /// When the range is empty, this method returns `0`.
+    ///
+    /// # Errors
+    /// * [`CalendarOutOfRangeError::Unbounded`]: When the range is unbounded
+    /// * [`CalendarOutOfRangeError::Specific`]: When the range contains a date which is out of the valid period
+    ///
+    /// # Example
+    /// ```
+    /// use qrs_chrono::Calendar;
+    /// use chrono::NaiveDate;
+    ///
+    /// let cal = Calendar::default();
+    /// let from = NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(); // Sun
+    /// let to = NaiveDate::from_ymd_opt(2021, 1, 8).unwrap(); // Fri
+    ///
+    /// assert_eq!(cal.num_bizdays(from..to), Ok(4)); // Mon, Tue, Wed, Thu
+    /// assert_eq!(cal.num_bizdays(from..=to), Ok(5)); // Mon, Tue, Wed, Thu, Fri
+    ///
+    /// // zero is returned for empty range
+    /// assert_eq!(cal.num_bizdays(to..from), Ok(0));
+    ///
+    /// // unbounded range is not supported
+    /// assert!(cal.num_bizdays(from..).is_err());
+    /// assert!(cal.num_bizdays(..to).is_err());
+    /// assert!(cal.num_bizdays(..).is_err());
+    /// ```
+    pub fn num_bizdays<R>(&self, range: R) -> Result<usize, CalendarOutOfRangeError>
+    where
+        R: RangeBounds<NaiveDate>,
+    {
+        // expand `range` and get target range.
+        // target range will be [`start`, `end`] at this point
+        // we use close-close interval at this point
+        // to handle `NaiveDate::MAX` and `NaiveDate::MIN` correctly
+        let start = match range.start_bound() {
+            Bound::Unbounded => return Err(CalendarOutOfRangeError::Unbounded),
+            Bound::Included(&d) => Some(d),
+            Bound::Excluded(&d) => d.checked_add_days(Days::new(1)),
+        };
+        let end = match range.end_bound() {
+            Bound::Unbounded => return Err(CalendarOutOfRangeError::Unbounded),
+            Bound::Included(&d) => Some(d),
+            Bound::Excluded(&d) => d.checked_sub_days(Days::new(1)),
+        };
 
+        // at this point, `end` is modified and
+        // target range is represented as a half-open interval [`start`, `end`).
+        let (start, end) = match (start, end) {
+            (None, _) => {
+                // this is when `range.start_bound()` is `Excluded(NaiveDate::MAX)`.
+                // no date `d` exists satisfying `NaiveDate::MAX < d`, so return 0
+                return Ok(0);
+            }
+            (_, None) => {
+                // this is when `range.end_bound()` is `Excluded(NaiveDate::MIN)`.
+                // no date `d` exists satisfying `d < NaiveDate::MIN`
+                return Ok(0);
+            }
+            (Some(s), Some(e)) => {
+                if e < s {
+                    return Ok(0);
+                };
+                let e = self
+                    .validate(e)?
+                    .checked_add_days(Days::new(1))
+                    .expect("`validate` method rejects `NaiveDate::MAX`");
+                (self.validate(s)?, e)
+            }
+        };
+
+        if self.treat_weekend_as_bizday() {
+            let hol_stt = self.extra_holidays().partition_point(|d| *d < start) as i64;
+            let hol_end = self.extra_holidays().partition_point(|d| *d < end) as i64;
+            let cal_days = (end - start).num_days();
+            let num_hols = hol_end - hol_stt;
+            return Ok((cal_days - num_hols) as usize);
+        }
         let extra_hols = {
             let stt = self.extra_holidays().partition_point(|d| *d < start);
             let end = self.extra_holidays().partition_point(|d| *d < end);
@@ -481,23 +561,30 @@ impl Calendar {
             (end - stt) as i64
         };
 
-        Some((naive_count - extra_hols + extra_bds) as usize)
+        let wd_stt = start.weekday().num_days_from_monday() as i64;
+        let wd_end = end.weekday().num_days_from_monday() as i64;
+        let sub_weekdays = match wd_stt.cmp(&wd_end) {
+            std::cmp::Ordering::Less => wd_end.min(5) - wd_stt.min(5),
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Greater => 5 + wd_end.min(5) - wd_stt.min(5),
+        };
+        let naive_count = (end - start).num_days() / 7 * 5 + sub_weekdays;
+
+        Ok((naive_count - extra_hols + extra_bds) as usize)
     }
 
     /// Check if the given date is a holiday.
     ///
     /// If the given date is not supported by the calendar, this method returns [`None`].
     #[inline]
-    pub fn is_holiday(&self, date: NaiveDate) -> Option<bool> {
-        if !self.is_valid_for(date) {
-            return None;
-        }
+    pub fn is_holiday(&self, date: NaiveDate) -> Result<bool, CalendarOutOfRangeError> {
+        self.validate(date)?;
         let is_default_hold = !self.treat_weekend_as_bizday()  // weekends are holiday
             && 5 < date.weekday().number_from_monday(); // and date is weekend
         if is_default_hold {
-            Some(self.0.extra_bizds.binary_search(&date).is_err())
+            Ok(self.0.extra_bizds.binary_search(&date).is_err())
         } else {
-            Some(self.0.extra_holds.binary_search(&date).is_ok())
+            Ok(self.0.extra_holds.binary_search(&date).is_ok())
         }
     }
 
@@ -505,16 +592,14 @@ impl Calendar {
     ///
     /// If the given date is not supported by the calendar, this method returns [`None`].
     #[inline]
-    pub fn is_bizday(&self, date: NaiveDate) -> Option<bool> {
-        if !self.is_valid_for(date) {
-            return None;
-        }
+    pub fn is_bizday(&self, date: NaiveDate) -> Result<bool, CalendarOutOfRangeError> {
+        self.validate(date)?;
         let is_default_hold = !self.treat_weekend_as_bizday()  // weekends are holiday
             && 5 < date.weekday().number_from_monday(); // and date is weekend
         if is_default_hold {
-            Some(self.0.extra_bizds.binary_search(&date).is_ok())
+            Ok(self.0.extra_bizds.binary_search(&date).is_ok())
         } else {
-            Some(self.0.extra_holds.binary_search(&date).is_err())
+            Ok(self.0.extra_holds.binary_search(&date).is_err())
         }
     }
 
@@ -1187,13 +1272,13 @@ mod tests {
     }
 
     #[test]
-    fn test_is_supported() {
+    fn test_validate() {
         let cal = Calendar::_new(vec![], vec![], ymd(2021, 1, 1), ymd(2021, 1, 10), false).unwrap();
-        assert!(!cal.is_valid_for(ymd(2020, 12, 31)));
-        assert!(cal.is_valid_for(ymd(2021, 1, 1)));
-        assert!(cal.is_valid_for(ymd(2021, 1, 9)));
-        assert!(!cal.is_valid_for(ymd(2021, 1, 10)));
-        assert!(!cal.is_valid_for(ymd(2021, 1, 11)));
+        assert!(cal.validate(ymd(2020, 12, 31)).is_err());
+        assert!(cal.validate(ymd(2021, 1, 1)).is_ok());
+        assert!(cal.validate(ymd(2021, 1, 9)).is_ok());
+        assert!(cal.validate(ymd(2021, 1, 10)).is_err());
+        assert!(cal.validate(ymd(2021, 1, 11)).is_err());
     }
 
     #[test]
@@ -1207,18 +1292,18 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(cal.is_holiday(ymd(2020, 12, 30)), None);
-        assert_eq!(cal.is_holiday(ymd(2020, 12, 31)), None);
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 1)), Some(true));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 2)), Some(false));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 3)), Some(true));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 4)), Some(false));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 5)), Some(false));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 6)), Some(false));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 7)), Some(false));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 8)), Some(false));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 9)), Some(true));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 10)), None);
+        assert!(cal.is_holiday(ymd(2020, 12, 30)).is_err());
+        assert!(cal.is_holiday(ymd(2020, 12, 31)).is_err());
+        assert!(cal.is_holiday(ymd(2021, 1, 1)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 2)).unwrap());
+        assert!(cal.is_holiday(ymd(2021, 1, 3)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 4)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 5)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 6)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 7)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 8)).unwrap());
+        assert!(cal.is_holiday(ymd(2021, 1, 9)).unwrap());
+        assert!(cal.is_holiday(ymd(2021, 1, 10)).is_err());
 
         // when treat_weekend_as_business_day is true, weekends are allowed as extra holidays
         let cal = Calendar::_new(
@@ -1229,12 +1314,12 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 1)), Some(true));
-        assert_eq!(cal.is_holiday(ymd(2021, 1, 2)), Some(true));
-        assert_eq!(
-            cal.is_holiday(ymd(2021, 1, 3)),
-            Some(false) // Sunday
-        );
+        assert!(cal.is_holiday(ymd(2020, 12, 30)).is_err());
+        assert!(cal.is_holiday(ymd(2020, 12, 31)).is_err());
+        assert!(cal.is_holiday(ymd(2021, 1, 1)).unwrap());
+        assert!(cal.is_holiday(ymd(2021, 1, 2)).unwrap());
+        assert!(!cal.is_holiday(ymd(2021, 1, 3)).unwrap()); // Sunday
+        assert!(cal.is_holiday(ymd(2021, 1, 10)).is_err());
     }
 
     #[test]
@@ -1248,16 +1333,16 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 1)), Some(false));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 2)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 3)), Some(false));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 4)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 5)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 6)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 7)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 8)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 9)), Some(false));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 10)), None);
+        assert!(!cal.is_bizday(ymd(2021, 1, 1)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 2)).unwrap());
+        assert!(!cal.is_bizday(ymd(2021, 1, 3)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 4)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 5)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 6)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 7)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 8)).unwrap());
+        assert!(!cal.is_bizday(ymd(2021, 1, 9)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 10)).is_err());
 
         let cal = Calendar::_new(
             vec![ymd(2021, 1, 1), ymd(2021, 1, 2)],
@@ -1268,16 +1353,16 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 1)), Some(false));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 2)), Some(false));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 3)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 4)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 5)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 6)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 7)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 8)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 9)), Some(true));
-        assert_eq!(cal.is_bizday(ymd(2021, 1, 10)), None);
+        assert!(!cal.is_bizday(ymd(2021, 1, 1)).unwrap());
+        assert!(!cal.is_bizday(ymd(2021, 1, 2)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 3)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 4)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 5)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 6)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 7)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 8)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 9)).unwrap());
+        assert!(cal.is_bizday(ymd(2021, 1, 10)).is_err());
     }
 
     #[test]
@@ -1338,65 +1423,122 @@ mod tests {
 
     #[test]
     fn test_num_bizdays() {
-        let from = ymd(2021, 1, 1);
-        let to = ymd(2021, 12, 30);
-
-        let cal = Calendar::_new(
-            vec![ymd(2021, 1, 1)],
-            vec![ymd(2021, 1, 2)],
+        let dates = vec![
+            NaiveDate::MIN,
+            ymd(1999, 1, 1),
             ymd(2021, 1, 1),
-            ymd(2022, 1, 10),
-            false,
-        )
-        .unwrap();
+            ymd(2021, 1, 10),
+            ymd(2021, 1, 13),
+            ymd(2021, 1, 20),
+            ymd(2025, 1, 1),
+            NaiveDate::MAX,
+        ];
+        let cals = [
+            Calendar::_new(
+                vec![ymd(2021, 1, 13)],
+                vec![ymd(2021, 1, 2)],
+                ymd(2021, 1, 1),
+                ymd(2022, 1, 10),
+                false,
+            )
+            .unwrap(),
+            Calendar::_new(
+                vec![ymd(2021, 1, 1), ymd(2021, 1, 2)],
+                vec![],
+                ymd(2021, 1, 1),
+                ymd(2022, 1, 10),
+                true,
+            )
+            .unwrap(),
+            Calendar::_new(
+                vec![],
+                vec![],
+                NaiveDate::MIN,
+                NaiveDate::MIN.checked_add_days(Days::new(100)).unwrap(),
+                false,
+            )
+            .unwrap(),
+            Calendar::_new(
+                vec![],
+                vec![],
+                NaiveDate::MAX.checked_sub_days(Days::new(100)).unwrap(),
+                NaiveDate::MAX,
+                false,
+            )
+            .unwrap(),
+        ];
+        for cal in cals {
+            // ..
+            assert_eq!(
+                cal.num_bizdays(..).unwrap_err(),
+                CalendarOutOfRangeError::Unbounded
+            );
 
-        let exp = from
-            .iter_days()
-            .take_while(|d| d < &to)
-            .filter(|d| cal.is_bizday(*d) == Some(true))
-            .count();
+            for d in &dates {
+                // d..d
+                let cnt = cal.num_bizdays(*d..*d);
+                assert_eq!(cnt.ok(), Some(0));
 
-        let num = cal.num_bizdays(from, to).unwrap();
-        assert_eq!(num, exp);
+                // d..=d
+                let cnt = cal.num_bizdays(*d..=*d);
+                assert_eq!(
+                    cnt.ok(),
+                    cal.is_bizday(*d).ok().map(|b| if b { 1 } else { 0 })
+                );
 
-        // reverse order
-        let num = cal.num_bizdays(to, from);
-        assert_eq!(num, None);
+                // ..d, ..=d, d..
+                assert_eq!(
+                    cal.num_bizdays(..*d).unwrap_err(),
+                    CalendarOutOfRangeError::Unbounded
+                );
+                assert_eq!(
+                    cal.num_bizdays(..=*d).unwrap_err(),
+                    CalendarOutOfRangeError::Unbounded
+                );
+                assert_eq!(
+                    cal.num_bizdays(*d..).unwrap_err(),
+                    CalendarOutOfRangeError::Unbounded
+                );
+            }
 
-        // invalid period
-        let num = cal.num_bizdays(ymd(2020, 12, 31), ymd(2021, 1, 10));
-        assert_eq!(num, None);
+            let ft = dates
+                .iter()
+                .flat_map(|f| dates.iter().map(move |t| (f, t)))
+                .filter(|(f, t)| f < t);
+            for (f, t) in ft {
+                // from..to
+                let exp = f
+                    .iter_days()
+                    .take_while(|d| d < t)
+                    .map(|d| cal.is_bizday(d))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|bs| bs.into_iter().filter(|b| *b).count());
 
-        let num = cal.num_bizdays(ymd(2021, 3, 1), ymd(2025, 1, 10));
-        assert_eq!(num, None);
+                let cnt = cal.num_bizdays(f..t);
 
-        // weekends are treated as business day
-        let cal = Calendar::_new(
-            vec![ymd(2021, 1, 1), ymd(2021, 1, 2)],
-            vec![],
-            ymd(2021, 1, 1),
-            ymd(2022, 1, 10),
-            true,
-        )
-        .unwrap();
+                assert_eq!(cnt.ok(), exp.ok());
 
-        let exp = from
-            .iter_days()
-            .take_while(|d| d < &to)
-            .filter(|d| cal.is_bizday(*d) == Some(true))
-            .count();
-        assert_eq!(cal.num_bizdays(from, to).unwrap(), exp);
+                // from..=to
+                let exp = f
+                    .iter_days()
+                    .take_while(|d| d <= t)
+                    .map(|d| cal.is_bizday(d))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|bs| bs.into_iter().filter(|b| *b).count());
 
-        // reverse order
-        let num = cal.num_bizdays(to, from);
-        assert_eq!(num, None);
+                let cnt = cal.num_bizdays(f..=t);
 
-        // invalid period
-        let num = cal.num_bizdays(ymd(2020, 12, 31), ymd(2021, 1, 10));
-        assert_eq!(num, None);
+                assert_eq!(cnt.ok(), exp.ok());
 
-        let num = cal.num_bizdays(ymd(2021, 3, 1), ymd(2025, 1, 10));
-        assert_eq!(num, None);
+                // to..from
+                let cnt = cal.num_bizdays(t..f);
+                assert_eq!(cnt.ok(), Some(0));
+
+                // to..=from
+                let cnt = cal.num_bizdays(t..=f);
+                assert_eq!(cnt.ok(), Some(0));
+            }
+        }
     }
 
     #[test]
