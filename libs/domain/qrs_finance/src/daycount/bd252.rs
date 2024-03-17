@@ -19,14 +19,7 @@ pub struct Bd252 {
 impl Dcf for Bd252 {
     fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
         match from.cmp(&to) {
-            std::cmp::Ordering::Less => {}
-            std::cmp::Ordering::Equal => {
-                if !self.cal.is_valid_for(from) || !self.cal.is_valid_for(to) {
-                    return None;
-                } else {
-                    return Some(0.0);
-                }
-            }
+            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
         };
         let num_bds = self.cal.num_bizdays(from, to)?;
@@ -47,7 +40,7 @@ impl RateDcf for Bd252 {
 // -----------------------------------------------------------------------------
 // Bd252Rate
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bd252Rate<V> {
     rate: V,
     cal: Calendar,
@@ -130,6 +123,8 @@ where
 // =============================================================================
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
     fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
@@ -149,32 +144,19 @@ mod tests {
         Bd252 { cal: cal() }
     }
 
-    #[test]
-    fn test_dcf() {
+    #[rstest]
+    #[case(ymd(2021, 1, 19), ymd(2021, 1, 22), Some(3. / 252.))] // only weekdays
+    #[case(ymd(2021, 1, 22), ymd(2021, 1, 25), Some(1. / 252.))] // over weekends
+    #[case(ymd(2021, 2, 1), ymd(2021, 2, 8), Some(3. / 252.))] // over holidays
+    #[case(ymd(1999, 12, 31), ymd(2000, 1, 3), None)] // out of valid period
+    #[case(ymd(1999, 12, 31), ymd(1999, 12, 31), None)] // out of valid period
+    fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate, #[case] expected: Option<f64>) {
         let cnv = cnv();
 
-        // only weekdays
-        let from = ymd(2021, 1, 19);
-        let to = ymd(2021, 1, 22);
+        let dcf = cnv.dcf(from, to);
+        let rev_dcf = cnv.dcf(to, from);
 
-        let dcf = cnv.dcf(from, to).unwrap();
-
-        assert_eq!(dcf, 3.0 / 252.0);
-
-        // over weekends
-        let from = ymd(2021, 1, 22);
-        let to = ymd(2021, 1, 25);
-
-        let dcf = cnv.dcf(from, to).unwrap();
-
-        assert_eq!(dcf, 1.0 / 252.0);
-
-        // over holidays
-        let from = ymd(2021, 2, 1);
-        let to = ymd(2021, 2, 8);
-
-        let dcf = cnv.dcf(from, to).unwrap();
-
-        assert_eq!(dcf, 3.0 / 252.0); // Feb 3rd and 5th are holidays
+        assert_eq!(dcf, expected);
+        assert_eq!(rev_dcf, expected.map(Neg::neg));
     }
 }

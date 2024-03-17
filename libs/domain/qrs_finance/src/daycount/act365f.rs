@@ -10,17 +10,8 @@ use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 // -----------------------------------------------------------------------------
 // Act365f
 //
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Act365f;
-
-//
-// display, serde
-//
-impl std::fmt::Display for Act365f {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Act/365f")
-    }
-}
 
 //
 // methods
@@ -128,8 +119,10 @@ mod tests {
         let to = NaiveDate::from_ymd_opt(2021, 1, 31).unwrap();
 
         let dcf = Act365f.dcf(from, to).unwrap();
+        let rev_dcf = Act365f.dcf(to, from).unwrap();
 
         assert_eq!(dcf, 30. / 365.);
+        assert_eq!(dcf, -rev_dcf);
     }
 
     #[test]

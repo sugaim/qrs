@@ -2,25 +2,14 @@ use std::ops::Neg;
 
 use qrs_chrono::{DateExtensions, Datelike, NaiveDate};
 use qrs_math::num::Real;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use super::{Dcf, InterestRate, RateDcf};
 
 // -----------------------------------------------------------------------------
 // Nl360
 //
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Nl360;
-
-//
-// display, serde
-//
-impl std::fmt::Display for Nl360 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NL/360")
-    }
-}
 
 //
 // methods
@@ -28,8 +17,7 @@ impl std::fmt::Display for Nl360 {
 impl Dcf for Nl360 {
     fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
         match from.cmp(&to) {
-            std::cmp::Ordering::Less => {}
-            std::cmp::Ordering::Equal => return Some(0.0),
+            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
         };
         let mut leap_days = ((from.year() + 1)..to.year())
@@ -179,7 +167,9 @@ mod tests {
     #[case(ymd(2020, 3, 1), ymd(2024, 3, 1), (4. * 365.) / 360.)]
     fn test_dcf(#[case] from: NaiveDate, #[case] to: NaiveDate, #[case] expected: f64) {
         let dcf = Nl360.dcf(from, to).unwrap();
+        let rev_dcf = Nl360.dcf(to, from).unwrap();
 
         assert_abs_diff_eq!(dcf, expected);
+        assert_abs_diff_eq!(dcf, -rev_dcf);
     }
 }

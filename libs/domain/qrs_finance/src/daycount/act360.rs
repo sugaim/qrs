@@ -8,17 +8,8 @@ use super::{Dcf, InterestRate, RateDcf, _ops::define_vector_behavior};
 // -----------------------------------------------------------------------------
 // Act360
 //
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Act360;
-
-//
-// display, serde
-//
-impl std::fmt::Display for Act360 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Act/360")
-    }
-}
 
 //
 // methods
@@ -60,16 +51,6 @@ impl<V> Act360Rate<V> {
     pub fn from_rate(value: V) -> Self {
         Self(value)
     }
-
-    #[inline]
-    pub fn from_ratio(ratio: V, dur: Duration) -> Self
-    where
-        V: Real,
-    {
-        const MILSEC_PER_YEAR: f64 = 1000.0 * 60.0 * 60.0 * 24.0 * 360.0;
-        let dcf = V::nearest_value_of(dur.millsecs() as f64 / MILSEC_PER_YEAR);
-        Self(ratio / &dcf)
-    }
 }
 
 //
@@ -105,7 +86,9 @@ mod tests {
         let to = NaiveDate::from_ymd_opt(2021, 1, 31).unwrap();
 
         let dcf = Act360.dcf(from, to).unwrap();
+        let rev_dcf = Act360.dcf(to, from).unwrap();
 
         assert_eq!(dcf, 30. / 360.);
+        assert_eq!(rev_dcf, -30. / 360.);
     }
 }

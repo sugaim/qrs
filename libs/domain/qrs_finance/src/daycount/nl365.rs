@@ -12,22 +12,12 @@ use super::{Dcf, InterestRate, RateDcf};
 pub struct Nl365;
 
 //
-// display, serde
-//
-impl std::fmt::Display for Nl365 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NL/365")
-    }
-}
-
-//
 // methods
 //
 impl Dcf for Nl365 {
     fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Option<f64> {
         match from.cmp(&to) {
-            std::cmp::Ordering::Less => {}
-            std::cmp::Ordering::Equal => return Some(0.0),
+            std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Greater => return self.dcf(to, from).map(Neg::neg),
         };
         let mut leap_days = ((from.year() + 1)..to.year())
