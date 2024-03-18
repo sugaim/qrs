@@ -109,7 +109,7 @@ pub struct OvernightIndexFixing {
 mod tests {
     use crate::{
         products::general::{
-            core::{ValueLess, ValueOrId},
+            core::{Component, ComponentCategory, ValueLess, ValueOrId},
             VariableTypesForData,
         },
         Ccy, Money,
@@ -138,9 +138,8 @@ mod tests {
         type Rounding = Option<Ts::Rounding>;
     }
 
-    #[test]
-    fn test_change_variable_types_to() {
-        let coupon: OvernightIndexCoupon<VariableTypesForData> = OvernightIndexCoupon {
+    fn cpn() -> OvernightIndexCoupon<VariableTypesForData> {
+        OvernightIndexCoupon {
             base: CouponBase {
                 notional: ValueOrId::Value(Money {
                     amount: 100.0,
@@ -160,7 +159,12 @@ mod tests {
             },
             spread: Some(ValueOrId::Value(0.01)),
             rounding: ValueOrId::Id("rounding".to_string()).into(),
-        };
+        }
+    }
+
+    #[test]
+    fn test_change_variable_types_to() {
+        let coupon = cpn();
         let expected: OvernightIndexCoupon<MockVariableTypes> = OvernightIndexCoupon {
             base: coupon.base.clone().change_variable_types_to(),
             convention: Some(coupon.convention.clone()),
@@ -176,5 +180,23 @@ mod tests {
         let actual = coupon.change_variable_types_to::<MockVariableTypes>();
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_category() {
+        let node = cpn();
+
+        let cat = node.category();
+
+        assert_eq!(cat, ComponentCategory::Cashflow);
+    }
+
+    #[test]
+    fn test_dependency() {
+        let node = cpn();
+
+        let deps = node.depends_on().into_iter().collect::<Vec<_>>();
+
+        assert_eq!(deps, vec![("reference_rate", ComponentCategory::Market)]);
     }
 }

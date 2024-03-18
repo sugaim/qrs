@@ -78,18 +78,19 @@ impl<Ts: VariableTypes> FixedCoupon<Ts> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        products::general::{core::ValueOrId, VariableTypesForData},
+        products::general::{
+            core::{Component, ComponentCategory, ValueOrId},
+            VariableTypesForData,
+        },
         Ccy, Money,
     };
 
     use super::*;
 
     #[derive(Debug, Clone, PartialEq)]
-    struct MockVariableTypes<Ts: VariableTypes = VariableTypesForData>(
-        std::marker::PhantomData<Ts>,
-    );
+    struct OptVariableTypes<Ts: VariableTypes = VariableTypesForData>(std::marker::PhantomData<Ts>);
 
-    impl<Ts: VariableTypes> VariableTypes for MockVariableTypes<Ts> {
+    impl<Ts: VariableTypes> VariableTypes for OptVariableTypes<Ts> {
         type Money = Option<Ts::Money>;
         type Boolean = Option<Ts::Boolean>;
         type Number = Option<Ts::Number>;
@@ -105,9 +106,8 @@ mod tests {
         type Rounding = Option<Ts::Rounding>;
     }
 
-    #[test]
-    fn test_change_variable_types_to() {
-        let coupon: FixedCoupon<VariableTypesForData> = FixedCoupon {
+    fn cpn() -> FixedCoupon<VariableTypesForData> {
+        FixedCoupon {
             base: CouponBase {
                 notional: ValueOrId::Value(Money {
                     amount: 100.0,
@@ -122,16 +122,39 @@ mod tests {
             accrual: ValueOrId::Id("accrual".to_string()),
             rate: ValueOrId::Value(0.05),
             rounding: ValueOrId::Id("rounding".to_string()).into(),
-        };
-        let expected: FixedCoupon<MockVariableTypes> = FixedCoupon {
+        }
+    }
+
+    #[test]
+    fn test_change_variable_types_to() {
+        let coupon = cpn();
+        let expected: FixedCoupon<OptVariableTypes> = FixedCoupon {
             base: coupon.base.clone().change_variable_types_to(),
             rate: Some(coupon.rate.clone()),
             accrual: Some(coupon.accrual.clone()),
             rounding: coupon.rounding.clone().map(Into::into),
         };
 
-        let actual = coupon.change_variable_types_to::<MockVariableTypes>();
+        let actual = coupon.change_variable_types_to::<OptVariableTypes>();
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_category() {
+        let node = cpn();
+
+        let cat = node.category();
+
+        assert_eq!(cat, ComponentCategory::Cashflow);
+    }
+
+    #[test]
+    fn test_depends_on() {
+        let node = cpn();
+
+        let deps = node.depends_on().into_iter().collect::<Vec<_>>();
+
+        assert!(deps.is_empty());
     }
 }

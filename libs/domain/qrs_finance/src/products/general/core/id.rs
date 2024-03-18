@@ -129,3 +129,18 @@ impl<T: ComponentField> ComponentField for WithId<T> {
         self.value.depends_on()
     }
 }
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_value_or_id_depends_on() {
+        let value: ValueOrId<ValueLess> = ValueOrId::Value(ValueLess);
+        assert!(value.depends_on().into_iter().next().is_none());
+
+        let id: ValueOrId<ValueLess> = ValueOrId::Id("id".to_string());
+        assert_eq!(id.depends_on().into_iter().collect::<Vec<_>>(), vec!["id"]);
+    }
+}

@@ -22,3 +22,55 @@ pub struct StraightLeg<Ts: VariableTypes> {
     #[component(field(category = "Cashflow"))]
     pub cashflows: Vec<WithId<Ts::CashflowRef>>,
 }
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use crate::products::general::{
+        core::{Component, ComponentCategory, ValueLess},
+        VariableTypesForData,
+    };
+
+    use super::*;
+
+    fn leg() -> StraightLeg<VariableTypesForData> {
+        StraightLeg {
+            cashflows: vec![
+                WithId {
+                    id: "cf1".to_string(),
+                    value: ValueLess,
+                },
+                WithId {
+                    id: "cf2".to_string(),
+                    value: ValueLess,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn test_category() {
+        let leg = leg();
+
+        let cat = leg.category();
+
+        assert_eq!(cat, ComponentCategory::Leg);
+    }
+
+    #[test]
+    fn test_depends_on() {
+        let leg = leg();
+
+        let deps = leg.depends_on();
+
+        let deps: Vec<_> = deps.into_iter().collect();
+
+        assert_eq!(
+            deps,
+            vec![
+                ("cf1", ComponentCategory::Cashflow),
+                ("cf2", ComponentCategory::Cashflow)
+            ]
+        );
+    }
+}

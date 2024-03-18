@@ -49,12 +49,13 @@ where
 
 impl<K, F> ComponentField for HashMap<K, F>
 where
-    K: Eq + Hash,
+    K: Eq + Hash + ComponentField,
     F: ComponentField,
 {
     #[inline]
     fn depends_on(&self) -> impl IntoIterator<Item = &str> {
-        self.values().flat_map(ComponentField::depends_on)
+        self.iter()
+            .flat_map(|(k, v)| k.depends_on().into_iter().chain(v.depends_on()))
     }
 }
 
