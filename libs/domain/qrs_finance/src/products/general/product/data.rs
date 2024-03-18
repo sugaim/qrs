@@ -18,6 +18,7 @@ use crate::{
         in_arrears::InArrears,
         Collateral,
     },
+    Money,
 };
 
 use super::super::{
@@ -75,13 +76,14 @@ impl<V> VariableTypes for VariableTypesForData<V> {
     type DateTime = ValueOrId<DateWithTag>;
     type DayCount = ValueOrId<DayCountSymbol>;
     type Calendar = ValueOrId<CalendarSymbol>;
+    type Rounding = ValueOrId<Rounding>;
+    type Money = ValueOrId<Money<V>>;
 
     type CashflowRef = ValueLess;
     type LegRef = ValueLess;
     type MarketRef = ValueLess;
     type ProcessRef = ValueLess;
 
-    type Rounding = ValueOrId<Rounding>;
     type InArrearsConvention = ValueOrId<InArrears<DayCountSymbol, CalendarSymbol>>;
 }
 

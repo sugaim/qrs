@@ -51,6 +51,7 @@ impl<Ts: VariableTypes> Cashflow<Ts> {
     pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> Cashflow<Ts2>
     where
         Ts::Number: Into<Ts2::Number>,
+        Ts::Money: Into<Ts2::Money>,
         Ts::DateTime: Into<Ts2::DateTime>,
         Ts::DayCount: Into<Ts2::DayCount>,
         Ts::Rounding: Into<Ts2::Rounding>,
@@ -100,6 +101,7 @@ impl<Ts: VariableTypes> CashflowWithFixing<Ts> {
     pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> CashflowWithFixing<Ts2>
     where
         Ts::Number: Into<Ts2::Number>,
+        Ts::Money: Into<Ts2::Money>,
         Ts::DateTime: Into<Ts2::DateTime>,
         Ts::DayCount: Into<Ts2::DayCount>,
         Ts::Rounding: Into<Ts2::Rounding>,

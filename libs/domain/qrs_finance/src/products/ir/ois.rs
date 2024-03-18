@@ -19,6 +19,7 @@ use crate::{
         },
         in_arrears::InArrears,
     },
+    Money,
 };
 
 // -----------------------------------------------------------------------------
@@ -38,13 +39,14 @@ impl<V> VariableTypes for OisVariableTypes<V> {
     type Calendar = Calendar;
     type DateTime = DateTime;
     type DayCount = DayCount;
+    type Rounding = Rounding;
+    type Money = Money<V>;
 
     type MarketRef = Arc<OvernightRate>;
     type ProcessRef = ();
     type CashflowRef = Arc<OisCashflow<V>>;
     type LegRef = Arc<StraightLeg<Self>>;
 
-    type Rounding = Rounding;
     type InArrearsConvention = Arc<InArrears<DayCount, Calendar>>;
 }
 

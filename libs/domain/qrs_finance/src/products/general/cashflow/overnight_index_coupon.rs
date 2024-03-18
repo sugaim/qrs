@@ -75,6 +75,7 @@ impl<Ts: VariableTypes> OvernightIndexCoupon<Ts> {
     pub fn change_variable_types_to<Ts2: VariableTypes>(self) -> OvernightIndexCoupon<Ts2>
     where
         Ts::Number: Into<Ts2::Number>,
+        Ts::Money: Into<Ts2::Money>,
         Ts::DateTime: Into<Ts2::DateTime>,
         Ts::DayCount: Into<Ts2::DayCount>,
         Ts::InArrearsConvention: Into<Ts2::InArrearsConvention>,

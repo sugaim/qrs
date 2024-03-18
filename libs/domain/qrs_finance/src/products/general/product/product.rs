@@ -315,6 +315,8 @@ impl<V> VariableTypes for DefaultVariableTypes<V> {
     type DateTime = DateTime;
     type Calendar = Calendar;
     type DayCount = DayCount;
+    type Money = Money<V>;
+    type Rounding = Rounding;
 
     type MarketRef = Arc<Market>;
     type ProcessRef = Arc<Process<Self>>;
@@ -322,7 +324,6 @@ impl<V> VariableTypes for DefaultVariableTypes<V> {
     type LegRef = Arc<Leg<Self>>;
 
     type InArrearsConvention = Arc<InArrears<DayCount, Calendar>>;
-    type Rounding = Rounding;
 }
 
 // -----------------------------------------------------------------------------
@@ -618,6 +619,7 @@ where
     fn _ctx_msg(&self, cmp: &str) -> String {
         format!("Parse {cmp} to convert `ProductData` to `Product`")
     }
+
     fn _unwrap_float<V: Real>(
         &self,
         v: &ValueOrId<V>,
@@ -634,6 +636,31 @@ where
             .and_then(|c| match c {
                 Constant::Number(v) => Ok(V::nearest_base_float_of(*v).into()),
                 _ => bail!("constant `{id}` is not a number."),
+            })
+    }
+
+    fn _unwrap_money<V: Real>(
+        &self,
+        v: &ValueOrId<Money<V>>,
+        consts: &HashMap<String, Constant>,
+        required_by: &str,
+    ) -> anyhow::Result<Money<V>> {
+        let id = match v {
+            ValueOrId::Value(v) => return Ok(v.clone()),
+            ValueOrId::Id(id) => id,
+        };
+        consts
+            .get(id)
+            .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
+            .and_then(|c| match c {
+                Constant::Object(v) => {
+                    let money = Money::<f64>::deserialize(v)?;
+                    Ok(Money {
+                        amount: V::nearest_base_float_of(money.amount).into(),
+                        ccy: money.ccy,
+                    })
+                }
+                _ => bail!("constant `{id}` is not an object, which is expected a `Money`."),
             })
     }
 
@@ -729,10 +756,7 @@ where
         required_by: &str,
     ) -> anyhow::Result<CouponBase<DefaultVariableTypes<V>>> {
         let base = CouponBase {
-            notional: Money {
-                amount: self._unwrap_float(&v.notional.amount, consts, required_by)?,
-                ccy: v.notional.ccy,
-            },
+            notional: self._unwrap_money(&v.notional, consts, required_by)?,
             period_start: self._unwrap_dt(&v.period_start, consts, required_by)?,
             period_end: self._unwrap_dt(&v.period_end, consts, required_by)?,
             entitle: self._unwrap_dt(&v.entitle, consts, required_by)?,

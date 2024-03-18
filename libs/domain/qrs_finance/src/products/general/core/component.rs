@@ -70,6 +70,7 @@ pub trait VariableTypes {
     type DayCount;
     type Calendar;
     type Rounding;
+    type Money;
 
     type CashflowRef;
     type LegRef;
