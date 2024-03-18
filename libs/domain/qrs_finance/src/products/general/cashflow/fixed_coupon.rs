@@ -73,3 +73,65 @@ impl<Ts: VariableTypes> FixedCoupon<Ts> {
         }
     }
 }
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use crate::{
+        products::general::{core::ValueOrId, VariableTypesForData},
+        Ccy, Money,
+    };
+
+    use super::*;
+
+    #[derive(Debug, Clone, PartialEq)]
+    struct MockVariableTypes<Ts: VariableTypes = VariableTypesForData>(
+        std::marker::PhantomData<Ts>,
+    );
+
+    impl<Ts: VariableTypes> VariableTypes for MockVariableTypes<Ts> {
+        type Money = Option<Ts::Money>;
+        type Boolean = Option<Ts::Boolean>;
+        type Number = Option<Ts::Number>;
+        type DateTime = Option<Ts::DateTime>;
+        type DayCount = Option<Ts::DayCount>;
+        type Calendar = Option<Ts::Calendar>;
+        type CashflowRef = Option<Ts::CashflowRef>;
+        type InArrearsConvention = Option<Ts::InArrearsConvention>;
+        type Integer = Option<Ts::Integer>;
+        type LegRef = Option<Ts::LegRef>;
+        type MarketRef = Option<Ts::MarketRef>;
+        type ProcessRef = Option<Ts::ProcessRef>;
+        type Rounding = Option<Ts::Rounding>;
+    }
+
+    #[test]
+    fn test_change_variable_types_to() {
+        let coupon: FixedCoupon<VariableTypesForData> = FixedCoupon {
+            base: CouponBase {
+                notional: ValueOrId::Value(Money {
+                    amount: 100.0,
+                    ccy: Ccy::USD,
+                }),
+                entitle: ValueOrId::Id("entitle".to_string()),
+                period_start: ValueOrId::Id("period_start".to_string()),
+                period_end: ValueOrId::Id("period_end".to_string()),
+                daycount: ValueOrId::Id("daycount".to_string()),
+                payment: ValueOrId::Id("payment".to_string()),
+            },
+            accrual: ValueOrId::Id("accrual".to_string()),
+            rate: ValueOrId::Value(0.05),
+            rounding: ValueOrId::Id("rounding".to_string()).into(),
+        };
+        let expected: FixedCoupon<MockVariableTypes> = FixedCoupon {
+            base: coupon.base.clone().change_variable_types_to(),
+            rate: Some(coupon.rate.clone()),
+            accrual: Some(coupon.accrual.clone()),
+            rounding: coupon.rounding.clone().map(Into::into),
+        };
+
+        let actual = coupon.change_variable_types_to::<MockVariableTypes>();
+
+        assert_eq!(actual, expected);
+    }
+}
