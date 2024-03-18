@@ -80,3 +80,97 @@ impl<Ts: VariableTypes> Process<Ts> {
         }
     }
 }
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use maplit::hashmap;
+    use qrs_collections::RequireMinSize;
+    use rstest::rstest;
+
+    use crate::products::general::{
+        core::{Component, ValueLess, ValueOrId, WithId},
+        VariableTypesForData,
+    };
+
+    use super::*;
+
+    fn constant() -> Process<VariableTypesForData> {
+        Process::ConstantFloat(ConstantFloat {
+            values: vec![
+                ValueOrId::Id("cf1".to_string()),
+                ValueOrId::Value(0.42),
+                ValueOrId::Id("cf3".to_string()),
+            ]
+            .require_min_size()
+            .unwrap(),
+        })
+    }
+
+    fn deterministic() -> Process<VariableTypesForData> {
+        Process::DeterministicFloat(DeterministicFloat {
+            series: vec![
+                hashmap! {
+                    ValueOrId::Id("datetime1".to_string()) => ValueOrId::Value(0.42),
+                    ValueOrId::Value("2024-01-01@tky".parse().unwrap()) =>ValueOrId::Id("num1".to_string()),
+                }
+                .require_min_size()
+                .unwrap(),
+                hashmap! {
+                    ValueOrId::Value("2024-01-05@nyk".parse().unwrap()) =>ValueOrId::Id("num2".to_string()),
+                    ValueOrId::Id("datetime2".to_string()) =>ValueOrId::Value(0.55),
+                }
+                .require_min_size()
+                .unwrap(),
+            ]
+            .require_min_size()
+            .unwrap(),
+        })
+    }
+
+    fn market() -> Process<VariableTypesForData> {
+        Process::MarketRef(MarketRef {
+            refs: vec![
+                WithId {
+                    id: "mr1".to_string(),
+                    value: ValueLess,
+                },
+                WithId {
+                    id: "mr2".to_string(),
+                    value: ValueLess,
+                },
+            ]
+            .require_min_size()
+            .unwrap(),
+        })
+    }
+
+    #[rstest]
+    #[case(constant())]
+    fn test_category(#[case] proc: Process<VariableTypesForData>) {
+        let cat = proc.category();
+
+        assert_eq!(
+            cat,
+            crate::products::general::core::ComponentCategory::Market
+        );
+    }
+
+    #[rstest]
+    #[case(constant())]
+    #[case(deterministic())]
+    #[case(market())]
+    fn test_depends_on(#[case] proc: Process<VariableTypesForData>) {
+        let expected: HashSet<_> = match &proc {
+            Process::ConstantFloat(c) => c.depends_on().into_iter().collect(),
+            Process::DeterministicFloat(d) => d.depends_on().into_iter().collect(),
+            Process::MarketRef(m) => m.depends_on().into_iter().collect(),
+        };
+
+        let deps: HashSet<_> = proc.depends_on().into_iter().collect();
+
+        assert_eq!(deps, expected);
+    }
+}

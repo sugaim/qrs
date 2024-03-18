@@ -76,3 +76,35 @@ impl Component for Constant {
         [].into_iter()
     }
 }
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case(Constant::Boolean(false))]
+    #[case(Constant::Int(42))]
+    #[case(Constant::Number(42.0))]
+    #[case(Constant::String("42".to_string()))]
+    #[case(Constant::Object(serde_json::json!({"key": "value"})))]
+    fn test_category(#[case] constant: Constant) {
+        let cat = constant.category();
+
+        assert_eq!(cat, ComponentCategory::Constant);
+    }
+
+    #[rstest]
+    #[case(Constant::Boolean(false))]
+    #[case(Constant::Int(42))]
+    #[case(Constant::Number(42.0))]
+    #[case(Constant::String("42".to_string()))]
+    #[case(Constant::Object(serde_json::json!({"key": "value"})))]
+    fn test_depends_on(#[case] constant: Constant) {
+        let deps = constant.depends_on();
+
+        assert!(deps.into_iter().next().is_none());
+    }
+}
