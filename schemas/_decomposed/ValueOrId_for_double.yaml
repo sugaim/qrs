@@ -1,5 +1,0 @@
-title: ValueOrId_for_double
-anyOf:
-- type: number
-  format: double
-- type: string

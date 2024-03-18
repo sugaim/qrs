@@ -1,0 +1,4 @@
+title: ValueOrId_for_Money_for_double
+anyOf:
+- $ref: ./Id.yaml
+- $ref: ./Money_for_double.yaml

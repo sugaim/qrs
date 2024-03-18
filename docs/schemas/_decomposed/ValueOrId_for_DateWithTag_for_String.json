@@ -1,0 +1,11 @@
+{
+  "title": "ValueOrId_for_DateWithTag_for_String",
+  "anyOf": [
+    {
+      "$ref": "./Id.yaml"
+    },
+    {
+      "$ref": "./DateWithTag_for_String.yaml"
+    }
+  ]
+}

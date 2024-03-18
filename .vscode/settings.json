@@ -13,6 +13,15 @@
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.cargo.features": "all",
   "rust-analyzer.linkedProjects": [
-    ".\\libs\\domain\\qrs_model\\Cargo.toml"
-  ]
+    "./Cargo.toml"
+  ],
+  "yaml.completion": true,
+  "yaml.format.enable": true,
+  "yaml.validate": true,
+  "yaml.hover": true,
+  "yaml.schemas": {
+    "./docs/schemas/ContractData_for_double.json": [
+      "libs/domain/qrs_finance/testdata/product/general/*",
+    ]
+  }
 }

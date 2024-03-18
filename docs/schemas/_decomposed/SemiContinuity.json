@@ -1,0 +1,9 @@
+{
+  "title": "SemiContinuity",
+  "description": "Semi continuity",
+  "type": "string",
+  "enum": [
+    "left_continuous",
+    "right_continuous"
+  ]
+}

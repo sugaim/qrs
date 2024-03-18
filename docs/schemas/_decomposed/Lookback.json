@@ -1,0 +1,40 @@
+{
+  "title": "Lookback",
+  "description": "Lookback convention\n\nWith `n` day lookback, rate applied on today is a observed rate `n` days ago.\n\nIf tomorrow is Friday, the rate is applied three days(today, tomorrow, and the day after tomorrow). (For simplicity, we assume that we do not have any special holidays around today)\n\nBut with observation shift, this date counting is also shifted in addition to applied rate. That is, in 2 days lookback with days observation shift, the number of days is counted 1 because date counting is also started from Wednesday.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "days",
+        "type"
+      ],
+      "properties": {
+        "days": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "type": {
+          "type": "string",
+          "const": "without_observation_shift"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "days",
+        "type"
+      ],
+      "properties": {
+        "days": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "type": {
+          "type": "string",
+          "const": "observation_shift"
+        }
+      }
+    }
+  ]
+}

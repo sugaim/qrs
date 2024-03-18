@@ -1,4 +1,0 @@
-title: ValueOrId_for_InArrears_for_DayCountSymbol_and_CalendarSymbol
-anyOf:
-- $ref: ./InArrears_for_DayCountSymbol_and_CalendarSymbol.yaml
-- type: string

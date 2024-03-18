@@ -1,0 +1,8 @@
+{
+  "title": "MinSized1_for_Array_of_MinSized1_for_Map_of_ValueOrId_for_double",
+  "type": "array",
+  "items": {
+    "$ref": "./MinSized1_for_Map_of_ValueOrId_for_double.yaml"
+  },
+  "minItems": 1
+}

@@ -1,0 +1,5 @@
+title: MinSized1_for_Array_of_Id
+type: array
+items:
+  $ref: ./Id.yaml
+minItems: 1

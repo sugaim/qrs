@@ -1,0 +1,18 @@
+{
+  "title": "CashflowFixing",
+  "type": "object",
+  "required": [
+    "rate",
+    "type"
+  ],
+  "properties": {
+    "rate": {
+      "type": "number",
+      "format": "double"
+    },
+    "type": {
+      "type": "string",
+      "const": "overnight_index_coupon"
+    }
+  }
+}

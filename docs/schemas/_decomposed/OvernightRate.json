@@ -1,0 +1,8 @@
+{
+  "title": "OvernightRate",
+  "type": "string",
+  "enum": [
+    "TONA",
+    "SOFR"
+  ]
+}

@@ -1,0 +1,4 @@
+title: ValueOrId_for_Rounding
+anyOf:
+- $ref: ./Id.yaml
+- $ref: ./Rounding.yaml

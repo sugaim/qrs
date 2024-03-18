@@ -1,0 +1,12 @@
+{
+  "title": "CatmullRomScheme",
+  "type": "object",
+  "required": [
+    "method"
+  ],
+  "properties": {
+    "method": {
+      "$ref": "./FiniteDiffMethod.yaml"
+    }
+  }
+}

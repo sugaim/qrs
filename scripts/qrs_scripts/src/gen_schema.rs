@@ -23,6 +23,12 @@ impl<T> Default for SchemaItem<T> {
     }
 }
 
+impl<T: 'static + JsonSchema> SchemaItem<T> {
+    fn create() -> Box<dyn ISchemaItem> {
+        Box::<SchemaItem<T>>::default() as _
+    }
+}
+
 impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
     fn gen(&self, collector: &mut SchemaCollector) -> anyhow::Result<()> {
         let mut gen: SchemaGenerator = SchemaSettings::draft07()
@@ -38,19 +44,11 @@ impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
 }
 
 fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
-    type SchItem<T> = Box<SchemaItem<T>>;
     vec![
-        SchItem::<qrs_chrono::Calendar>::default() as _,
-        SchItem::<qrs_chrono::CalendarSymbol>::default() as _,
-        SchItem::<qrs_chrono::DateTime<chrono::FixedOffset>>::default() as _,
-        SchItem::<qrs_chrono::DateTime<chrono::Utc>>::default() as _,
-        SchItem::<qrs_chrono::DateTime<chrono_tz::Tz>>::default() as _,
-        SchItem::<qrs_chrono::DateTime>::default() as _,
-        SchItem::<qrs_chrono::Tz>::default() as _,
-        SchItem::<qrs_chrono::Duration>::default() as _,
-        SchItem::<qrs_chrono::Velocity<f64>>::default() as _,
-        SchItem::<qrs_finance::products::general::ProductData>::default() as _,
-        SchItem::<qrs_model::core::curve::ComponentCurve<f64>>::default() as _,
+        SchemaItem::<qrs_chrono::Calendar>::create(),
+        SchemaItem::<qrs_finance::product::general::ContractData>::create(),
+        SchemaItem::<qrs_finance::product::general::ProductData>::create(),
+        SchemaItem::<qrs_model::core::curve::ComponentCurve<f64>>::create(),
     ]
 }
 
@@ -69,6 +67,7 @@ fn gen_schema(remove_defs: bool) -> anyhow::Result<SchemaCollector> {
 pub fn write_schema() -> anyhow::Result<()> {
     let root_dir = {
         let mut dir = workspace_root()?;
+        dir.push("docs");
         dir.push("schemas");
         dir
     };
@@ -84,17 +83,21 @@ pub fn write_schema() -> anyhow::Result<()> {
         let collector = gen_schema(remove_defs)?;
         if remove_defs {
             for (name, sch) in &collector.definitions {
-                let filepath = dir.join(format!("{name}.yaml"));
                 let y = serde_yaml::to_string(&sch);
+                let j = serde_json::to_string_pretty(&sch);
                 assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
-                std::fs::write(filepath, y.unwrap())?;
+                assert!(j.is_ok(), "Failed to serialize schema: {:?}", name);
+                std::fs::write(dir.join(format!("{name}.yaml")), y.unwrap())?;
+                std::fs::write(dir.join(format!("{name}.json")), j.unwrap())?;
             }
         }
         for (name, sch) in &collector.roots {
-            let filepath = dir.join(format!("{name}.yaml"));
             let y = serde_yaml::to_string(&sch);
+            let j = serde_json::to_string_pretty(&sch);
             assert!(y.is_ok(), "Failed to serialize schema: {:?}", name);
-            std::fs::write(filepath, y.unwrap())?;
+            assert!(j.is_ok(), "Failed to serialize schema: {:?}", name);
+            std::fs::write(dir.join(format!("{name}.yaml")), y.unwrap())?;
+            std::fs::write(dir.join(format!("{name}.json")), j.unwrap())?;
         }
     }
     Ok(())
@@ -110,6 +113,7 @@ mod tests {
     fn test_gen_schema() {
         let root_dir = {
             let mut dir = workspace_root().unwrap();
+            dir.push("docs");
             dir.push("schemas");
             dir.push("_decomposed");
             dir

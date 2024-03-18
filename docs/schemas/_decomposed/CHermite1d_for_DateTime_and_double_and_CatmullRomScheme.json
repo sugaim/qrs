@@ -1,0 +1,16 @@
+{
+  "title": "CHermite1d_for_DateTime_and_double_and_CatmullRomScheme",
+  "type": "object",
+  "required": [
+    "knots",
+    "scheme"
+  ],
+  "properties": {
+    "knots": {
+      "$ref": "./MinSized2_for_Series_for_DateTime_and_double.yaml"
+    },
+    "scheme": {
+      "$ref": "./CatmullRomScheme.yaml"
+    }
+  }
+}

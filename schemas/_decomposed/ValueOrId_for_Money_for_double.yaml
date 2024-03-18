@@ -1,4 +1,0 @@
-title: ValueOrId_for_Money_for_double
-anyOf:
-- $ref: ./Money_for_double.yaml
-- type: string

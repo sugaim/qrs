@@ -1,0 +1,69 @@
+{
+  "title": "DayCountSymbol",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "act360"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "act365f"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "nl360"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "nl365"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "calendar",
+        "type"
+      ],
+      "properties": {
+        "calendar": {
+          "$ref": "./CalendarSymbol.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "bd252"
+        }
+      }
+    }
+  ]
+}

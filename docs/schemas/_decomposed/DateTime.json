@@ -1,0 +1,19 @@
+{
+  "title": "DateTime",
+  "description": "A datetime with fixed offset or IANA timezone",
+  "examples": [
+    "2021-01-01T10:42:11+09:00",
+    "2021-01-01T10:42:11Z",
+    "2021-01-01T10:42:11[America/New_York]",
+    "2021-01-01T10:42:11Z[America/New_York]",
+    "2021-01-01T10:42:11+09:00[Asia/Tokyo]"
+  ],
+  "oneOf": [
+    {
+      "$ref": "./DateTimeFixedOffset.yaml"
+    },
+    {
+      "$ref": "./DateTimeIana.yaml"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "title": "CouponBase_for_VariableTypesForData_for_double",
+  "type": "object",
+  "required": [
+    "daycount",
+    "entitle",
+    "notional",
+    "payment",
+    "period_end",
+    "period_start"
+  ],
+  "properties": {
+    "daycount": {
+      "description": "Day count convention to calculate dcf of accrual period",
+      "$ref": "./ValueOrId_for_DayCountSymbol.yaml"
+    },
+    "entitle": {
+      "description": "A date which the right of the coupon is granted",
+      "$ref": "./ValueOrId_for_DateWithTag_for_String.yaml"
+    },
+    "notional": {
+      "description": "Notional amount",
+      "$ref": "./ValueOrId_for_Money_for_double.yaml"
+    },
+    "payment": {
+      "description": "Payment date",
+      "$ref": "./ValueOrId_for_DateWithTag_for_String.yaml"
+    },
+    "period_end": {
+      "description": "Accrual period end date",
+      "$ref": "./ValueOrId_for_DateWithTag_for_String.yaml"
+    },
+    "period_start": {
+      "description": "Accrual period start date",
+      "$ref": "./ValueOrId_for_DateWithTag_for_String.yaml"
+    }
+  }
+}

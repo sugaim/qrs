@@ -1,0 +1,20 @@
+{
+  "title": "Leg_for_VariableTypesForData_for_double",
+  "type": "object",
+  "required": [
+    "cashflows",
+    "type"
+  ],
+  "properties": {
+    "cashflows": {
+      "type": "array",
+      "items": {
+        "$ref": "./Id.yaml"
+      }
+    },
+    "type": {
+      "type": "string",
+      "const": "straight"
+    }
+  }
+}

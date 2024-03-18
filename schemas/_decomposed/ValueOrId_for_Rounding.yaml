@@ -1,4 +1,0 @@
-title: ValueOrId_for_Rounding
-anyOf:
-- $ref: ./Rounding.yaml
-- type: string

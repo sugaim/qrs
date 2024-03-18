@@ -1,0 +1,13 @@
+{
+  "title": "Lerp1d_for_DateTime_and_Act365fRate_for_double",
+  "description": "1-dimensional linear interpolation",
+  "type": "object",
+  "required": [
+    "knots"
+  ],
+  "properties": {
+    "knots": {
+      "$ref": "./MinSized2_for_Series_for_DateTime_and_Act365fRate_for_double.yaml"
+    }
+  }
+}

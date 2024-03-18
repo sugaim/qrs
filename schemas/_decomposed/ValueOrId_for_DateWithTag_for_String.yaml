@@ -1,4 +1,0 @@
-title: ValueOrId_for_DateWithTag_for_String
-anyOf:
-- $ref: ./DateWithTag_for_String.yaml
-- type: string

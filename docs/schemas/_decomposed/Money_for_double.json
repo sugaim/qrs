@@ -1,0 +1,17 @@
+{
+  "title": "Money_for_double",
+  "type": "object",
+  "required": [
+    "amount",
+    "ccy"
+  ],
+  "properties": {
+    "amount": {
+      "type": "number",
+      "format": "double"
+    },
+    "ccy": {
+      "$ref": "./Ccy.yaml"
+    }
+  }
+}

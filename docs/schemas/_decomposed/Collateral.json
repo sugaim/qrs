@@ -1,0 +1,37 @@
+{
+  "title": "Collateral",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "ccy",
+        "type"
+      ],
+      "properties": {
+        "ccy": {
+          "$ref": "./Ccy.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "money"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "company",
+        "type"
+      ],
+      "properties": {
+        "company": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "share"
+        }
+      }
+    }
+  ]
+}

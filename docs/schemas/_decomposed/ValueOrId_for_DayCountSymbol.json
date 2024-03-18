@@ -1,0 +1,11 @@
+{
+  "title": "ValueOrId_for_DayCountSymbol",
+  "anyOf": [
+    {
+      "$ref": "./Id.yaml"
+    },
+    {
+      "$ref": "./DayCountSymbol.yaml"
+    }
+  ]
+}

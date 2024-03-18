@@ -1,0 +1,17 @@
+{
+  "title": "Market",
+  "type": "object",
+  "required": [
+    "reference",
+    "type"
+  ],
+  "properties": {
+    "reference": {
+      "$ref": "./OvernightRate.yaml"
+    },
+    "type": {
+      "type": "string",
+      "const": "overnight_rate"
+    }
+  }
+}

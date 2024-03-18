@@ -1,0 +1,6 @@
+{
+  "title": "DateTimeFixedOffset",
+  "description": "A datetime with fixed offset timezone",
+  "type": "string",
+  "format": "date-time"
+}

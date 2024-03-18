@@ -1,0 +1,71 @@
+# This test data is intended to check dependencies from
+# cashflows to other components are correctly tracked by implementation.
+collateral:
+  type: money
+  ccy: JPY
+
+constants:
+  notional:
+    amount: 100000000
+    ccy: JPY
+
+  daycount:
+    type: nl365
+
+  convention:
+    type: spread_exclusive
+    overall_daycount:
+      type: act365f
+    obsrate_daycount:
+      type: act365f
+    calendar: TKY
+
+markets:
+  tona:
+    type: overnight_rate
+    reference: TONA
+
+cashflows:
+  cpn1:
+    type: fixed_coupon
+    rate: 0.005
+    accrual_daycount:
+      type: act365f
+    coupon_base:
+      notional: $ref:notional
+      daycount:
+        type: nl365
+      entitle: 2024-09-01@tky_close
+      payment: 2024-09-01@tky_close
+      period_start: 2024-03-01@tky_close
+      period_end: 2024-09-01@tky_close
+
+  cpn2:
+    type: fixed_coupon
+    rate: 0.005
+    accrual_daycount:
+      type: act365f
+    coupon_base:
+      notional: $ref:notional
+      daycount: $ref:daycount
+      entitle: 2025-03-01@tky_close
+      payment: 2025-03-01@tky_close
+      period_start: 2024-09-01@tky_close
+      period_end: 2025-03-01@tky_close
+
+  cpn3:
+    type: overnight_index_coupon
+    reference_rate: $ref:tona
+    convention: $ref:convention
+    accrual_daycount:
+      type: act365f
+    coupon_base:
+      notional:
+        amount: 100000000
+        ccy: JPY
+      daycount:
+        type: nl365
+      entitle: 2025-09-01@tky_close
+      payment: 2025-09-01@tky_close
+      period_start: 2025-03-01@tky_close
+      period_end: 2025-09-01@tky_close

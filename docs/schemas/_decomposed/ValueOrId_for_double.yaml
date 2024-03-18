@@ -1,0 +1,5 @@
+title: ValueOrId_for_double
+anyOf:
+- $ref: ./Id.yaml
+- type: number
+  format: double
