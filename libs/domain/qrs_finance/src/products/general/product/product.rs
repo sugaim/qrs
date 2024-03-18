@@ -16,6 +16,7 @@ use serde::Deserialize;
 use crate::{
     daycount::{DayCount, DayCountSymbol},
     products::{
+        core::{Collateral, InArrears, SpreadExclusiveCompounding, StraightCompounding},
         general::{
             cashflow::{
                 Cashflow, CashflowFixing, CashflowWithFixing, CouponBase, FixedCoupon,
@@ -27,8 +28,6 @@ use crate::{
             market::{Market, OvernightRate},
             process::{ConstantFloat, DeterministicFloat, MarketRef, Process},
         },
-        in_arrears::{InArrears, SpreadExclusiveCompounding, StraightCompounding},
-        Collateral,
     },
     Money,
 };

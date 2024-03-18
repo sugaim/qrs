@@ -8,6 +8,7 @@ use schemars::JsonSchema;
 use crate::{
     daycount::DayCount,
     products::{
+        core::InArrears,
         general::{
             cashflow::{
                 CashflowWithFixing, FixedCoupon, OvernightIndexCoupon, OvernightIndexFixing,
@@ -17,7 +18,6 @@ use crate::{
             market::{Market, OvernightRate},
             ConvertProduct, DefaultVariableTypes, Product,
         },
-        in_arrears::InArrears,
     },
     Money,
 };

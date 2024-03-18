@@ -11,12 +11,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     daycount::DayCountSymbol,
     products::{
+        core::{Collateral, InArrears},
         general::{
             cashflow::CashflowFixing,
             core::{Component, ComponentKey, ValueLess, ValueOrId, VariableTypes},
         },
-        in_arrears::InArrears,
-        Collateral,
     },
     Money,
 };
