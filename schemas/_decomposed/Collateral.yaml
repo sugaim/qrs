@@ -1,7 +1,6 @@
 title: Collateral
 oneOf:
-- description: Money
-  type: object
+- type: object
   required:
   - ccy
   - type
@@ -11,8 +10,7 @@ oneOf:
     type:
       type: string
       const: money
-- description: Equity shares
-  type: object
+- type: object
   required:
   - company
   - type

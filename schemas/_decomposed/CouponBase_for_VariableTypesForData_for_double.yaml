@@ -16,7 +16,7 @@ properties:
     $ref: ./ValueOrId_for_DateWithTag_for_String.yaml
   notional:
     description: Notional amount
-    $ref: ./Money_for_ValueOrId_for_double.yaml
+    $ref: ./ValueOrId_for_Money_for_double.yaml
   payment:
     description: Payment date
     $ref: ./ValueOrId_for_DateWithTag_for_String.yaml

@@ -81,8 +81,7 @@ definitions:
     - USD
   Collateral:
     oneOf:
-    - description: Money
-      type: object
+    - type: object
       required:
       - ccy
       - type
@@ -92,8 +91,7 @@ definitions:
         type:
           type: string
           const: money
-    - description: Equity shares
-      type: object
+    - type: object
       required:
       - company
       - type
@@ -159,7 +157,7 @@ definitions:
         $ref: '#/definitions/ValueOrId_for_DateWithTag_for_String'
       notional:
         description: Notional amount
-        $ref: '#/definitions/Money_for_ValueOrId_for_double'
+        $ref: '#/definitions/ValueOrId_for_Money_for_double'
       payment:
         description: Payment date
         $ref: '#/definitions/ValueOrId_for_DateWithTag_for_String'
@@ -364,14 +362,15 @@ definitions:
     minProperties: 1
     additionalProperties:
       $ref: '#/definitions/ValueOrId_for_double'
-  Money_for_ValueOrId_for_double:
+  Money_for_double:
     type: object
     required:
     - amount
     - ccy
     properties:
       amount:
-        $ref: '#/definitions/ValueOrId_for_double'
+        type: number
+        format: double
       ccy:
         $ref: '#/definitions/Ccy'
   OvernightRate:
@@ -443,6 +442,10 @@ definitions:
   ValueOrId_for_InArrears_for_DayCountSymbol_and_CalendarSymbol:
     anyOf:
     - $ref: '#/definitions/InArrears_for_DayCountSymbol_and_CalendarSymbol'
+    - type: string
+  ValueOrId_for_Money_for_double:
+    anyOf:
+    - $ref: '#/definitions/Money_for_double'
     - type: string
   ValueOrId_for_Rounding:
     anyOf:
