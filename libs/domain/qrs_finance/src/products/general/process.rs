@@ -154,7 +154,7 @@ mod tests {
 
         assert_eq!(
             cat,
-            crate::products::general::core::ComponentCategory::Market
+            crate::products::general::core::ComponentCategory::Process
         );
     }
 
