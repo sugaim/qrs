@@ -31,10 +31,11 @@ jobs:
         components: llvm-tools-preview
     - uses: taiki-e/install-action@cargo-llvm-cov
     - uses: taiki-e/install-action@nextest
-    - run: |
-        cargo llvm-cov --no-report nextest --all-features --workspace
-        cargo llvm-cov --no-report --doc --all-features --workspace
-        cargo llvm-cov report --doctests --lcov --output-path lcov.info --ignore-filename-regex "(scripts/*|qrs_datasrc_derive/*)"
+    - run: cargo llvm-cov --no-report nextest --all-features --workspace
+    - run: cargo llvm-cov --no-report --doc --all-features --workspace
+    - run: >
+        cargo llvm-cov report --doctests --lcov --output-path lcov.info 
+        --ignore-filename-regex "(scripts/*|qrs_datasrc_derive/*|qrs_finance_derive/*)"
     - uses: codecov/codecov-action@v3
 
   doc-gen:
