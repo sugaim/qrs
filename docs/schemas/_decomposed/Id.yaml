@@ -1,4 +1,4 @@
 title: Id
 description: Id of a component
 type: string
-pattern: ^\$ref:.+$
+pattern: ^\$ref/.+$

@@ -339,7 +339,7 @@
     "Id": {
       "description": "Id of a component",
       "type": "string",
-      "pattern": "^\\$ref:.+$"
+      "pattern": "^\\$ref/.+$"
     },
     "InArrears_for_DayCountSymbol_and_CalendarSymbol": {
       "oneOf": [

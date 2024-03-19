@@ -1,5 +1,5 @@
 [package]
-name = "qrs_scripts"
+name = "scripts"
 version.workspace = true
 edition.workspace = true
 exclude.workspace = true

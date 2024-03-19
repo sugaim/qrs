@@ -14,7 +14,7 @@ pub struct Id(pub String);
 //
 impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "$ref:{}", self.0)
+        write!(f, "$ref/{}", self.0)
     }
 }
 
@@ -23,7 +23,7 @@ impl Serialize for Id {
     where
         S: serde::Serializer,
     {
-        format!("$ref:{}", self.0).serialize(serializer)
+        format!("$ref/{}", self.0).serialize(serializer)
     }
 }
 
@@ -33,7 +33,7 @@ impl<'de> Deserialize<'de> for Id {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        if let Some(id) = s.strip_prefix("$ref:") {
+        if let Some(id) = s.strip_prefix("$ref/") {
             Ok(Id(id.to_string()))
         } else {
             Err(serde::de::Error::custom("Invalid id format"))
@@ -54,7 +54,7 @@ impl JsonSchema for Id {
         let mut schema = String::json_schema(gen);
         if let Schema::Object(ref mut obj) = schema {
             obj.metadata().description = Some("Id of a component".to_string());
-            obj.string().pattern = Some(r"^\$ref:.+$".to_string());
+            obj.string().pattern = Some(r"^\$ref/.+$".to_string());
         }
         schema
     }

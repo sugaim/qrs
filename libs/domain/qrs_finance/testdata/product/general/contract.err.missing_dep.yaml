@@ -27,7 +27,7 @@ cashflows:
     accrual_daycount:
       type: act365f
     coupon_base:
-      notional: $ref:notional
+      notional: $ref/notional
       daycount:
         type: nl365
       entitle: 2024-09-01@tky_close
@@ -41,8 +41,8 @@ cashflows:
     accrual_daycount:
       type: act365f
     coupon_base:
-      notional: $ref:notional
-      daycount: $ref:daycount
+      notional: $ref/notional
+      daycount: $ref/daycount
       entitle: 2025-03-01@tky_close
       payment: 2025-03-01@tky_close
       period_start: 2024-09-01@tky_close
@@ -50,8 +50,8 @@ cashflows:
 
   cpn3:
     type: overnight_index_coupon
-    reference_rate: $ref:tona
-    convention: $ref:convention
+    reference_rate: $ref/tona
+    convention: $ref/convention
     accrual_daycount:
       type: act365f
     coupon_base:

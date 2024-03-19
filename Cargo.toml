@@ -21,7 +21,7 @@ members = [
     "libs/domain/qrs_model",
 
     # others
-    "scripts/qrs_scripts",
+    "scripts",
 ]
 
 [workspace.dependencies]

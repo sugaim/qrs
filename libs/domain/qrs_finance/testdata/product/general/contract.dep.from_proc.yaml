@@ -17,11 +17,11 @@ processes:
   proc1:
     type: market_ref
     references:
-      - $ref:tona
+      - $ref/tona
 
   proc2:
     type: constant_float
     values:
-      - $ref:cnst1
+      - $ref/cnst1
       - 0.004
-      - $ref:cnst2
+      - $ref/cnst2

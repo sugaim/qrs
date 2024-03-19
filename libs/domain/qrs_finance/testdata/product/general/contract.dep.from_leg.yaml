@@ -57,10 +57,10 @@ legs:
   leg1:
     type: straight
     cashflows:
-      - $ref:cpn2
+      - $ref/cpn2
 
   leg2:
     type: straight
     cashflows:
-      - $ref:cpn1
-      - $ref:cpn3
+      - $ref/cpn1
+      - $ref/cpn3
