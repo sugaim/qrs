@@ -29,7 +29,7 @@ cashflows:
   cpn1:
     type: fixed_coupon
     rate: 0.005
-    accrual_daycount:
+    accrued_daycount:
       type: act365f
     coupon_base:
       notional: $ref/notional
@@ -43,7 +43,7 @@ cashflows:
   cpn2:
     type: fixed_coupon
     rate: 0.005
-    accrual_daycount:
+    accrued_daycount:
       type: act365f
     coupon_base:
       notional: $ref/notional

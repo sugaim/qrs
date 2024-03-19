@@ -15,7 +15,7 @@ use crate::product::general::core::VariableTypes;
     deserialize = "Ts::Number: Deserialize<'de>"
 ))]
 #[schemars(bound = "Ts: JsonSchema, Ts::Number: JsonSchema")]
-pub struct ConstantFloat<Ts: VariableTypes> {
+pub struct ConstantNumber<Ts: VariableTypes> {
     #[has_dependency(ref_category = "Constant")]
     pub values: NonEmpty<Vec<Ts::Number>>,
 }
@@ -30,8 +30,8 @@ mod tests {
 
     use super::*;
 
-    fn proc() -> ConstantFloat<VariableTypesForData> {
-        ConstantFloat {
+    fn proc() -> ConstantNumber<VariableTypesForData> {
+        ConstantNumber {
             values: vec![
                 ValueOrId::Id("cf1".into()),
                 ValueOrId::Value(0.42),

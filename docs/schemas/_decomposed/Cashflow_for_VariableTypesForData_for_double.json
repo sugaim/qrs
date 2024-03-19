@@ -4,13 +4,13 @@
     {
       "type": "object",
       "required": [
-        "accrual_daycount",
+        "accrued_daycount",
         "coupon_base",
         "rate",
         "type"
       ],
       "properties": {
-        "accrual_daycount": {
+        "accrued_daycount": {
           "$ref": "./ValueOrId_for_DayCountSymbol.yaml"
         },
         "coupon_base": {

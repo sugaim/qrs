@@ -20,7 +20,7 @@ processes:
       - $ref/tona
 
   proc2:
-    type: constant_float
+    type: constant_number
     values:
       - $ref/cnst1
       - 0.004

@@ -19,7 +19,7 @@ use crate::product::general::core::VariableTypes;
     deserialize = "Ts::DateTime: Eq + std::hash::Hash + Deserialize<'de>, Ts::Number: Deserialize<'de>"
 ))]
 #[schemars(bound = "Ts: JsonSchema, Ts::Number: JsonSchema, Ts::DateTime: JsonSchema")]
-pub struct DeterministicFloat<Ts: VariableTypes> {
+pub struct DeterministicNumber<Ts: VariableTypes> {
     #[has_dependency(ref_category = "Constant")]
     #[allow(clippy::type_complexity)]
     pub series: NonEmpty<Vec<NonEmpty<HashMap<Ts::DateTime, Ts::Number>>>>,
@@ -38,8 +38,8 @@ mod tests {
 
     use super::*;
 
-    fn proc() -> DeterministicFloat<VariableTypesForData> {
-        DeterministicFloat {
+    fn proc() -> DeterministicNumber<VariableTypesForData> {
+        DeterministicNumber {
             series: vec![
                 hashmap! {
                     ValueOrId::Id("datetime1".into()) => ValueOrId::Value(0.42),

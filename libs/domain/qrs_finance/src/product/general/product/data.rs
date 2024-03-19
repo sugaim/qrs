@@ -36,8 +36,8 @@ pub(crate) enum _DependencyError {
     },
     #[error("circular dependency detected because all of the components are required by other components")]
     NoRootComponent,
-    #[error("circular dependency detected at {}", .at)]
-    Circular { at: ComponentKey },
+    #[error("circular dependency detected at {}", .around)]
+    Circular { around: ComponentKey },
 }
 
 // -----------------------------------------------------------------------------
@@ -196,15 +196,15 @@ impl<V> ContractData<V> {
             edges
         };
 
-        // check missing dependencies
+        // check missing dependencies.
+        // since keys are existing components and values are components required by the key,
+        // we can detect missing dependencies by checking if the required component is not in the keys.
         for (from, tos) in &edges {
-            for to in tos {
-                if !edges.contains_key(to) {
-                    return Err(_DependencyError::MissingRequiredDependency {
-                        required: to.clone(),
-                        by: from.clone(),
-                    });
-                }
+            if let Some(not_found) = tos.iter().find(|to| !edges.contains_key(to)) {
+                return Err(_DependencyError::MissingRequiredDependency {
+                    required: not_found.clone(),
+                    by: from.clone(),
+                });
             }
         }
 
@@ -230,20 +230,23 @@ impl<V> ContractData<V> {
         // so the first element is not depended by any other components.
         let mut sorted = Vec::new();
         while let Some(from) = no_required.pop() {
-            sorted.push(from);
-            for to in edges.get(sorted.last().unwrap()).into_iter().flatten() {
+            for to in edges.get(&from).into_iter().flatten() {
                 if let Some(n) = num_required.get_mut(to) {
                     *n -= 1;
                     if *n == 0 {
                         no_required.push(to.clone());
+                        num_required.remove(&to);
                     }
                 }
             }
+            sorted.push(from);
         }
 
-        if sorted.len() != edges.len() {
-            let at = edges.into_keys().find(|k| !sorted.contains(k)).unwrap();
-            return Err(_DependencyError::Circular { at });
+        if let Some((k, _)) = edges
+            .iter()
+            .find(|(k, v)| !v.is_empty() && num_required.contains_key(k))
+        {
+            return Err(_DependencyError::Circular { around: k.clone() });
         }
 
         Ok(_ComponentDependency {
@@ -346,7 +349,7 @@ mod tests {
         assert_eq!(dep, expected);
     }
 
-    #[rstest]
+    #[test]
     fn test_missing_dependency() {
         let path = testdata_root().join("contract.err.missing_dep.yaml");
         let yaml = std::fs::read_to_string(path).unwrap();
@@ -363,5 +366,32 @@ mod tests {
                 by: key(Cashflow, "cpn3"),
             }
         )
+    }
+
+    #[test]
+    fn test_no_root_component() {
+        let path = testdata_root().join("contract.err.no_root.yaml");
+        let yaml = std::fs::read_to_string(path).unwrap();
+        let data: ContractData = serde_yaml::from_str(&yaml).unwrap();
+
+        let dep = data._dependency();
+
+        assert!(dep.is_err());
+        let err = dep.unwrap_err();
+        assert_eq!(err, _DependencyError::NoRootComponent);
+    }
+
+    #[test]
+    fn test_cyclic_dependency() {
+        let path = testdata_root().join("contract.err.cyclic_dep.yaml");
+        let yaml = std::fs::read_to_string(path).unwrap();
+        let data: ContractData = serde_yaml::from_str(&yaml).unwrap();
+
+        let dep = data._dependency();
+
+        assert!(dep.is_err());
+        let err = dep.unwrap_err();
+        // actual error depends on the hash seed of the HashMap.
+        assert!(matches!(err, _DependencyError::Circular { .. }));
     }
 }

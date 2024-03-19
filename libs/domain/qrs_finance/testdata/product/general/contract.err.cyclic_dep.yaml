@@ -1,0 +1,26 @@
+collateral:
+  type: money
+  ccy: JPY
+
+processes:
+  const:
+    type: constant_number
+    values:
+      - 0.005
+      - 0.004
+      - -0.005
+  
+  ratio1:
+    type: ratio
+    numer: $ref/const
+    denom: $ref/ratio2
+
+  ratio2:
+    type: ratio
+    numer: $ref/ratio1
+    denom: $ref/const
+
+  ratio3:
+    type: ratio
+    numer: $ref/ratio2
+    denom: $ref/const

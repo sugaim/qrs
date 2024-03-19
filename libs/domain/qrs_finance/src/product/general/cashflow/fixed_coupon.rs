@@ -50,7 +50,7 @@ pub struct FixedCoupon<Ts: VariableTypes> {
     pub rate: Ts::Number,
 
     #[has_dependency(ref_category = "Constant")]
-    pub accrual_daycount: Ts::DayCount,
+    pub accrued_daycount: Ts::DayCount,
 
     /// rounding method for calculate coupon amount
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -74,7 +74,7 @@ impl<Ts: VariableTypes> FixedCoupon<Ts> {
         FixedCoupon {
             base: self.base.change_variable_types_to(),
             rate: self.rate.into(),
-            accrual_daycount: self.accrual_daycount.into(),
+            accrued_daycount: self.accrued_daycount.into(),
             rounding: self.rounding.map(|x| x.into()),
         }
     }
@@ -129,7 +129,7 @@ mod tests {
                 daycount: ValueOrId::Id("daycount".into()),
                 payment: ValueOrId::Id("payment".into()),
             },
-            accrual_daycount: ValueOrId::Id("accrual".into()),
+            accrued_daycount: ValueOrId::Id("accrual".into()),
             rate: ValueOrId::Value(0.05),
             rounding: ValueOrId::Id("rounding".into()).into(),
         }
@@ -141,7 +141,7 @@ mod tests {
         let expected: FixedCoupon<OptVariableTypes> = FixedCoupon {
             base: coupon.base.clone().change_variable_types_to(),
             rate: Some(coupon.rate.clone()),
-            accrual_daycount: Some(coupon.accrual_daycount.clone()),
+            accrued_daycount: Some(coupon.accrued_daycount.clone()),
             rounding: coupon.rounding.clone().map(Into::into),
         };
 

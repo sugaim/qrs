@@ -26,7 +26,7 @@ use crate::{
             core::{ComponentCategory, ComponentKey, ValueOrId, VariableTypes, WithId},
             leg::{Leg, StraightLeg},
             market::{Market, OvernightRate},
-            process::{ConstantFloat, DeterministicFloat, MarketRef, Process},
+            process::{ConstantNumber, DeterministicNumber, MarketRef, Process, Ratio, ValueType},
         },
     },
     Money,
@@ -177,13 +177,13 @@ pub trait BuildProduct<V>: Sized {
     // process
     fn parse_proc_constant_float(
         &self,
-        cmp: &ConstantFloat<VariableTypesForData<V>>,
+        cmp: &ConstantNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     fn parse_proc_deternministic_float(
         &self,
-        cmp: &DeterministicFloat<VariableTypesForData<V>>,
+        cmp: &DeterministicNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
@@ -191,6 +191,12 @@ pub trait BuildProduct<V>: Sized {
         &self,
         cmp: &MarketRef<VariableTypesForData<V>>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
+    ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
+
+    fn parse_proc_ratio(
+        &self,
+        cmp: &Ratio<VariableTypesForData<V>>,
+        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     // cashflow
@@ -238,13 +244,14 @@ pub trait BuildProduct<V>: Sized {
                 ComponentCategory::Process => {
                     let cmp = data.contract.processes.get(name.as_ref()).unwrap();
                     let proc = match cmp {
-                        Process::ConstantFloat(cmp) => {
+                        Process::ConstantNumber(cmp) => {
                             self.parse_proc_constant_float(cmp, &data.contract.constants)?
                         }
-                        Process::DeterministicFloat(cmp) => {
+                        Process::DeterministicNumber(cmp) => {
                             self.parse_proc_deternministic_float(cmp, &data.contract.constants)?
                         }
                         Process::MarketRef(cmp) => self.parse_proc_market_ref(cmp, &mkts)?,
+                        Process::Ratio(cmp) => self.parse_proc_ratio(cmp, &procs)?,
                     };
                     procs.insert(name.clone().0, proc);
                 }
@@ -464,7 +471,7 @@ where
     // process
     fn parse_proc_constant_float(
         &self,
-        cmp: &ConstantFloat<VariableTypesForData<V>>,
+        cmp: &ConstantNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "constant_float";
@@ -473,12 +480,12 @@ where
         let values = values
             .collect::<anyhow::Result<Vec<_>>>()?
             .require_min_size()?;
-        Ok(Arc::new(Process::ConstantFloat(ConstantFloat { values })))
+        Ok(Arc::new(Process::ConstantNumber(ConstantNumber { values })))
     }
 
     fn parse_proc_deternministic_float(
         &self,
-        cmp: &DeterministicFloat<VariableTypesForData<V>>,
+        cmp: &DeterministicNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "deterministic_float";
@@ -493,9 +500,9 @@ where
             series.push(ts.require_min_size()?);
         }
         let series = series.require_min_size()?;
-        Ok(Arc::new(Process::DeterministicFloat(DeterministicFloat {
-            series,
-        })))
+        Ok(Arc::new(Process::DeterministicNumber(
+            DeterministicNumber { series },
+        )))
     }
 
     fn parse_proc_market_ref(
@@ -520,6 +527,47 @@ where
         Ok(Arc::new(Process::MarketRef(MarketRef { refs })))
     }
 
+    fn parse_proc_ratio(
+        &self,
+        cmp: &Ratio<VariableTypesForData<V>>,
+        procs: &HashMap<String, <Self::Variables as VariableTypes>::ProcessRef>,
+    ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
+        const NAME: &str = "ratio";
+        let num = procs.get(cmp.numer.id.as_ref()).ok_or_else(|| {
+            anyhow!(
+                "process `{}` is not found which is required by {NAME} as numerator",
+                cmp.numer.id
+            )
+        })?;
+        let den = procs.get(cmp.denom.id.as_ref()).ok_or_else(|| {
+            anyhow!(
+                "process `{}` is not found which is required by {NAME} as denominator",
+                cmp.denom.id
+            )
+        })?;
+        match (num.value_type()?, den.value_type()?) {
+            (ValueType::Number { dim: num }, ValueType::Number { dim: den }) => {
+                if num != den {
+                    bail!("numerator and denominator of {NAME} must have the same dimension");
+                }
+                if num == 0 {
+                    bail!("numerator and denominator of {NAME} must have non-zero dimension");
+                }
+            }
+            _ => bail!("numerator and denominator of {NAME} must return number"),
+        }
+        Ok(Arc::new(Process::Ratio(Ratio {
+            numer: WithId {
+                id: cmp.numer.id.clone(),
+                value: num.clone(),
+            },
+            denom: WithId {
+                id: cmp.denom.id.clone(),
+                value: den.clone(),
+            },
+        })))
+    }
+
     //
     fn parse_cf_fixed_coupon(
         &self,
@@ -530,7 +578,7 @@ where
         Ok(Arc::new(CashflowWithFixing::FixedCoupon(FixedCoupon {
             base: self._unwrap_cpnbase(&cmp.base, consts, NAME)?,
             rate: self._unwrap_float(&cmp.rate, consts, NAME)?,
-            accrual_daycount: self._unwrap_dcnt(&cmp.accrual_daycount, consts, NAME)?,
+            accrued_daycount: self._unwrap_dcnt(&cmp.accrued_daycount, consts, NAME)?,
             rounding: cmp
                 .rounding
                 .as_ref()

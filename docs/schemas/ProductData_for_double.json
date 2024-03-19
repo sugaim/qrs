@@ -47,13 +47,13 @@
         {
           "type": "object",
           "required": [
-            "accrual_daycount",
+            "accrued_daycount",
             "coupon_base",
             "rate",
             "type"
           ],
           "properties": {
-            "accrual_daycount": {
+            "accrued_daycount": {
               "$ref": "#/definitions/ValueOrId_for_DayCountSymbol"
             },
             "coupon_base": {
@@ -574,7 +574,7 @@
             },
             "type": {
               "type": "string",
-              "const": "deterministic_float"
+              "const": "deterministic_number"
             }
           }
         },
@@ -587,7 +587,7 @@
           "properties": {
             "type": {
               "type": "string",
-              "const": "constant_float"
+              "const": "constant_number"
             },
             "values": {
               "$ref": "#/definitions/MinSized1_for_Array_of_ValueOrId_for_double"
@@ -607,6 +607,26 @@
             "type": {
               "type": "string",
               "const": "market_ref"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "denom",
+            "numer",
+            "type"
+          ],
+          "properties": {
+            "denom": {
+              "$ref": "#/definitions/Id"
+            },
+            "numer": {
+              "$ref": "#/definitions/Id"
+            },
+            "type": {
+              "type": "string",
+              "const": "ratio"
             }
           }
         }

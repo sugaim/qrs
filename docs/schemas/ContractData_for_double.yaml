@@ -39,12 +39,12 @@ definitions:
     oneOf:
     - type: object
       required:
-      - accrual_daycount
+      - accrued_daycount
       - coupon_base
       - rate
       - type
       properties:
-        accrual_daycount:
+        accrued_daycount:
           $ref: '#/definitions/ValueOrId_for_DayCountSymbol'
         coupon_base:
           $ref: '#/definitions/CouponBase_for_VariableTypesForData_for_double'
@@ -364,7 +364,7 @@ definitions:
           $ref: '#/definitions/MinSized1_for_Array_of_MinSized1_for_Map_of_ValueOrId_for_double'
         type:
           type: string
-          const: deterministic_float
+          const: deterministic_number
     - type: object
       required:
       - type
@@ -372,7 +372,7 @@ definitions:
       properties:
         type:
           type: string
-          const: constant_float
+          const: constant_number
         values:
           $ref: '#/definitions/MinSized1_for_Array_of_ValueOrId_for_double'
     - type: object
@@ -385,6 +385,19 @@ definitions:
         type:
           type: string
           const: market_ref
+    - type: object
+      required:
+      - denom
+      - numer
+      - type
+      properties:
+        denom:
+          $ref: '#/definitions/Id'
+        numer:
+          $ref: '#/definitions/Id'
+        type:
+          type: string
+          const: ratio
   Rounding:
     type: object
     required:

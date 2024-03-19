@@ -9,7 +9,7 @@ oneOf:
       $ref: ./MinSized1_for_Array_of_MinSized1_for_Map_of_ValueOrId_for_double.yaml
     type:
       type: string
-      const: deterministic_float
+      const: deterministic_number
 - type: object
   required:
   - type
@@ -17,7 +17,7 @@ oneOf:
   properties:
     type:
       type: string
-      const: constant_float
+      const: constant_number
     values:
       $ref: ./MinSized1_for_Array_of_ValueOrId_for_double.yaml
 - type: object
@@ -30,3 +30,16 @@ oneOf:
     type:
       type: string
       const: market_ref
+- type: object
+  required:
+  - denom
+  - numer
+  - type
+  properties:
+    denom:
+      $ref: ./Id.yaml
+    numer:
+      $ref: ./Id.yaml
+    type:
+      type: string
+      const: ratio

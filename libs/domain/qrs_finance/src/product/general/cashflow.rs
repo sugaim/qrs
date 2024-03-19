@@ -172,7 +172,7 @@ mod tests {
     fn fixed() -> FixedCoupon<VariableTypesForData> {
         FixedCoupon {
             base: cpn_base(),
-            accrual_daycount: ValueOrId::Id("accrual".into()),
+            accrued_daycount: ValueOrId::Id("accrual".into()),
             rate: ValueOrId::Value(0.05),
             rounding: ValueOrId::Id("rounding".into()).into(),
         }
