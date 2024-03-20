@@ -1,5 +1,6 @@
 use std::{
     borrow::Borrow,
+    hash::Hash,
     ops::{Deref, Index, IndexMut},
 };
 
@@ -7,9 +8,10 @@ use std::{
 // MinSizedError
 //
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, thiserror::Error)]
-pub enum MinSizedError {
-    #[error("Size is {}, which is less than required size {}", .actual, .required)]
-    TooSmall { required: usize, actual: usize },
+#[error("Size is {}, which is less than required size {}", .actual, .required)]
+pub struct MinSizedError {
+    pub required: usize,
+    pub actual: usize,
 }
 
 // -----------------------------------------------------------------------------
@@ -28,7 +30,7 @@ pub enum MinSizedError {
 /// On the other hand, to prevent changing the length of the inner data,
 /// this struct does not expose inner data as mutable reference.
 /// Only [`IntoIterator`] for the mutable reference or [`IndexMut`] is way to access the inner data as mutable.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MinSized<C, const N: usize>(C);
 
 pub type NonEmpty<C> = MinSized<C, 1>;
@@ -135,7 +137,7 @@ impl<C, const N: usize> MinSized<C, N> {
     {
         let len = data.len();
         if len < N {
-            Err(MinSizedError::TooSmall {
+            Err(MinSizedError {
                 required: N,
                 actual: len,
             })

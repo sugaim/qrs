@@ -130,6 +130,28 @@ pub enum DayCountSymbol {
     },
 }
 
+//
+// methods
+//
+impl DayCountSymbol {
+    #[inline]
+    pub fn instantinate(
+        &self,
+        calsrc: &impl DataSrc<CalendarSymbol, Output = Calendar>,
+    ) -> anyhow::Result<DayCount> {
+        let res = match self {
+            DayCountSymbol::Act360 => DayCount::Act360(Act360),
+            DayCountSymbol::Act365f => DayCount::Act365f(Act365f),
+            DayCountSymbol::Nl360 => DayCount::Nl360(Nl360),
+            DayCountSymbol::Nl365 => DayCount::Nl365(Nl365),
+            DayCountSymbol::Bd252 { cal } => DayCount::Bd252(Bd252 {
+                cal: calsrc.get(cal)?,
+            }),
+        };
+        Ok(res)
+    }
+}
+
 // -----------------------------------------------------------------------------
 // DayCountSrc
 //
@@ -153,6 +175,23 @@ impl<Cal> DayCountSrc<Cal> {
 //
 // methods
 //
+impl<Cal> DayCountSrc<Cal> {
+    #[inline]
+    pub fn inner(&self) -> &Cal {
+        &self.cal
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut Cal {
+        &mut self.cal
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> Cal {
+        self.cal
+    }
+}
+
 impl<Cal> DataSrc<DayCountSymbol> for DayCountSrc<Cal>
 where
     Cal: DataSrc<CalendarSymbol, Output = Calendar>,
@@ -161,14 +200,6 @@ where
 
     #[inline]
     fn get(&self, req: &DayCountSymbol) -> anyhow::Result<Self::Output> {
-        match req {
-            DayCountSymbol::Act360 => Ok(DayCount::Act360(Act360)),
-            DayCountSymbol::Act365f => Ok(DayCount::Act365f(Act365f)),
-            DayCountSymbol::Nl360 => Ok(DayCount::Nl360(Nl360)),
-            DayCountSymbol::Nl365 => Ok(DayCount::Nl365(Nl365)),
-            DayCountSymbol::Bd252 { cal } => Ok(DayCount::Bd252(Bd252 {
-                cal: self.cal.get(cal)?,
-            })),
-        }
+        req.instantinate(self.inner())
     }
 }

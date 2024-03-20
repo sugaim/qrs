@@ -90,14 +90,23 @@ impl<V> VariableTypes for VariableTypesForData<V> {
 // ContractData
 //
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(bound(
+    serialize = "V: Serialize,
+        Process<VariableTypesForData<V>>: Serialize,
+        Cashflow<VariableTypesForData<V>>: Serialize,",
+    deserialize = "V: qrs_math::num::Real,
+        Process<VariableTypesForData<V>>: Deserialize<'de>,
+        Cashflow<VariableTypesForData<V>>: Deserialize<'de>,"
+))]
+#[schemars(bound = "V: JsonSchema")]
 pub struct ContractData<V = f64> {
     pub collateral: Collateral,
 
     #[serde(
-        default = "HashMap::<String, Constant>::new",
+        default = "HashMap::<String, Constant<V>>::new",
         skip_serializing_if = "HashMap::is_empty"
     )]
-    pub constants: HashMap<String, Constant>,
+    pub constants: HashMap<String, Constant<V>>,
 
     #[serde(
         default = "HashMap::<String, Market>::new",
@@ -269,6 +278,11 @@ pub struct FixingData {
 // ProductData
 //
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(bound(
+    serialize = "ContractData<V>: Serialize",
+    deserialize = "ContractData<V>: Deserialize<'de>"
+))]
+#[schemars(bound = "V: JsonSchema, ContractData<V>: JsonSchema")]
 pub struct ProductData<V = f64> {
     pub contract: ContractData<V>,
     #[serde(default)]

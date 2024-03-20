@@ -8,7 +8,7 @@ use std::{
 use anyhow::{anyhow, bail, Context};
 use qrs_chrono::{Calendar, CalendarSymbol, DateTime, DateToDateTime, DateWithTag};
 use qrs_collections::RequireMinSize;
-use qrs_datasrc::DataSrc;
+use qrs_datasrc::{DataSrc, DebugTree};
 use qrs_math::{num::Real, rounding::Rounding};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -161,30 +161,32 @@ pub trait ConvertProduct<From: VariableTypes, To: VariableTypes> {
 // -----------------------------------------------------------------------------
 // BuildProduct
 //
-pub trait BuildProduct<V>: Sized {
+pub trait BuildProduct<V = f64>: Sized {
     type Variables: VariableTypes;
 
-    fn initialize(&mut self);
-    fn post_validation(&self, result: &Product<Self::Variables>) -> anyhow::Result<()>;
+    fn initialize(&self) {}
+    fn post_validation(&self, result: &Product<Self::Variables>) -> anyhow::Result<()> {
+        let _ = result;
+        Ok(())
+    }
 
     // market
     fn parse_mkt_overnight_rate(
         &self,
         cmp: &OvernightRate,
-        consts: &HashMap<String, Constant>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::MarketRef>;
 
     // process
     fn parse_proc_constant_float(
         &self,
         cmp: &ConstantNumber<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     fn parse_proc_deternministic_float(
         &self,
         cmp: &DeterministicNumber<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
     fn parse_proc_market_ref(
@@ -203,14 +205,14 @@ pub trait BuildProduct<V>: Sized {
     fn parse_cf_fixed_coupon(
         &self,
         cmp: &FixedCoupon<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef>;
 
     fn parse_cf_overnight_index_coupon(
         &self,
         cmp: &OvernightIndexCoupon<VariableTypesForData<V>>,
         fixing: Option<&OvernightIndexFixing>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef>;
 
@@ -222,7 +224,7 @@ pub trait BuildProduct<V>: Sized {
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::LegRef>;
 
     // build
-    fn build(mut self, data: &ProductData<V>) -> anyhow::Result<Product<Self::Variables>> {
+    fn build(&self, data: &ProductData<V>) -> anyhow::Result<Product<Self::Variables>> {
         self.initialize();
         let dep = data.contract._dependency()?;
         let mut mkts = HashMap::new();
@@ -235,9 +237,7 @@ pub trait BuildProduct<V>: Sized {
                 ComponentCategory::Market => {
                     let cmp = data.contract.markets.get(name.as_ref()).unwrap();
                     let mkt = match cmp {
-                        Market::OvernightRate(cmp) => {
-                            self.parse_mkt_overnight_rate(cmp, &data.contract.constants)?
-                        }
+                        Market::OvernightRate(cmp) => self.parse_mkt_overnight_rate(cmp)?,
                     };
                     mkts.insert(name.clone().0, mkt);
                 }
@@ -335,10 +335,14 @@ impl<V> VariableTypes for DefaultVariableTypes<V> {
 // -----------------------------------------------------------------------------
 //  DefaultProductBuilder
 //
-#[derive(Debug)]
+#[derive(Debug, DebugTree)]
+#[debug_tree(desc = "default product builder")]
 pub struct DefaultProductBuilder<DayCnt = (), Cal = (), TimeCut = ()> {
+    #[debug_tree(subtree)]
     daycnt_src: DayCnt,
+    #[debug_tree(subtree)]
     cal_src: Cal,
+    #[debug_tree(subtree)]
     time_cut: TimeCut,
     conv: Mutex<HashMap<String, Arc<InArrears<DayCount, Calendar>>>>,
     rounding: Mutex<HashMap<String, Rounding>>,
@@ -390,7 +394,7 @@ impl<Cal, TimeCut> DefaultProductBuilder<(), Cal, TimeCut> {
         daycnt_src: DayCnt,
     ) -> DefaultProductBuilder<DayCnt, Cal, TimeCut>
     where
-        DayCnt: DataSrc<str, Output = DayCount>,
+        DayCnt: DataSrc<DayCountSymbol, Output = DayCount>,
     {
         DefaultProductBuilder {
             daycnt_src,
@@ -450,12 +454,9 @@ where
     type Variables = DefaultVariableTypes<V>;
 
     #[inline]
-    fn initialize(&mut self) {
+    fn initialize(&self) {
         self.conv.lock().unwrap().clear();
-    }
-    #[inline]
-    fn post_validation(&self, _: &Product<Self::Variables>) -> anyhow::Result<()> {
-        Ok(())
+        self.rounding.lock().unwrap().clear();
     }
 
     // market
@@ -463,7 +464,6 @@ where
     fn parse_mkt_overnight_rate(
         &self,
         cmp: &OvernightRate,
-        _: &HashMap<String, Constant>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::MarketRef> {
         Ok(Arc::new(Market::OvernightRate(cmp.clone())))
     }
@@ -472,7 +472,7 @@ where
     fn parse_proc_constant_float(
         &self,
         cmp: &ConstantNumber<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "constant_float";
         let values = cmp.values.iter();
@@ -486,7 +486,7 @@ where
     fn parse_proc_deternministic_float(
         &self,
         cmp: &DeterministicNumber<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
         const NAME: &str = "deterministic_float";
         let mut series = Vec::default();
@@ -572,7 +572,7 @@ where
     fn parse_cf_fixed_coupon(
         &self,
         cmp: &FixedCoupon<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef> {
         const NAME: &str = "fixed_coupon";
         Ok(Arc::new(CashflowWithFixing::FixedCoupon(FixedCoupon {
@@ -591,7 +591,7 @@ where
         &self,
         cmp: &OvernightIndexCoupon<VariableTypesForData<V>>,
         fixing: Option<&OvernightIndexFixing>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         mkts: &HashMap<String, <Self::Variables as VariableTypes>::MarketRef>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::CashflowRef> {
         const NAME: &str = "overnight_index_coupon";
@@ -670,7 +670,7 @@ where
     fn _unwrap_float<V: Real>(
         &self,
         v: &ValueOrId<V>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<V> {
         let id = match v {
@@ -681,7 +681,7 @@ where
             .get(id.as_ref())
             .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
             .and_then(|c| match c {
-                Constant::Number(v) => Ok(V::nearest_base_float_of(*v).into()),
+                Constant::Number(v) => Ok(v.clone()),
                 _ => bail!("constant `{id}` is not a number."),
             })
     }
@@ -689,7 +689,7 @@ where
     fn _unwrap_money<V: Real>(
         &self,
         v: &ValueOrId<Money<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<Money<V>> {
         let id = match v {
@@ -711,10 +711,10 @@ where
             })
     }
 
-    fn _unwrap_dt(
+    fn _unwrap_dt<V: Real>(
         &self,
         v: &ValueOrId<DateWithTag>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<DateTime> {
         let id = match v {
@@ -738,10 +738,10 @@ where
             })
     }
 
-    fn _unwrap_dcnt(
+    fn _unwrap_dcnt<V: Real>(
         &self,
         v: &ValueOrId<DayCountSymbol>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<DayCount> {
         let id = match v {
@@ -769,10 +769,10 @@ where
             })
     }
 
-    fn _unwrap_rounding(
+    fn _unwrap_rounding<V: Real>(
         &self,
         v: &ValueOrId<Rounding>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<Rounding> {
         let id = match v {
@@ -799,7 +799,7 @@ where
     fn _unwrap_cpnbase<V: Real>(
         &self,
         v: &CouponBase<VariableTypesForData<V>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<CouponBase<DefaultVariableTypes<V>>> {
         let base = CouponBase {
@@ -813,10 +813,10 @@ where
         Ok(base)
     }
 
-    fn _unwrap_inarrears(
+    fn _unwrap_inarrears<V: Real>(
         &self,
         v: &ValueOrId<InArrears<DayCountSymbol, CalendarSymbol>>,
-        consts: &HashMap<String, Constant>,
+        consts: &HashMap<String, Constant<V>>,
         required_by: &str,
     ) -> anyhow::Result<Arc<InArrears<DayCount, Calendar>>> {
         let parse = |v: &InArrears<DayCountSymbol, CalendarSymbol>| {
@@ -865,5 +865,166 @@ where
             .and_then(|s| parse(&s).context("Converting ProductData to Product"))?;
         cache.insert(id.clone().into(), res.clone());
         Ok(res)
+    }
+}
+
+impl<D, C, T, V> DataSrc<ProductData<V>> for DefaultProductBuilder<D, C, T>
+where
+    D: DataSrc<DayCountSymbol, Output = DayCount>,
+    C: DataSrc<CalendarSymbol, Output = Calendar>,
+    T: DataSrc<str, Output = DateToDateTime>,
+    V: Real,
+{
+    type Output = Product<DefaultVariableTypes<V>>;
+
+    #[inline]
+    fn get(&self, data: &ProductData<V>) -> anyhow::Result<Product<DefaultVariableTypes<V>>> {
+        self.build(data)
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use maplit::hashmap;
+    use mockall::mock;
+    use qrs_datasrc::{DataSrc, DebugTree, TreeInfo};
+
+    use crate::{daycount::DayCountSrc, market};
+
+    use super::*;
+
+    mock! {
+        CalSrc {}
+
+        impl DebugTree for CalSrc {
+            fn desc(&self) -> String;
+            fn debug_tree(&self) -> TreeInfo;
+        }
+
+        impl DataSrc<CalendarSymbol> for CalSrc {
+            type Output = Calendar;
+
+            fn get(&self, symbol: &CalendarSymbol) -> anyhow::Result<Calendar>;
+        }
+    }
+    mock! {
+        TimeCutSrc {}
+
+        impl DebugTree for TimeCutSrc {
+            fn desc(&self) -> String;
+            fn debug_tree(&self) -> TreeInfo;
+        }
+
+        impl DataSrc<str> for TimeCutSrc {
+            type Output = DateToDateTime;
+
+            fn get(&self, symbol: &str) -> anyhow::Result<DateToDateTime>;
+        }
+    }
+
+    impl MockCalSrc {
+        fn set_count(&mut self, n: usize) {
+            self.expect_get()
+                .times(n)
+                .returning(|_| Ok(Calendar::default()));
+        }
+    }
+    impl MockTimeCutSrc {
+        fn set_count(&mut self, n: usize) {
+            self.expect_get()
+                .times(n)
+                .returning(|_| "15:30T+09:00".parse().map_err(Into::into));
+        }
+    }
+    struct MockSrc {
+        cal: Arc<Mutex<MockCalSrc>>,
+        tct: Arc<Mutex<MockTimeCutSrc>>,
+        dct: Arc<Mutex<DayCountSrc<MockCalSrc>>>,
+    }
+    impl MockSrc {
+        fn set_cal_count(&mut self, n: usize) -> &mut Self {
+            self.cal.lock().unwrap().set_count(n);
+            self
+        }
+        fn set_tct_count(&mut self, n: usize) -> &mut Self {
+            self.tct.lock().unwrap().set_count(n);
+            self
+        }
+        fn set_dct_count(&mut self, n: usize) -> &mut Self {
+            self.dct.lock().unwrap().inner_mut().set_count(n);
+            self
+        }
+        fn checkpoint(&mut self) {
+            self.cal.lock().unwrap().checkpoint();
+            self.tct.lock().unwrap().checkpoint();
+            self.dct.lock().unwrap().inner_mut().checkpoint();
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn fixture() -> (
+        MockSrc,
+        DefaultProductBuilder<
+            Arc<Mutex<DayCountSrc<MockCalSrc>>>,
+            Arc<Mutex<MockCalSrc>>,
+            Arc<Mutex<MockTimeCutSrc>>,
+        >,
+    ) {
+        let cal = Arc::new(Mutex::new(MockCalSrc::new()));
+        let dct = Arc::new(Mutex::new(DayCountSrc::new(MockCalSrc::new())));
+        let tct = Arc::new(Mutex::new(MockTimeCutSrc::new()));
+        let builder = DefaultProductBuilder::new()
+            .with_daycount_src(dct.clone())
+            .with_calendar_src(cal.clone())
+            .with_time_cut(tct.clone());
+        (MockSrc { dct, cal, tct }, builder)
+    }
+
+    #[test]
+    fn test_parse_mkt_overnight_rate() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(0).set_dct_count(0);
+        let mkt = OvernightRate {
+            reference: market::ir::OvernightRate::TONA,
+        };
+
+        let res = BuildProduct::<f64>::parse_mkt_overnight_rate(&builder, &mkt).unwrap();
+
+        assert_eq!(res, Arc::new(Market::OvernightRate(mkt)));
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_proc_constant_float() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(0).set_dct_count(0);
+        let cmp = ConstantNumber {
+            values: vec![
+                ValueOrId::Id("c0".into()),
+                ValueOrId::Value(1.0),
+                ValueOrId::Id("c1".into()),
+            ]
+            .require_min_size()
+            .unwrap(),
+        };
+        let consts = hashmap! {
+            "c0".into() => Constant::Number(42.0),
+            "c1".into() => Constant::Number(24.0),
+        };
+
+        let res = BuildProduct::<f64>::parse_proc_constant_float(&builder, &cmp, &consts).unwrap();
+
+        assert!(matches!(res.as_ref(), Process::ConstantNumber(_)));
+        let Process::ConstantNumber(res) = res.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            res,
+            &ConstantNumber {
+                values: vec![42.0f64, 1.0f64, 24.0f64].require_min_size().unwrap()
+            }
+        );
+        mock.checkpoint();
     }
 }

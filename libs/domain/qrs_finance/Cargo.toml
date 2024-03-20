@@ -27,5 +27,6 @@ qrs_math = { workspace = true, features = ["serde"] }
 [dev-dependencies]
 approx = { workspace = true }
 maplit = { workspace = true }
+mockall = { workspace = true }
 rstest = { workspace = true }
 serde_yaml = { workspace = true }

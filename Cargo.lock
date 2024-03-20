@@ -940,6 +940,7 @@ dependencies = [
  "approx",
  "derivative",
  "maplit",
+ "mockall",
  "qrs_chrono",
  "qrs_collections",
  "qrs_datasrc",

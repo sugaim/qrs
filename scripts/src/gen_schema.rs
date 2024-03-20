@@ -148,6 +148,6 @@ mod tests {
             }
             res
         };
-        assert_eq!(expected, generated);
+        assert!(expected == generated);
     }
 }

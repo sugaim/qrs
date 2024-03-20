@@ -1,3 +1,4 @@
+use qrs_math::num::Real;
 use schemars::{schema::SchemaObject, JsonSchema};
 use serde::{Deserialize, Serialize};
 
@@ -10,21 +11,23 @@ use super::core::HasDependency;
 //
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
-pub enum Constant {
-    Number(f64),
+pub enum Constant<V = f64> {
+    Number(V),
     Boolean(bool),
     String(String),
     Object(serde_json::Value),
 }
 
-impl<'de> Deserialize<'de> for Constant {
-    fn deserialize<D>(deserializer: D) -> Result<Constant, D::Error>
+impl<'de, V: Real> Deserialize<'de> for Constant<V> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         match value {
-            serde_json::Value::Number(n) => Ok(Constant::Number(n.as_f64().unwrap())),
+            serde_json::Value::Number(n) => {
+                Ok(Constant::Number(V::nearest_value_of(n.as_f64().unwrap())))
+            }
             serde_json::Value::Bool(b) => Ok(Constant::Boolean(b)),
             serde_json::Value::String(s) => Ok(Constant::String(s)),
             serde_json::Value::Object(_) => Ok(Constant::Object(value)),
@@ -35,7 +38,7 @@ impl<'de> Deserialize<'de> for Constant {
     }
 }
 
-impl JsonSchema for Constant {
+impl<V: JsonSchema> JsonSchema for Constant<V> {
     fn schema_name() -> String {
         "Constant".to_string()
     }
@@ -47,8 +50,7 @@ impl JsonSchema for Constant {
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut sch = SchemaObject::default();
         sch.subschemas().one_of = Some(vec![
-            f64::json_schema(gen),
-            i64::json_schema(gen),
+            V::json_schema(gen),
             bool::json_schema(gen),
             String::json_schema(gen),
             serde_json::Map::<String, serde_json::Value>::json_schema(gen),
@@ -61,13 +63,13 @@ impl JsonSchema for Constant {
 //
 // methods
 //
-impl HasDependency for Constant {
+impl<V> HasDependency for Constant<V> {
     #[inline]
     fn depends_on(&self) -> impl IntoIterator<Item = (&str, ComponentCategory)> {
         [].into_iter()
     }
 }
-impl Component for Constant {
+impl<V> Component for Constant<V> {
     #[inline]
     fn category(&self) -> ComponentCategory {
         ComponentCategory::Constant
