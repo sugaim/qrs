@@ -177,13 +177,13 @@ pub trait BuildProduct<V = f64>: Sized {
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::MarketRef>;
 
     // process
-    fn parse_proc_constant_float(
+    fn parse_proc_constant_number(
         &self,
         cmp: &ConstantNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef>;
 
-    fn parse_proc_deternministic_float(
+    fn parse_proc_deterministic_number(
         &self,
         cmp: &DeterministicNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant<V>>,
@@ -245,10 +245,10 @@ pub trait BuildProduct<V = f64>: Sized {
                     let cmp = data.contract.processes.get(name.as_ref()).unwrap();
                     let proc = match cmp {
                         Process::ConstantNumber(cmp) => {
-                            self.parse_proc_constant_float(cmp, &data.contract.constants)?
+                            self.parse_proc_constant_number(cmp, &data.contract.constants)?
                         }
                         Process::DeterministicNumber(cmp) => {
-                            self.parse_proc_deternministic_float(cmp, &data.contract.constants)?
+                            self.parse_proc_deterministic_number(cmp, &data.contract.constants)?
                         }
                         Process::MarketRef(cmp) => self.parse_proc_market_ref(cmp, &mkts)?,
                         Process::Ratio(cmp) => self.parse_proc_ratio(cmp, &procs)?,
@@ -469,12 +469,12 @@ where
     }
 
     // process
-    fn parse_proc_constant_float(
+    fn parse_proc_constant_number(
         &self,
         cmp: &ConstantNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
-        const NAME: &str = "constant_float";
+        const NAME: &str = "constant_number";
         let values = cmp.values.iter();
         let values = values.map(|v| self._unwrap_float(v, consts, NAME));
         let values = values
@@ -483,12 +483,12 @@ where
         Ok(Arc::new(Process::ConstantNumber(ConstantNumber { values })))
     }
 
-    fn parse_proc_deternministic_float(
+    fn parse_proc_deterministic_number(
         &self,
         cmp: &DeterministicNumber<VariableTypesForData<V>>,
         consts: &HashMap<String, Constant<V>>,
     ) -> anyhow::Result<<Self::Variables as VariableTypes>::ProcessRef> {
-        const NAME: &str = "deterministic_float";
+        const NAME: &str = "deterministic_number";
         let mut series = Vec::default();
         for ser in cmp.series.iter() {
             let ts = ser.iter().map(|(dt, v)| {
@@ -757,7 +757,9 @@ where
             .get(id.as_ref())
             .ok_or_else(|| anyhow!("constant `{id}` is required by {required_by} but not found."))
             .and_then(|c| match c {
-                Constant::Object(v) => DayCountSymbol::deserialize(v).map_err(Into::into),
+                Constant::String(v) => DayCountSymbol::from_str(v)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .with_context(|| self._ctx_msg(required_by)),
                 _ => {
                     bail!("constant `{id}` is not an object, which is expected a `DayCountSymbol`.")
                 }
@@ -825,7 +827,7 @@ where
             let dcnt_src = &self.daycnt_src;
             let res = match v {
                 Straight(v) => Straight(StraightCompounding {
-                    calendar: cal_src.get(&v.calendar)?,
+                    rate_calendar: cal_src.get(&v.rate_calendar)?,
                     obsrate_daycount: dcnt_src.get(&v.obsrate_daycount)?,
                     overall_daycount: dcnt_src.get(&v.overall_daycount)?,
                     lockout: v.lockout,
@@ -834,7 +836,7 @@ where
                     zero_interest_rate_method: v.zero_interest_rate_method,
                 }),
                 SpreadExclusive(v) => SpreadExclusive(SpreadExclusiveCompounding {
-                    calendar: cal_src.get(&v.calendar)?,
+                    rate_calendar: cal_src.get(&v.rate_calendar)?,
                     obsrate_daycount: dcnt_src.get(&v.obsrate_daycount)?,
                     overall_daycount: dcnt_src.get(&v.overall_daycount)?,
                     lockout: v.lockout,
@@ -889,8 +891,14 @@ mod tests {
     use maplit::hashmap;
     use mockall::mock;
     use qrs_datasrc::{DataSrc, DebugTree, TreeInfo};
+    use qrs_math::rounding::RoundingStrategy;
 
-    use crate::{daycount::DayCountSrc, market};
+    use crate::{
+        daycount::Bd252,
+        market,
+        product::{core::Lookback, general::core::ValueLess},
+        Ccy,
+    };
 
     use super::*;
 
@@ -922,6 +930,20 @@ mod tests {
             fn get(&self, symbol: &str) -> anyhow::Result<DateToDateTime>;
         }
     }
+    mock! {
+        DcntSrc {}
+
+        impl DebugTree for DcntSrc {
+            fn desc(&self) -> String;
+            fn debug_tree(&self) -> TreeInfo;
+        }
+
+        impl DataSrc<DayCountSymbol> for DcntSrc {
+            type Output = DayCount;
+
+            fn get(&self, symbol: &DayCountSymbol) -> anyhow::Result<DayCount>;
+        }
+    }
 
     impl MockCalSrc {
         fn set_count(&mut self, n: usize) {
@@ -934,13 +956,26 @@ mod tests {
         fn set_count(&mut self, n: usize) {
             self.expect_get()
                 .times(n)
-                .returning(|_| "15:30T+09:00".parse().map_err(Into::into));
+                .returning(|_| "15:30:00+09:00".parse().map_err(Into::into));
+        }
+    }
+    impl MockDcntSrc {
+        fn set_count(&mut self, n: usize) {
+            self.expect_get().times(n).returning(|s| match s {
+                DayCountSymbol::Act360 => Ok(DayCount::Act360),
+                DayCountSymbol::Act365f => Ok(DayCount::Act365f),
+                DayCountSymbol::Nl365 => Ok(DayCount::Nl365),
+                DayCountSymbol::Bd252 { .. } => Ok(DayCount::Bd252(Bd252 {
+                    cal: Calendar::default(),
+                })),
+                _ => panic!("mock does not support the symbol"),
+            });
         }
     }
     struct MockSrc {
         cal: Arc<Mutex<MockCalSrc>>,
         tct: Arc<Mutex<MockTimeCutSrc>>,
-        dct: Arc<Mutex<DayCountSrc<MockCalSrc>>>,
+        dct: Arc<Mutex<MockDcntSrc>>,
     }
     impl MockSrc {
         fn set_cal_count(&mut self, n: usize) -> &mut Self {
@@ -952,13 +987,13 @@ mod tests {
             self
         }
         fn set_dct_count(&mut self, n: usize) -> &mut Self {
-            self.dct.lock().unwrap().inner_mut().set_count(n);
+            self.dct.lock().unwrap().set_count(n);
             self
         }
         fn checkpoint(&mut self) {
             self.cal.lock().unwrap().checkpoint();
             self.tct.lock().unwrap().checkpoint();
-            self.dct.lock().unwrap().inner_mut().checkpoint();
+            self.dct.lock().unwrap().checkpoint();
         }
     }
 
@@ -966,13 +1001,13 @@ mod tests {
     fn fixture() -> (
         MockSrc,
         DefaultProductBuilder<
-            Arc<Mutex<DayCountSrc<MockCalSrc>>>,
+            Arc<Mutex<MockDcntSrc>>,
             Arc<Mutex<MockCalSrc>>,
             Arc<Mutex<MockTimeCutSrc>>,
         >,
     ) {
         let cal = Arc::new(Mutex::new(MockCalSrc::new()));
-        let dct = Arc::new(Mutex::new(DayCountSrc::new(MockCalSrc::new())));
+        let dct = Arc::new(Mutex::new(MockDcntSrc::new()));
         let tct = Arc::new(Mutex::new(MockTimeCutSrc::new()));
         let builder = DefaultProductBuilder::new()
             .with_daycount_src(dct.clone())
@@ -1013,7 +1048,7 @@ mod tests {
             "c1".into() => Constant::Number(24.0),
         };
 
-        let res = BuildProduct::<f64>::parse_proc_constant_float(&builder, &cmp, &consts).unwrap();
+        let res = BuildProduct::<f64>::parse_proc_constant_number(&builder, &cmp, &consts).unwrap();
 
         assert!(matches!(res.as_ref(), Process::ConstantNumber(_)));
         let Process::ConstantNumber(res) = res.as_ref() else {
@@ -1025,6 +1060,395 @@ mod tests {
                 values: vec![42.0f64, 1.0f64, 24.0f64].require_min_size().unwrap()
             }
         );
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_proc_deterministic_float() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(5).set_dct_count(0);
+        let cmp = DeterministicNumber::<VariableTypesForData> {
+            series: vec![
+                hashmap! {
+                    ValueOrId::Id("dt0".into()) => ValueOrId::Value(1.0),
+                    ValueOrId::Value("2024-03-01@tky".parse().unwrap()) => ValueOrId::Id("num0".into()),
+                    ValueOrId::Id("dt1".into()) => ValueOrId::Id("num1".into()),
+                }
+                .require_min_size()
+                .unwrap(),
+                hashmap! {
+                    ValueOrId::Value("2024-03-01@tky".parse().unwrap()) => ValueOrId::Value(2.0),
+                    ValueOrId::Id("dt1".into()) => ValueOrId::Id("num1".into()),
+                }
+                .require_min_size().unwrap(),
+            ]
+            .require_min_size()
+            .unwrap(),
+        };
+        let consts: HashMap<String, _> = hashmap! {
+            "dt0".into() => Constant::String("2024-02-01@tky".into()),
+            "dt1".into() => Constant::String("2024-03-15@tky".into()),
+            "num0".into() => Constant::Number(42.0),
+            "num1".into() => Constant::Number(24.0),
+        };
+
+        let res =
+            BuildProduct::<f64>::parse_proc_deterministic_number(&builder, &cmp, &consts).unwrap();
+
+        assert!(matches!(res.as_ref(), Process::DeterministicNumber(_)));
+        let Process::DeterministicNumber(res) = res.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            res,
+            &DeterministicNumber {
+                series: vec![
+                    hashmap! {
+                        "2024-02-01T15:30:00+09:00".parse().unwrap() => 1.0,
+                        "2024-03-01T15:30:00+09:00".parse().unwrap() => 42.0,
+                        "2024-03-15T15:30:00+09:00".parse().unwrap() => 24.0,
+                    }
+                    .require_min_size()
+                    .unwrap(),
+                    hashmap! {
+                        "2024-03-01T15:30:00+09:00".parse().unwrap() => 2.0,
+                        "2024-03-15T15:30:00+09:00".parse().unwrap() => 24.0,
+                    }
+                    .require_min_size()
+                    .unwrap(),
+                ]
+                .require_min_size()
+                .unwrap()
+            }
+        );
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_proc_market_ref() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(0).set_dct_count(0);
+        let cmp = MarketRef {
+            refs: vec![
+                WithId {
+                    id: "m0".into(),
+                    value: ValueLess,
+                },
+                WithId {
+                    id: "m1".into(),
+                    value: ValueLess,
+                },
+            ]
+            .require_min_size()
+            .unwrap(),
+        };
+        let mkts = hashmap! {
+            "m0".into() => Arc::new(Market::OvernightRate(OvernightRate {
+                reference: market::ir::OvernightRate::TONA,
+            })),
+            "m1".into() => Arc::new(Market::OvernightRate(OvernightRate {
+                reference: market::ir::OvernightRate::SOFR,
+            })),
+        };
+
+        let res = BuildProduct::<f64>::parse_proc_market_ref(&builder, &cmp, &mkts).unwrap();
+
+        assert!(matches!(res.as_ref(), Process::MarketRef(_)));
+        let Process::MarketRef(res) = res.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            res,
+            &MarketRef {
+                refs: vec![
+                    WithId {
+                        id: "m0".into(),
+                        value: Arc::new(Market::OvernightRate(OvernightRate {
+                            reference: market::ir::OvernightRate::TONA,
+                        })),
+                    },
+                    WithId {
+                        id: "m1".into(),
+                        value: Arc::new(Market::OvernightRate(OvernightRate {
+                            reference: market::ir::OvernightRate::SOFR,
+                        })),
+                    },
+                ]
+                .require_min_size()
+                .unwrap()
+            }
+        );
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_proc_ratio() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(0).set_dct_count(0);
+        let cmp = Ratio {
+            numer: WithId {
+                id: "n".into(),
+                value: ValueLess,
+            },
+            denom: WithId {
+                id: "d".into(),
+                value: ValueLess,
+            },
+        };
+        let procs = hashmap! {
+            "n".into() => Arc::new(Process::ConstantNumber(ConstantNumber {
+                values: vec![1.0, 2.0, 3.0].require_min_size().unwrap(),
+            })),
+            "d".into() => Arc::new(Process::ConstantNumber(ConstantNumber {
+                values: vec![4.0, 5.0, 6.0].require_min_size().unwrap(),
+            })),
+        };
+
+        let res = BuildProduct::<f64>::parse_proc_ratio(&builder, &cmp, &procs).unwrap();
+
+        assert!(matches!(res.as_ref(), Process::Ratio(_)));
+        let Process::Ratio(res) = res.as_ref() else {
+            panic!()
+        };
+        assert_eq!(res.denom.id.as_ref(), "d");
+        assert_eq!(res.numer.id.as_ref(), "n");
+        let Process::ConstantNumber(n) = res.numer.value.as_ref() else {
+            panic!()
+        };
+        let Process::ConstantNumber(d) = res.denom.value.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            n,
+            &ConstantNumber {
+                values: vec![1.0, 2.0, 3.0].require_min_size().unwrap()
+            }
+        );
+        assert_eq!(
+            d,
+            &ConstantNumber {
+                values: vec![4.0, 5.0, 6.0].require_min_size().unwrap()
+            }
+        );
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_cf_fixed_coupon() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(4).set_dct_count(2);
+        let cmp = FixedCoupon {
+            base: CouponBase {
+                notional: ValueOrId::Id("n".into()),
+                period_start: ValueOrId::Id("ps".into()),
+                period_end: ValueOrId::Value("2024-03-01@tky".parse().unwrap()),
+                entitle: ValueOrId::Value("2024-03-01@tky".parse().unwrap()),
+                payment: ValueOrId::Value("2024-03-01@tky".parse().unwrap()),
+                daycount: ValueOrId::Id("dc".into()),
+            },
+            rate: ValueOrId::Id("r".into()),
+            accrued_daycount: ValueOrId::Id("adc".into()),
+            rounding: Some(ValueOrId::Id("rnd".into())),
+        };
+        let consts = hashmap! {
+            "n".into() => Constant::Object(serde_json::json!({"amount": 100.0, "ccy": "JPY"})),
+            "ps".into() => Constant::String("2024-02-01@tky".into()),
+            "dc".into() => Constant::String("NL/365".into()),
+            "r".into() => Constant::Number(0.01),
+            "adc".into() => Constant::String("ACT/365F".into()),
+            "rnd".into() => Constant::Object(serde_json::json!({"strategy": "to_negative_infinity", "scale": 7})),
+        };
+
+        let res = BuildProduct::<f64>::parse_cf_fixed_coupon(&builder, &cmp, &consts).unwrap();
+
+        assert!(matches!(res.as_ref(), CashflowWithFixing::FixedCoupon(_)));
+        let CashflowWithFixing::FixedCoupon(res) = res.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            res,
+            &FixedCoupon {
+                base: CouponBase {
+                    notional: Money {
+                        amount: 100.0,
+                        ccy: Ccy::JPY,
+                    },
+                    period_start: "2024-02-01T15:30:00+09:00".parse().unwrap(),
+                    period_end: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    entitle: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    payment: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    daycount: DayCount::Nl365,
+                },
+                rate: 0.01,
+                accrued_daycount: DayCount::Act365f,
+                rounding: Some(Rounding {
+                    strategy: RoundingStrategy::ToNegativeInfinity,
+                    scale: 7,
+                }),
+            }
+        );
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_cf_overnight_coupon() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(1).set_tct_count(4).set_dct_count(3);
+        let cmp = OvernightIndexCoupon {
+            base: CouponBase {
+                notional: ValueOrId::Id("n".into()),
+                period_start: ValueOrId::Id("ps".into()),
+                period_end: ValueOrId::Value("2024-03-01@tky".parse().unwrap()),
+                entitle: ValueOrId::Value("2024-03-01@tky".parse().unwrap()),
+                payment: ValueOrId::Value("2024-03-01@tky".parse().unwrap()),
+                daycount: ValueOrId::Id("dc".into()),
+            },
+            convention: ValueOrId::Id("conv".into()),
+            reference_rate: WithId {
+                id: "rr".into(),
+                value: ValueLess,
+            },
+            gearing: Some(ValueOrId::Id("g".into())),
+            spread: Some(ValueOrId::Id("s".into())),
+            rounding: Some(ValueOrId::Id("rnd".into())),
+        };
+        let markets = hashmap! {
+            "rr".into() => Arc::new(Market::OvernightRate(OvernightRate {
+                reference: market::ir::OvernightRate::TONA,
+            })),
+        };
+        let consts = hashmap! {
+            "n".into() => Constant::Object(serde_json::json!({"amount": 100.0, "ccy": "JPY"})),
+            "ps".into() => Constant::String("2024-02-01@tky".into()),
+            "dc".into() => Constant::String("NL/365".into()),
+            "conv".into() => Constant::Object(serde_json::json!({
+                "type": "straight",
+                "rate_calendar": "TKY",
+                "obsrate_daycount": "ACT/365F",
+                "overall_daycount": "NL/365",
+                "lockout": 5,
+                "lookback": {
+                    "type": "without_observation_shift",
+                    "days": 2,
+                },
+                "zero_interest_rate_method": false,
+            })),
+            "g".into() => Constant::Number(1.0),
+            "s".into() => Constant::Number(0.01),
+            "rnd".into() => Constant::Object(serde_json::json!({"strategy": "to_negative_infinity", "scale": 7})),
+        };
+        let fixing = Some(OvernightIndexFixing { rate: 0.01 });
+
+        let res = BuildProduct::<f64>::parse_cf_overnight_index_coupon(
+            &builder,
+            &cmp,
+            fixing.as_ref(),
+            &consts,
+            &markets,
+        )
+        .unwrap();
+
+        let CashflowWithFixing::OvernightIndexCoupon(res, f) = res.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            res,
+            &OvernightIndexCoupon {
+                base: CouponBase {
+                    notional: Money {
+                        amount: 100.0,
+                        ccy: Ccy::JPY,
+                    },
+                    period_start: "2024-02-01T15:30:00+09:00".parse().unwrap(),
+                    period_end: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    entitle: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    payment: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    daycount: DayCount::Nl365,
+                },
+                convention: Arc::new(InArrears::Straight(StraightCompounding {
+                    rate_calendar: Calendar::default(),
+                    obsrate_daycount: DayCount::Act365f,
+                    overall_daycount: DayCount::Nl365,
+                    lockout: Some(5),
+                    lookback: Some(Lookback::WithoutObsShift { days: 2 }),
+                    rounding: None,
+                    zero_interest_rate_method: false,
+                })),
+                reference_rate: WithId {
+                    id: "rr".into(),
+                    value: Arc::new(Market::OvernightRate(OvernightRate {
+                        reference: market::ir::OvernightRate::TONA,
+                    })),
+                },
+                gearing: Some(1.0),
+                spread: Some(0.01),
+                rounding: Some(Rounding {
+                    strategy: RoundingStrategy::ToNegativeInfinity,
+                    scale: 7,
+                }),
+            }
+        );
+        assert_eq!(f, &fixing);
+        mock.checkpoint();
+    }
+
+    #[test]
+    fn test_parse_straight_leg() {
+        let (mut mock, builder) = fixture();
+        mock.set_cal_count(0).set_tct_count(0).set_dct_count(0);
+        let cfs = hashmap! {
+            "cf0".into() => Arc::new(CashflowWithFixing::FixedCoupon(FixedCoupon {
+                base: CouponBase {
+                    notional: Money {
+                        amount: 100.0,
+                        ccy: Ccy::JPY,
+                    },
+                    period_start: "2024-02-01T15:30:00+09:00".parse().unwrap(),
+                    period_end: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    entitle: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    payment: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    daycount: DayCount::Nl365,
+                },
+                rate: 0.01,
+                accrued_daycount: DayCount::Act365f,
+                rounding: None,
+            })),
+            "cf1".into() => Arc::new(CashflowWithFixing::FixedCoupon(FixedCoupon {
+                base: CouponBase {
+                    notional: Money {
+                        amount: 100000.0,
+                        ccy: Ccy::JPY,
+                    },
+                    period_start: "2024-02-01T15:30:00+09:00".parse().unwrap(),
+                    period_end: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    entitle: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    payment: "2024-03-01T15:30:00+09:00".parse().unwrap(),
+                    daycount: DayCount::Nl365,
+                },
+                rate: 0.01,
+                accrued_daycount: DayCount::Act365f,
+                rounding: None,
+            })),
+        };
+        let leg = StraightLeg {
+            cashflows: vec![
+                WithId {
+                    id: "cf0".into(),
+                    value: ValueLess,
+                },
+                WithId {
+                    id: "cf1".into(),
+                    value: ValueLess,
+                },
+            ],
+        };
+
+        let res = BuildProduct::<f64>::parse_leg_straight(&builder, &leg, &cfs).unwrap();
+
+        let Leg::Straight(res) = res.as_ref();
+        assert_eq!(res.cashflows.len(), 2);
+        assert_eq!(res.cashflows[0].value.as_ref(), cfs["cf0"].as_ref());
+        assert_eq!(res.cashflows[1].value.as_ref(), cfs["cf1"].as_ref());
         mock.checkpoint();
     }
 }

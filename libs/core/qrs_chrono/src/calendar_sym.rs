@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 #[cfg(feature = "serde")]
 use schemars::JsonSchema;
 #[cfg(feature = "serde")]
@@ -191,7 +191,9 @@ impl FromStr for CalendarSymbol {
             }
         });
         let s = s.trim();
-        cal_sym::parse(s).map_err(|e| anyhow::anyhow!(e))
+        cal_sym::parse(s)
+            .map_err(|e| anyhow::anyhow!(e))
+            .with_context(|| format!("Invalid calendar symbol: {}", s))
     }
 }
 

@@ -14,22 +14,18 @@ constants:
 
   convention:
     type: spread_exclusive
-    overall_daycount:
-      type: act365f
-    obsrate_daycount:
-      type: act365f
-    calendar: TKY
+    overall_daycount: ACT/365F
+    obsrate_daycount: ACT/365F
+    rate_calendar: TKY
 
 cashflows:
   cpn1:
     type: fixed_coupon
     rate: 0.005
-    accrued_daycount:
-      type: act365f
+    accrued_daycount: ACT/365F
     coupon_base:
       notional: $ref/notional
-      daycount:
-        type: nl365
+      daycount: NL/365
       entitle: 2024-09-01@tky_close
       payment: 2024-09-01@tky_close
       period_start: 2024-03-01@tky_close
@@ -38,8 +34,7 @@ cashflows:
   cpn2:
     type: fixed_coupon
     rate: 0.005
-    accrued_daycount:
-      type: act365f
+    accrued_daycount: ACT/365F
     coupon_base:
       notional: $ref/notional
       daycount: $ref/daycount
@@ -58,8 +53,7 @@ cashflows:
       notional:
         amount: 100000000
         ccy: JPY
-      daycount:
-        type: nl365
+      daycount: NL/365
       entitle: 2025-09-01@tky_close
       payment: 2025-09-01@tky_close
       period_start: 2025-03-01@tky_close

@@ -147,11 +147,10 @@ where
 
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = format!("2021-01-01T{}", s);
-        let Ok(dt): Result<DateTime<Tz>, _> = s.parse() else {
+        let maybe_datetime = format!("2021-01-01T{}", s);
+        let Ok(dt): Result<DateTime<Tz>, _> = maybe_datetime.parse() else {
             return Err(anyhow!(
-                "Fail to parse time and timezone from string: {}. The string must be valid when it is concatenated with date string and time separator, 'yyyy-MM-ddT'",
-                s
+                "Fail to parse time and timezone from string: {s}. The string must be valid when it is concatenated with date string and time separator, 'yyyy-MM-ddT'",
             ));
         };
         Ok(DateTimeBuilder::new()

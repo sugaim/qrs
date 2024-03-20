@@ -1,40 +1,14 @@
 title: DayCountSymbol
+description: Day count symbol
 oneOf:
-- type: object
-  required:
-  - type
-  properties:
-    type:
-      type: string
-      const: act360
-- type: object
-  required:
-  - type
-  properties:
-    type:
-      type: string
-      const: act365f
-- type: object
-  required:
-  - type
-  properties:
-    type:
-      type: string
-      const: nl360
-- type: object
-  required:
-  - type
-  properties:
-    type:
-      type: string
-      const: nl365
-- type: object
-  required:
-  - calendar
-  - type
-  properties:
-    calendar:
-      $ref: ./CalendarSymbol.yaml
-    type:
-      type: string
-      const: bd252
+- type: string
+  const: ACT/360
+- type: string
+  const: ACT/365F
+- type: string
+  const: NL/360
+- type: string
+  const: NL/365
+- description: BD/252 convention. String must be in 'BD/252[{calendar}]' format
+  type: string
+  pattern: ^BD/252\[.*\]$

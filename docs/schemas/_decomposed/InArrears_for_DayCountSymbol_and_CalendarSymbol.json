@@ -4,16 +4,12 @@
     {
       "type": "object",
       "required": [
-        "calendar",
         "obsrate_daycount",
         "overall_daycount",
+        "rate_calendar",
         "type"
       ],
       "properties": {
-        "calendar": {
-          "description": "Calendar for rate publication.",
-          "$ref": "./CalendarSymbol.yaml"
-        },
         "lockout": {
           "description": "Lockout period",
           "type": "integer",
@@ -30,6 +26,10 @@
         "overall_daycount": {
           "description": "Day count convention used to calculate dcf of accrual period.",
           "$ref": "./DayCountSymbol.yaml"
+        },
+        "rate_calendar": {
+          "description": "Calendar for rate publication.",
+          "$ref": "./CalendarSymbol.yaml"
         },
         "rounding": {
           "description": "Rounding for compunded rate",
@@ -49,16 +49,12 @@
     {
       "type": "object",
       "required": [
-        "calendar",
         "obsrate_daycount",
         "overall_daycount",
+        "rate_calendar",
         "type"
       ],
       "properties": {
-        "calendar": {
-          "description": "Calendar for rate publication.",
-          "$ref": "./CalendarSymbol.yaml"
-        },
         "lockout": {
           "description": "Lockout period",
           "type": "integer",
@@ -75,6 +71,10 @@
         "overall_daycount": {
           "description": "Day count convention used to calculate dcf of accrual period.",
           "$ref": "./DayCountSymbol.yaml"
+        },
+        "rate_calendar": {
+          "description": "Calendar for rate publication.",
+          "$ref": "./CalendarSymbol.yaml"
         },
         "rounding": {
           "description": "Rounding for compunded rate",

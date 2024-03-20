@@ -254,70 +254,28 @@
       "pattern": "^\\d{4}-\\d{2}-\\d{2}@.*$"
     },
     "DayCountSymbol": {
+      "description": "Day count symbol",
       "oneOf": [
         {
-          "type": "object",
-          "required": [
-            "type"
-          ],
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "act360"
-            }
-          }
+          "type": "string",
+          "const": "ACT/360"
         },
         {
-          "type": "object",
-          "required": [
-            "type"
-          ],
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "act365f"
-            }
-          }
+          "type": "string",
+          "const": "ACT/365F"
         },
         {
-          "type": "object",
-          "required": [
-            "type"
-          ],
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "nl360"
-            }
-          }
+          "type": "string",
+          "const": "NL/360"
         },
         {
-          "type": "object",
-          "required": [
-            "type"
-          ],
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "nl365"
-            }
-          }
+          "type": "string",
+          "const": "NL/365"
         },
         {
-          "type": "object",
-          "required": [
-            "calendar",
-            "type"
-          ],
-          "properties": {
-            "calendar": {
-              "$ref": "#/definitions/CalendarSymbol"
-            },
-            "type": {
-              "type": "string",
-              "const": "bd252"
-            }
-          }
+          "description": "BD/252 convention. String must be in 'BD/252[{calendar}]' format",
+          "type": "string",
+          "pattern": "^BD/252\\[.*\\]$"
         }
       ]
     },
@@ -342,16 +300,12 @@
         {
           "type": "object",
           "required": [
-            "calendar",
             "obsrate_daycount",
             "overall_daycount",
+            "rate_calendar",
             "type"
           ],
           "properties": {
-            "calendar": {
-              "description": "Calendar for rate publication.",
-              "$ref": "#/definitions/CalendarSymbol"
-            },
             "lockout": {
               "description": "Lockout period",
               "type": "integer",
@@ -368,6 +322,10 @@
             "overall_daycount": {
               "description": "Day count convention used to calculate dcf of accrual period.",
               "$ref": "#/definitions/DayCountSymbol"
+            },
+            "rate_calendar": {
+              "description": "Calendar for rate publication.",
+              "$ref": "#/definitions/CalendarSymbol"
             },
             "rounding": {
               "description": "Rounding for compunded rate",
@@ -387,16 +345,12 @@
         {
           "type": "object",
           "required": [
-            "calendar",
             "obsrate_daycount",
             "overall_daycount",
+            "rate_calendar",
             "type"
           ],
           "properties": {
-            "calendar": {
-              "description": "Calendar for rate publication.",
-              "$ref": "#/definitions/CalendarSymbol"
-            },
             "lockout": {
               "description": "Lockout period",
               "type": "integer",
@@ -413,6 +367,10 @@
             "overall_daycount": {
               "description": "Day count convention used to calculate dcf of accrual period.",
               "$ref": "#/definitions/DayCountSymbol"
+            },
+            "rate_calendar": {
+              "description": "Calendar for rate publication.",
+              "$ref": "#/definitions/CalendarSymbol"
             },
             "rounding": {
               "description": "Rounding for compunded rate",

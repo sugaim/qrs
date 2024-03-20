@@ -402,11 +402,11 @@ impl FromStr for DateTime<super::Tz> {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(dt) = DateTime::<chrono_tz::Tz>::from_str(s) {
-            return Ok(dt.with_timezone(&super::Tz::Iana(dt.internal.timezone())));
-        }
         if let Ok(dt) = DateTime::<chrono::FixedOffset>::from_str(s) {
             return Ok(dt.with_timezone(&super::Tz::FixedOffset(*dt.internal.offset())));
+        }
+        if let Ok(dt) = DateTime::<chrono_tz::Tz>::from_str(s) {
+            return Ok(dt.with_timezone(&super::Tz::Iana(dt.internal.timezone())));
         }
         Err(anyhow!(
             "Failed to parse datetime from string. Expected format is

@@ -31,7 +31,7 @@ pub enum Lookback {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StraightCompounding<DayCount, Cal> {
     /// Calendar for rate publication.
-    pub calendar: Cal,
+    pub rate_calendar: Cal,
 
     /// Day count convention used to calculate dcf of each observation period.
     pub obsrate_daycount: DayCount,
@@ -62,7 +62,7 @@ pub struct StraightCompounding<DayCount, Cal> {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SpreadExclusiveCompounding<DayCount, Cal> {
     /// Calendar for rate publication.
-    pub calendar: Cal,
+    pub rate_calendar: Cal,
 
     /// Day count convention used to calculate dcf of each observation period.
     pub obsrate_daycount: DayCount,

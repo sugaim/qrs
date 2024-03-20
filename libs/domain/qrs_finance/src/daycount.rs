@@ -6,6 +6,9 @@ mod nl360;
 mod nl365;
 mod traits;
 
+use std::str::FromStr;
+
+use anyhow::Context;
 use qrs_chrono::{Calendar, CalendarSymbol, NaiveDate};
 use qrs_datasrc::{DataSrc, DebugTree};
 use qrs_math::num::Real;
@@ -41,10 +44,10 @@ impl<V: Real> InterestRate for Rate<V> {
     #[inline]
     fn convention(&self) -> Self::Convention {
         match self {
-            Rate::Act360(rate) => DayCount::Act360(rate.convention()),
-            Rate::Act365f(rate) => DayCount::Act365f(rate.convention()),
-            Rate::Nl360(rate) => DayCount::Nl360(rate.convention()),
-            Rate::Nl365(rate) => DayCount::Nl365(rate.convention()),
+            Rate::Act360(_) => DayCount::Act360,
+            Rate::Act365f(_) => DayCount::Act365f,
+            Rate::Nl360(_) => DayCount::Nl360,
+            Rate::Nl365(_) => DayCount::Nl365,
             Rate::Bd252(rate) => DayCount::Bd252(rate.convention()),
         }
     }
@@ -66,10 +69,10 @@ impl<V: Real> InterestRate for Rate<V> {
 //
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DayCount {
-    Act360(Act360),
-    Act365f(Act365f),
-    Nl360(Nl360),
-    Nl365(Nl365),
+    Act360,
+    Act365f,
+    Nl360,
+    Nl365,
     Bd252(Bd252),
 }
 
@@ -80,10 +83,10 @@ impl Dcf for DayCount {
     #[inline]
     fn dcf(&self, from: NaiveDate, to: NaiveDate) -> Result<f64, DcfError> {
         match self {
-            DayCount::Act360(dcf) => dcf.dcf(from, to),
-            DayCount::Act365f(dcf) => dcf.dcf(from, to),
-            DayCount::Nl360(dcf) => dcf.dcf(from, to),
-            DayCount::Nl365(dcf) => dcf.dcf(from, to),
+            DayCount::Act360 => Act360.dcf(from, to),
+            DayCount::Act365f => Act365f.dcf(from, to),
+            DayCount::Nl360 => Nl360.dcf(from, to),
+            DayCount::Nl365 => Nl365.dcf(from, to),
             DayCount::Bd252(dcf) => dcf.dcf(from, to),
         }
     }
@@ -95,10 +98,10 @@ impl RateDcf for DayCount {
     #[inline]
     fn to_rate<V: Real>(&self, annual_rate: V) -> Self::Rate<V> {
         match self {
-            DayCount::Act360(dcf) => Rate::Act360(dcf.to_rate(annual_rate)),
-            DayCount::Act365f(dcf) => Rate::Act365f(dcf.to_rate(annual_rate)),
-            DayCount::Nl360(dcf) => Rate::Nl360(dcf.to_rate(annual_rate)),
-            DayCount::Nl365(dcf) => Rate::Nl365(dcf.to_rate(annual_rate)),
+            DayCount::Act360 => Rate::Act360(Act360.to_rate(annual_rate)),
+            DayCount::Act365f => Rate::Act365f(Act365f.to_rate(annual_rate)),
+            DayCount::Nl360 => Rate::Nl360(Nl360.to_rate(annual_rate)),
+            DayCount::Nl365 => Rate::Nl365(Nl365.to_rate(annual_rate)),
             DayCount::Bd252(dcf) => Rate::Bd252(dcf.to_rate(annual_rate)),
         }
     }
@@ -107,27 +110,138 @@ impl RateDcf for DayCount {
 // -----------------------------------------------------------------------------
 // DayCountSymbol
 //
-#[derive(Debug, Clone, PartialEq, Eq, strum::Display, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DayCountSymbol {
-    #[serde(rename = "act360")]
-    #[strum(serialize = "act360")]
     Act360,
-    #[serde(rename = "act365f")]
-    #[strum(serialize = "act365f")]
     Act365f,
-    #[serde(rename = "nl360")]
-    #[strum(serialize = "nl360")]
     Nl360,
-    #[serde(rename = "nl365")]
-    #[strum(serialize = "nl365")]
     Nl365,
-    #[serde(rename = "bd252")]
-    #[strum(serialize = "bd252")]
-    Bd252 {
-        #[serde(rename = "calendar")]
-        cal: CalendarSymbol,
-    },
+    Bd252 { cal: CalendarSymbol },
+}
+
+//
+// display, serde
+//
+impl std::fmt::Display for DayCountSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DayCountSymbol::Act360 => write!(f, "ACT/360"),
+            DayCountSymbol::Act365f => write!(f, "ACT/365F"),
+            DayCountSymbol::Nl360 => write!(f, "NL/360"),
+            DayCountSymbol::Nl365 => write!(f, "NL/365"),
+            DayCountSymbol::Bd252 { cal } => write!(f, "BD/252[{}]", cal),
+        }
+    }
+}
+
+impl Serialize for DayCountSymbol {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for DayCountSymbol {
+    fn deserialize<D>(deserializer: D) -> Result<DayCountSymbol, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let s: &str = serde::de::Deserialize::deserialize(deserializer)?;
+        DayCountSymbol::from_str(s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl JsonSchema for DayCountSymbol {
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "qrs_finance::daycount::DayCountSymbol".into()
+    }
+    fn schema_name() -> String {
+        "DayCountSymbol".into()
+    }
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::SchemaObject;
+        let mut schema = SchemaObject::default();
+        schema.metadata().description = Some("Day count symbol".to_string());
+        schema.subschemas().one_of = Some(vec![
+            SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                const_value: Some("ACT/360".to_string().into()),
+                ..Default::default()
+            }
+            .into(),
+            SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                const_value: Some("ACT/365F".to_string().into()),
+                ..Default::default()
+            }
+            .into(),
+            SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                const_value: Some("NL/360".to_string().into()),
+                ..Default::default()
+            }
+            .into(),
+            SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                const_value: Some("NL/365".to_string().into()),
+                ..Default::default()
+            }
+            .into(),
+            SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                metadata: Some(Box::new(schemars::schema::Metadata {
+                    description: Some(
+                        "BD/252 convention. String must be in 'BD/252[{calendar}]' format"
+                            .to_string(),
+                    ),
+                    ..Default::default()
+                })),
+                string: Some(Box::new(schemars::schema::StringValidation {
+                    pattern: Some(r#"^BD/252\[.*\]$"#.to_string()),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }
+            .into(),
+        ]);
+
+        schema.into()
+    }
+}
+
+//
+// construction
+//
+impl FromStr for DayCountSymbol {
+    type Err = anyhow::Error;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        const SUPPORTED_FMT: &[&str] = &[
+            "ACT/360",
+            "ACT/365F",
+            "NL/360",
+            "NL/365",
+            "BD/252[{{calendar}}]",
+        ];
+        match s {
+            "ACT/360" => Ok(DayCountSymbol::Act360),
+            "ACT/365F" => Ok(DayCountSymbol::Act365f),
+            "NL/360" => Ok(DayCountSymbol::Nl360),
+            "NL/365" => Ok(DayCountSymbol::Nl365),
+            s if s.starts_with("BD/252[") && s.ends_with(']') => {
+                let cal = s[7..(s.len() - 1)]
+                    .parse()
+                    .context("for BD/252 daycount convention")?;
+                Ok(DayCountSymbol::Bd252 { cal })
+            }
+            _ => Err(anyhow::anyhow!(
+                "invalid day count symbol '{s}'. Expected one of {SUPPORTED_FMT:?}",
+            )),
+        }
+    }
 }
 
 //
@@ -140,10 +254,10 @@ impl DayCountSymbol {
         calsrc: &impl DataSrc<CalendarSymbol, Output = Calendar>,
     ) -> anyhow::Result<DayCount> {
         let res = match self {
-            DayCountSymbol::Act360 => DayCount::Act360(Act360),
-            DayCountSymbol::Act365f => DayCount::Act365f(Act365f),
-            DayCountSymbol::Nl360 => DayCount::Nl360(Nl360),
-            DayCountSymbol::Nl365 => DayCount::Nl365(Nl365),
+            DayCountSymbol::Act360 => DayCount::Act360,
+            DayCountSymbol::Act365f => DayCount::Act365f,
+            DayCountSymbol::Nl360 => DayCount::Nl360,
+            DayCountSymbol::Nl365 => DayCount::Nl365,
             DayCountSymbol::Bd252 { cal } => DayCount::Bd252(Bd252 {
                 cal: calsrc.get(cal)?,
             }),
@@ -201,5 +315,36 @@ where
     #[inline]
     fn get(&self, req: &DayCountSymbol) -> anyhow::Result<Self::Output> {
         req.instantinate(self.inner())
+    }
+}
+
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case("ACT/360", DayCountSymbol::Act360)]
+    #[case("ACT/365F", DayCountSymbol::Act365f)]
+    #[case("NL/360", DayCountSymbol::Nl360)]
+    #[case("NL/365", DayCountSymbol::Nl365)]
+    #[case("BD/252[TKY]", DayCountSymbol::Bd252 {
+        cal: "TKY".parse().unwrap()
+    })]
+    #[case("BD/252[LDN|TKY]", DayCountSymbol::Bd252 {
+        cal: "LDN|TKY".parse().unwrap()
+    })]
+    fn test_string(#[case] s: &str, #[case] o: DayCountSymbol) {
+        // from_str
+        let res = DayCountSymbol::from_str(s).unwrap();
+
+        assert_eq!(res, o);
+
+        // to_string
+        let res = o.to_string();
+
+        assert_eq!(res, s);
     }
 }
