@@ -1323,19 +1323,19 @@ mod tests {
             "overall_daycount": "NL/365",
             "lockout": 5,
             "lookback": {
-                "type": "without_observation_shift",
+                "type": "observation_shift",
                 "days": 2,
             },
-            "zero_interest_rate_method": false,
+            "zero_interest_rate_method": true,
         }),
         InArrears::SpreadExclusive(SpreadExclusiveCompounding {
             rate_calendar: Calendar::default(),
             obsrate_daycount: DayCount::Act365f,
             overall_daycount: DayCount::Nl365,
             lockout: Some(5),
-            lookback: Some(Lookback::WithoutObsShift { days: 2 }),
+            lookback: Some(Lookback::ObsShift { days: 2 }),
             rounding: None,
-            zero_interest_rate_method: false,
+            zero_interest_rate_method: true,
         })
     )]
     fn test_parse_cf_overnight_coupon(
