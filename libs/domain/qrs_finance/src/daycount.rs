@@ -321,9 +321,25 @@ where
 // =============================================================================
 #[cfg(test)]
 mod tests {
+    use mockall::mock;
+    use qrs_datasrc::{DataSrc, DebugTree, TreeInfo};
     use rstest::rstest;
 
     use super::*;
+
+    mock! {
+        CalSrc {}
+
+        impl DebugTree for CalSrc {
+            fn desc(&self) -> String;
+            fn debug_tree(&self) -> TreeInfo;
+        }
+
+        impl DataSrc<CalendarSymbol> for CalSrc {
+            type Output = Calendar;
+            fn get(&self, req: &CalendarSymbol) -> anyhow::Result<Calendar>;
+        }
+    }
 
     #[rstest]
     #[case("ACT/360", DayCountSymbol::Act360)]
@@ -346,5 +362,32 @@ mod tests {
         let res = o.to_string();
 
         assert_eq!(res, s);
+    }
+
+    #[rstest]
+    #[case(DayCountSymbol::Act360, DayCount::Act360, false)]
+    #[case(DayCountSymbol::Act365f, DayCount::Act365f, false)]
+    #[case(DayCountSymbol::Nl360, DayCount::Nl360, false)]
+    #[case(DayCountSymbol::Nl365, DayCount::Nl365, false)]
+    #[case(DayCountSymbol::Bd252 {
+        cal: "TKY".parse().unwrap()
+    }, DayCount::Bd252(Bd252 {
+        cal: Calendar::default()
+    }), true)]
+    fn test_instantinate(
+        #[case] sym: DayCountSymbol,
+        #[case] exp: DayCount,
+        #[case] call_calsrc: bool,
+    ) {
+        let mut calsrc = MockCalSrc::new();
+        calsrc
+            .expect_get()
+            .returning(|_| Ok(Calendar::default()))
+            .times(if call_calsrc { 1 } else { 0 });
+
+        let res = sym.instantinate(&calsrc).unwrap();
+
+        assert_eq!(res, exp);
+        calsrc.checkpoint();
     }
 }
