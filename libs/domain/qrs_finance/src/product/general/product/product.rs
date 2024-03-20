@@ -892,6 +892,7 @@ mod tests {
     use mockall::mock;
     use qrs_datasrc::{DataSrc, DebugTree, TreeInfo};
     use qrs_math::rounding::RoundingStrategy;
+    use rstest::rstest;
 
     use crate::{
         daycount::Bd252,
@@ -1290,8 +1291,57 @@ mod tests {
         mock.checkpoint();
     }
 
-    #[test]
-    fn test_parse_cf_overnight_coupon() {
+    #[rstest]
+    #[case(
+        serde_json::json!({
+            "type": "straight",
+            "rate_calendar": "TKY",
+            "obsrate_daycount": "ACT/365F",
+            "overall_daycount": "NL/365",
+            "lockout": 5,
+            "lookback": {
+                "type": "without_observation_shift",
+                "days": 2,
+            },
+            "zero_interest_rate_method": false,
+        }),
+        InArrears::Straight(StraightCompounding {
+            rate_calendar: Calendar::default(),
+            obsrate_daycount: DayCount::Act365f,
+            overall_daycount: DayCount::Nl365,
+            lockout: Some(5),
+            lookback: Some(Lookback::WithoutObsShift { days: 2 }),
+            rounding: None,
+            zero_interest_rate_method: false,
+        })
+    )]
+    #[case(
+        serde_json::json!({
+            "type": "spread_exclusive",
+            "rate_calendar": "TKY",
+            "obsrate_daycount": "ACT/365F",
+            "overall_daycount": "NL/365",
+            "lockout": 5,
+            "lookback": {
+                "type": "without_observation_shift",
+                "days": 2,
+            },
+            "zero_interest_rate_method": false,
+        }),
+        InArrears::SpreadExclusive(SpreadExclusiveCompounding {
+            rate_calendar: Calendar::default(),
+            obsrate_daycount: DayCount::Act365f,
+            overall_daycount: DayCount::Nl365,
+            lockout: Some(5),
+            lookback: Some(Lookback::WithoutObsShift { days: 2 }),
+            rounding: None,
+            zero_interest_rate_method: false,
+        })
+    )]
+    fn test_parse_cf_overnight_coupon(
+        #[case] cnv_json: serde_json::Value,
+        #[case] cnv_obj: InArrears<DayCount, Calendar>,
+    ) {
         let (mut mock, builder) = fixture();
         mock.set_cal_count(1).set_tct_count(4).set_dct_count(3);
         let cmp = OvernightIndexCoupon {
@@ -1321,18 +1371,7 @@ mod tests {
             "n".into() => Constant::Object(serde_json::json!({"amount": 100.0, "ccy": "JPY"})),
             "ps".into() => Constant::String("2024-02-01@tky".into()),
             "dc".into() => Constant::String("NL/365".into()),
-            "conv".into() => Constant::Object(serde_json::json!({
-                "type": "straight",
-                "rate_calendar": "TKY",
-                "obsrate_daycount": "ACT/365F",
-                "overall_daycount": "NL/365",
-                "lockout": 5,
-                "lookback": {
-                    "type": "without_observation_shift",
-                    "days": 2,
-                },
-                "zero_interest_rate_method": false,
-            })),
+            "conv".into() => Constant::Object(cnv_json),
             "g".into() => Constant::Number(1.0),
             "s".into() => Constant::Number(0.01),
             "rnd".into() => Constant::Object(serde_json::json!({"strategy": "to_negative_infinity", "scale": 7})),
@@ -1365,15 +1404,7 @@ mod tests {
                     payment: "2024-03-01T15:30:00+09:00".parse().unwrap(),
                     daycount: DayCount::Nl365,
                 },
-                convention: Arc::new(InArrears::Straight(StraightCompounding {
-                    rate_calendar: Calendar::default(),
-                    obsrate_daycount: DayCount::Act365f,
-                    overall_daycount: DayCount::Nl365,
-                    lockout: Some(5),
-                    lookback: Some(Lookback::WithoutObsShift { days: 2 }),
-                    rounding: None,
-                    zero_interest_rate_method: false,
-                })),
+                convention: Arc::new(cnv_obj),
                 reference_rate: WithId {
                     id: "rr".into(),
                     value: Arc::new(Market::OvernightRate(OvernightRate {
