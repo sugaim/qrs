@@ -16,7 +16,7 @@ use crate::{
             core::{VariableTypes, WithId},
             leg::{Leg, StraightLeg},
             market::{Market, OvernightRate},
-            ConvertProduct, DefaultVariableTypes, Product,
+            CastProduct, DefaultVariableTypes,
         },
     },
     Money,
@@ -63,21 +63,16 @@ pub enum OisCashflow<V> {
 }
 
 // -----------------------------------------------------------------------------
-// OisConverter
+// Oiscaster
 //
 #[derive(Debug, Clone, PartialEq)]
-pub struct OisConverter {}
+pub struct Oiscaster {}
 
 //
 // methods
 //
-impl<V: Real> ConvertProduct<DefaultVariableTypes<V>, OisVariableTypes<V>> for OisConverter {
-    fn initialize(&mut self) {}
-    fn post_validation(&self, _: &Product<OisVariableTypes<V>>) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn convert_mkt(
+impl<V: Real> CastProduct<DefaultVariableTypes<V>, OisVariableTypes<V>> for Oiscaster {
+    fn cast_mkt(
         &self,
         cmp: <DefaultVariableTypes<V> as VariableTypes>::MarketRef,
     ) -> anyhow::Result<<OisVariableTypes<V> as VariableTypes>::MarketRef> {
@@ -90,7 +85,7 @@ impl<V: Real> ConvertProduct<DefaultVariableTypes<V>, OisVariableTypes<V>> for O
         }
     }
 
-    fn convert_proc(
+    fn cast_proc(
         &self,
         _: <DefaultVariableTypes<V> as VariableTypes>::ProcessRef,
         _: &HashMap<String, <OisVariableTypes<V> as VariableTypes>::MarketRef>,
@@ -98,7 +93,7 @@ impl<V: Real> ConvertProduct<DefaultVariableTypes<V>, OisVariableTypes<V>> for O
         bail!("OIS does not support process component")
     }
 
-    fn convert_cf(
+    fn cast_cf(
         &self,
         cmp: <DefaultVariableTypes<V> as VariableTypes>::CashflowRef,
         mkts: &HashMap<String, <OisVariableTypes<V> as VariableTypes>::MarketRef>,
@@ -138,7 +133,7 @@ impl<V: Real> ConvertProduct<DefaultVariableTypes<V>, OisVariableTypes<V>> for O
         Ok(Arc::new(cf))
     }
 
-    fn convert_leg(
+    fn cast_leg(
         &self,
         cmp: <DefaultVariableTypes<V> as VariableTypes>::LegRef,
         _: &HashMap<String, <OisVariableTypes<V> as VariableTypes>::ProcessRef>,

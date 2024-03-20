@@ -5,5 +5,5 @@ mod product;
 
 pub use data::{ContractData, ProductData, VariableTypesForData};
 pub use product::{
-    BuildProduct, ConvertProduct, DefaultProductBuilder, DefaultVariableTypes, Product,
+    BuildProduct, CastProduct, DefaultProductBuilder, DefaultVariableTypes, Product,
 };

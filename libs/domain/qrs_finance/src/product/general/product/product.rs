@@ -81,35 +81,38 @@ impl<Ts: VariableTypes> Product<Ts> {
 }
 
 // -----------------------------------------------------------------------------
-// ConvertProduct
+// CastProduct
 //
-pub trait ConvertProduct<From: VariableTypes, To: VariableTypes> {
-    fn initialize(&mut self);
-    fn post_validation(&self, result: &Product<To>) -> anyhow::Result<()>;
+pub trait CastProduct<From: VariableTypes, To: VariableTypes> {
+    fn initialize(&self) {}
+    fn post_validation(&self, result: &Product<To>) -> anyhow::Result<()> {
+        let _ = result;
+        Ok(())
+    }
 
-    fn convert_mkt(&self, cmp: From::MarketRef) -> anyhow::Result<To::MarketRef>;
+    fn cast_mkt(&self, cmp: From::MarketRef) -> anyhow::Result<To::MarketRef>;
 
-    fn convert_proc(
+    fn cast_proc(
         &self,
         cmp: From::ProcessRef,
         mkts: &HashMap<String, To::MarketRef>,
     ) -> anyhow::Result<To::ProcessRef>;
 
-    fn convert_cf(
+    fn cast_cf(
         &self,
         cmp: From::CashflowRef,
         mkts: &HashMap<String, To::MarketRef>,
         procs: &HashMap<String, To::ProcessRef>,
     ) -> anyhow::Result<To::CashflowRef>;
 
-    fn convert_leg(
+    fn cast_leg(
         &self,
         cmp: From::LegRef,
         procs: &HashMap<String, To::ProcessRef>,
         cfs: &HashMap<String, To::CashflowRef>,
     ) -> anyhow::Result<To::LegRef>;
 
-    fn convert_product(&self, mut product: Product<From>) -> anyhow::Result<Product<To>> {
+    fn cast_product(&self, mut product: Product<From>) -> anyhow::Result<Product<To>> {
         let mut mkts = HashMap::new();
         let mut procs = HashMap::new();
         let mut cfs = HashMap::new();
@@ -121,25 +124,25 @@ pub trait ConvertProduct<From: VariableTypes, To: VariableTypes> {
                 ComponentCategory::Constant => {}
                 ComponentCategory::Market => {
                     if let Some(cmp) = product.mkts.remove(name.as_ref()) {
-                        let mkt = self.convert_mkt(cmp)?;
+                        let mkt = self.cast_mkt(cmp)?;
                         mkts.insert(name.clone().0, mkt);
                     }
                 }
                 ComponentCategory::Process => {
                     if let Some(cmp) = product.procs.remove(name.as_ref()) {
-                        let proc = self.convert_proc(cmp, &mkts)?;
+                        let proc = self.cast_proc(cmp, &mkts)?;
                         procs.insert(name.clone().0, proc);
                     }
                 }
                 ComponentCategory::Cashflow => {
                     if let Some(cmp) = product.cfs.remove(name.as_ref()) {
-                        let cf = self.convert_cf(cmp, &mkts, &procs)?;
+                        let cf = self.cast_cf(cmp, &mkts, &procs)?;
                         cfs.insert(name.clone().0, cf);
                     }
                 }
                 ComponentCategory::Leg => {
                     if let Some(cmp) = product.legs.remove(name.as_ref()) {
-                        let leg = self.convert_leg(cmp, &procs, &cfs)?;
+                        let leg = self.cast_leg(cmp, &procs, &cfs)?;
                         legs.insert(name.clone().0, leg);
                     }
                 }
