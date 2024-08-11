@@ -59,8 +59,7 @@ jobs:
     - run: rm -rf .measurements
     - run: mkdir -p .measurements
 
-    - run: |
-        cargo llvm-cov --no-cfg-coverage --all-features --workspace --codecov --output-path target/codecov.dat --ignore-filename-regex sandbox
+    - run: cargo llvm-cov --no-cfg-coverage --all-features --workspace --codecov --output-path target/codecov.dat --ignore-filename-regex sandbox
     - run: cargo llvm-cov report --lcov --output-path .measurements/coverage.info
     - uses: codecov/codecov-action@v4
       with:
