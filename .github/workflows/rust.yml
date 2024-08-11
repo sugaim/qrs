@@ -51,7 +51,8 @@ jobs:
 
     - run: sudo apt install cloc
     - run: cloc --exclude-list-file=.gitignore . > .measurements/cloc.txt
+    - run: cat .measurements/cloc.txt
 
     - run: git add .
     - run: git commit -m "ci passed"
-    - run: git push
+    - run: git push origin HEAD
