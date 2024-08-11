@@ -58,7 +58,7 @@ jobs:
     - run: mkdir -p .measurements
 
     - run: |
-        cargo llvm-cov--all-features --workspace 
+        cargo llvm-cov --all-features --workspace 
         --codecov --output-path target/codecov.dat 
         --ignore-filename-regex sandbox
     - run: cargo llvm-cov report --lcov --output-path .measurements/coverage.info
