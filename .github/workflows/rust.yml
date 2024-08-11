@@ -41,6 +41,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - run: git fetch
     - run: git checkout ci_passed
 
     - run: sudo apt install cloc
@@ -48,4 +49,4 @@ jobs:
     - run: git add .measurements/cloc.txt
 
     - run: git commit -m "ci passed"
-    - run: git push origin ci_passed
+    - run: git push
