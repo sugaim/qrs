@@ -1,0 +1,16 @@
+[package]
+name = "qautodiff"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+
+qmath = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+rstest = { workspace = true }
+static_assertions = { workspace = true }

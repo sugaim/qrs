@@ -1,0 +1,22 @@
+[package]
+name = "qmodel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }
+
+qmath = { workspace = true }
+qchrono = { workspace = true }
+qfincore = { workspace = true }
+qproduct = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+rstest = { workspace = true }
+ordered-float = { workspace = true }

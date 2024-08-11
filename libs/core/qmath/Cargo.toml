@@ -1,0 +1,17 @@
+[package]
+name = "qmath"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+libm = { workspace = true }
+num = { workspace = true }
+ordered-float = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+static_assertions = { workspace = true }

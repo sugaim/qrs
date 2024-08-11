@@ -1,0 +1,13 @@
+[package]
+name = "qproduct"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+
+qfincore = { workspace = true }

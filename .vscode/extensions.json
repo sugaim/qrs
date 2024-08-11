@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+    "github.vscode-github-actions",
+    "JScearcy.rust-doc-viewer",
+    "ms-python.debugpy",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "redhat.vscode-yaml",
+    "richie5um2.vscode-sort-json",
+    "rust-lang.rust-analyzer",
+    "ryanluker.vscode-coverage-gutters",
+    "serayuzgur.crates",
+    "tamasfe.even-better-toml",
+    "vadimcn.vscode-lldb",
+  ]
+}

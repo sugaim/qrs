@@ -1,0 +1,52 @@
+{
+  "folders": [
+    {
+      "name": "root",
+      "path": ".."
+    },
+    {
+      "name": "docs",
+      "path": "../docs"
+    },
+    {
+      "name": "sandbox",
+      "path": "../sandbox/rs"
+    },
+    {
+      "name": "core",
+      "path": "../libs/core"
+    },
+    {
+      "name": "domain",
+      "path": "../libs/domain"
+    }
+  ],
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "qrs: test",
+        "group": "test",
+        "type": "cargo",
+        "command": "test",
+        "args": ["--all-features", "--workspace"],
+        "problemMatcher": ["$rustc"]
+      },
+      {
+        "label": "qrs: coverage",
+        "group": "test",
+        "type": "cargo",
+        "command": "llvm-cov",
+        "args": [
+          "--lcov",
+          "--no-cfg-coverage",
+          "--all-features",
+          "--workspace",
+          "--output-path",
+          "target/lcov.info"
+        ],
+        "problemMatcher": ["$rustc"]
+      }
+    ]
+  }
+}

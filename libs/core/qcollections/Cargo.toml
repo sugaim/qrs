@@ -1,0 +1,11 @@
+[package]
+name = "qcollections"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+schemars = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

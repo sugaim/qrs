@@ -1,0 +1,32 @@
+[package]
+name = "qchrono"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+derivative = { workspace = true }
+maplit = { workspace = true }
+moka = { workspace = true }
+num = { workspace = true }
+peg = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+schemars = { workspace = true }
+smallvec = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+qcollections = { workspace = true }
+qmath = { workspace = true }
+
+[dev-dependencies]
+mockall = { workspace = true }
+rstest = { workspace = true }
+rstest_reuse = { workspace = true }
+serde_json = { workspace = true }
