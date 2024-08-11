@@ -18,12 +18,34 @@ use crate::{
 ///
 /// Mainly this struct is implemented to override some operators.
 #[derive(Derivative, Clone)]
-#[derivative(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derivative(Debug)]
 pub struct DateTime {
     pub(crate) inner: chrono::DateTime<Tz>,
     #[cfg(debug_assertions)]
     #[derivative(Debug = "ignore", PartialEq = "ignore", PartialOrd = "ignore")]
+    #[allow(unused)]
     pub(crate) debug_str: String,
+}
+
+impl PartialEq for DateTime {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+impl Eq for DateTime {}
+
+impl PartialOrd for DateTime {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.inner.cmp(&other.inner))
+    }
+}
+impl Ord for DateTime {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.inner.cmp(&other.inner)
+    }
 }
 
 impl std::hash::Hash for DateTime {
@@ -45,7 +67,7 @@ impl From<chrono::DateTime<Tz>> for DateTime {
     #[inline]
     fn from(inner: chrono::DateTime<Tz>) -> Self {
         #[cfg(debug_assertions)]
-        let debug_str = format!("{}", inner.to_rfc3339());
+        let debug_str = inner.to_rfc3339().to_string();
 
         #[cfg(debug_assertions)]
         return DateTime { inner, debug_str };
@@ -108,13 +130,11 @@ impl FromStr for DateTime {
         if let Some(caps) = with_tz.captures(s) {
             let tp = &caps["timepoint"];
             let tz = &caps["timezone"];
-            if let Some(tp) = chrono::DateTime::parse_from_rfc3339(tp).ok() {
+            if let Ok(tp) = chrono::DateTime::parse_from_rfc3339(tp) {
                 let tz = Tz::from_str(tz)
                     .with_context(|| format!("parse '{}' to timezone", &caps["timezone"]))?;
-                return Ok(tp.with_timezone(&tz).into());
-            } else if let Some(tp) =
-                chrono::NaiveDateTime::parse_from_str(tp, "%Y-%m-%dT%H:%M:%S").ok()
-            {
+                Ok(tp.with_timezone(&tz).into())
+            } else if let Ok(tp) = chrono::NaiveDateTime::parse_from_str(tp, "%Y-%m-%dT%H:%M:%S") {
                 let tz = Tz::from_str(tz)
                     .with_context(|| format!("parse '{}' to timezone", &caps["timezone"]))?;
                 match tp.and_local_timezone(tz) {
@@ -135,7 +155,7 @@ impl FromStr for DateTime {
             if s.ends_with('Z') {
                 return Ok(timeponint.with_timezone(&Tz::Utc).into());
             }
-            return Ok(timeponint.into());
+            Ok(timeponint.into())
         }
     }
 }

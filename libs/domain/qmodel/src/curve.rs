@@ -2,8 +2,8 @@ pub mod adj;
 pub mod atom;
 pub mod composite;
 
-mod curve;
+mod curve_impl;
 mod traits;
 
-pub use curve::{Curve, CurveReq, CurveSrc, CurveSrcInduce};
+pub use curve_impl::{Curve, CurveReq, CurveSrc, CurveSrcInduce};
 pub use traits::YieldCurve;

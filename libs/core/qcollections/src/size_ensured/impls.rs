@@ -58,8 +58,14 @@ where
 // -----------------------------------------------------------------------------
 pub trait SizedContainer: for<'this> RefIntoIter<'this> {
     fn iter(&self) -> <Self as RefIntoIter<'_>>::Iter;
+
+    #[inline]
     fn len(&self) -> usize {
         self.iter().len()
+    }
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

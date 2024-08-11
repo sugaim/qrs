@@ -31,7 +31,7 @@ struct _CalendarData {
     valid_to: NaiveDate,
 
     /// Flag to treat weekend as business day
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[serde(default)]
     treat_weekend_as_business_day: bool,
 }
 
@@ -367,9 +367,7 @@ impl Calendar {
             valid_from = valid_from.max(cal.valid_from);
             valid_to = valid_to.min(cal.valid_to);
         }
-        let Some(treat_weekend_as_business_day) = treat_weekend_as_business_day else {
-            return None;
-        };
+        let treat_weekend_as_business_day = treat_weekend_as_business_day?;
         Self::_new(
             extra_holds.into_iter().collect(),
             if treat_weekend_as_business_day {

@@ -120,9 +120,8 @@ impl FromStr for Tz {
         if s != s.trim() {
             anyhow::bail!("Non-trimmed timezone string({})", s);
         }
-        match s {
-            "Z" => return Ok(Tz::Utc),
-            _ => {}
+        if s == "Z" {
+            return Ok(Tz::Utc);
         }
         if let Ok(tz) = chrono::FixedOffset::from_str(s) {
             return Ok(Tz::FixedOffset(tz));
@@ -153,8 +152,8 @@ mod tests {
     #[case::ok("-15:00", chrono::FixedOffset::west_opt(15 * 3600).map(Into::into))]
     #[case::ok("-15:59", chrono::FixedOffset::west_opt(15 * 3600 + 59 * 60).map(Into::into))]
     #[case::ok("-23:59", chrono::FixedOffset::west_opt(23 * 3600 + 59 * 60).map(Into::into))]
-    #[case::ok("Asia/Tokyo", Some(chrono_tz::Tz::Asia__Tokyo).map(Into::into))]
-    #[case::ok("UTC", Some(chrono_tz::Tz::UTC).map(Into::into))]
+    #[case::ok("Asia/Tokyo", Some(Into::into(chrono_tz::Tz::Asia__Tokyo)))]
+    #[case::ok("UTC", Some(Into::into(chrono_tz::Tz::UTC)))]
     #[case::err_nontrim("Z ", None)]
     #[case::err_nontrim(" Z", None)]
     #[case::err_nontrim(" Z ", None)]

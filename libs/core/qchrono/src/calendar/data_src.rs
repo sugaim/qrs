@@ -42,8 +42,8 @@ fn _merge_leaves(
                 .map(|s| _merge_leaves(s, leaves))
                 .collect::<Result<SmallVec<[Calendar; 5]>, _>>()?;
             let res = match sym {
-                CalendarSym::AllClosed(_) => Calendar::all_closed_of(cals.into_iter()),
-                CalendarSym::AnyClosed(_) => Calendar::any_closed_of(cals.into_iter()),
+                CalendarSym::AllClosed(_) => Calendar::all_closed_of(cals),
+                CalendarSym::AnyClosed(_) => Calendar::any_closed_of(cals),
                 _ => unreachable!(),
             };
             Ok(res.expect("A collection 'syms' is not empty. So merged calendar must be created."))
@@ -70,12 +70,6 @@ mod tests {
     #[derive(Default)]
     struct CallCount {
         get: Option<usize>,
-    }
-
-    impl CallCount {
-        fn zero() -> Self {
-            CallCount { get: Some(0) }
-        }
     }
 
     fn get_cal(nm: &CalendarSymAtom) -> anyhow::Result<Calendar> {
@@ -159,10 +153,7 @@ mod tests {
         #[case] num: usize,
         #[case] exp: Result<Calendar, String>,
     ) {
-        let mut mock = MockSrc::with_call_count(&CallCount {
-            get: Some(num),
-            ..CallCount::zero()
-        });
+        let mut mock = MockSrc::with_call_count(&CallCount { get: Some(num) });
 
         let res = mock.get_calendar(&sym);
 

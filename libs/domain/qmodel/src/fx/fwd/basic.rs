@@ -45,8 +45,8 @@ impl<V: Real> FxFwd for BasicFxFwd<V> {
         spot_date: &DateTime,
         tgt: &DateTime,
     ) -> anyhow::Result<FxRate<Self::Value>> {
-        let qdisc = self.quote.discount(&spot_date, tgt)?;
-        let bdisc = self.base.discount(&spot_date, tgt)?;
+        let qdisc = self.quote.discount(spot_date, tgt)?;
+        let bdisc = self.base.discount(spot_date, tgt)?;
         Ok(FxRate {
             pair: self.spot.rate.pair,
             value: bdisc / &qdisc * spot_rate,
@@ -60,7 +60,7 @@ impl<V: Real> FxFwd for BasicFxFwd<V> {
         spot_date: &DateTime,
         tgt: &DateTime,
     ) -> anyhow::Result<FxRate<V>> {
-        let tgt = self.mkt.spot_datetime_of(&tgt)?;
+        let tgt = self.mkt.spot_datetime_of(tgt)?;
         self.forward_of(spot_rate, spot_date, &tgt)
     }
 }

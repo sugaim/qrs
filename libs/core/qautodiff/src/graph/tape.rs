@@ -860,12 +860,7 @@ impl<K, V> _Tape<K, V> {
     where
         K: Eq,
     {
-        if self
-            .vars
-            .iter()
-            .find(|_VarIdx { key: k, .. }| k == &key)
-            .is_some()
-        {
+        if self.vars.iter().any(|_VarIdx { key: k, .. }| k == &key) {
             return Err(Error::VarAlreadyExists(key));
         }
 
@@ -1226,6 +1221,7 @@ impl<K, V> _GraphvizGraph<K, V> {
             edge,
         ));
     }
+    #[allow(clippy::too_many_arguments)]
     fn _binary_partial(
         &mut self,
         op: &str,
@@ -1259,6 +1255,8 @@ impl<K, V> _GraphvizGraph<K, V> {
             arg_edge,
         ));
     }
+
+    #[allow(clippy::too_many_arguments)]
     fn _binary(
         &mut self,
         op: &str,
@@ -1746,15 +1744,15 @@ impl<K, V, KeyFmt, ValFmt> GraphvizBuilder<K, V, KeyFmt, ValFmt> {
                 _GraphvizNode::Const { value } => {
                     let annotations = format!(
                         "label=\"{{value={}}}\", shape=record",
-                        (&self.value_fmt)(value)
+                        (self.value_fmt)(value)
                     );
                     buf.push_str(&format!("  {idx} [{annotations}];\n"));
                 }
                 _GraphvizNode::Var { key, value, grad } => {
                     let annotations = format!("label=\"{key}|{{value={value}|grad={grad}}}\", shape=record, style=\"diagonals\"",
-                        key = (&self.key_fmt)(key),
-                        value = (&self.value_fmt)(value),
-                        grad = (&self.value_fmt)(grad),
+                        key = (self.key_fmt)(key),
+                        value = (self.value_fmt)(value),
+                        grad = (self.value_fmt)(grad),
                     );
                     buf.push_str(&format!("  {idx} [{annotations}];\n"));
                 }
@@ -1762,8 +1760,8 @@ impl<K, V, KeyFmt, ValFmt> GraphvizBuilder<K, V, KeyFmt, ValFmt> {
                     let annotations = format!(
                         "label=\"{op}|{{value={value}|grad={grad}}}\", shape=record",
                         op = op,
-                        value = (&self.value_fmt)(value),
-                        grad = (&self.value_fmt)(grad),
+                        value = (self.value_fmt)(value),
+                        grad = (self.value_fmt)(grad),
                     );
                     buf.push_str(&format!("  {idx} [{annotations}];\n"));
                 }
@@ -1803,9 +1801,9 @@ mod tests {
         let graph = Graph::new();
 
         {
-            let _1 = graph.create_var("42", 4.2f64).unwrap();
-            let _2 = graph.create_var("43", 4.3f64).unwrap();
-            let _3 = _1.clone();
+            let x1 = graph.create_var("42", 4.2f64).unwrap();
+            let x2 = graph.create_var("43", 4.3f64).unwrap();
+            let x3 = x1.clone();
 
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.vars.len(), 2);
@@ -1816,6 +1814,7 @@ mod tests {
             assert_eq!(graph.0.borrow().tape.vars[1].cell_idx, 1);
             assert_eq!(graph.0.borrow().tape.vars[1].key, "43");
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x2, x3);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1835,15 +1834,16 @@ mod tests {
     fn test_refcnt_neg() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = -_1.as_ref();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = -x1.as_ref();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1857,15 +1857,16 @@ mod tests {
     fn test_refcnt_addl() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref() + Expr::from(3.0);
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref() + Expr::from(3.0);
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1879,15 +1880,16 @@ mod tests {
     fn test_refcnt_addr() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = Expr::from(3.0) + _1.as_ref();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = Expr::from(3.0) + x1.as_ref();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1901,15 +1903,16 @@ mod tests {
     fn test_refcnt_subl() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref() - Expr::from(3.0);
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref() - Expr::from(3.0);
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1923,15 +1926,16 @@ mod tests {
     fn test_refcnt_subr() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = Expr::from(3.0) - _1.as_ref();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = Expr::from(3.0) - x1.as_ref();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1945,15 +1949,16 @@ mod tests {
     fn test_refcnt_mull() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref() * Expr::from(3.0);
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref() * Expr::from(3.0);
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1967,15 +1972,16 @@ mod tests {
     fn test_refcnt_mulr() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = Expr::from(3.0) * _1.as_ref();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = Expr::from(3.0) * x1.as_ref();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -1989,15 +1995,16 @@ mod tests {
     fn test_refcnt_divl() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref() / Expr::from(3.0);
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref() / Expr::from(3.0);
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2011,15 +2018,16 @@ mod tests {
     fn test_refcnt_divr() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = Expr::from(3.0) / _1.as_ref();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = Expr::from(3.0) / x1.as_ref();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2033,15 +2041,16 @@ mod tests {
     fn test_refcnt_exp() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref().clone().exp();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref().clone().exp();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2055,15 +2064,16 @@ mod tests {
     fn test_refcnt_log() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref().clone().log();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref().clone().log();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2077,15 +2087,16 @@ mod tests {
     fn test_refcnt_erf() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref().clone().erf();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref().clone().erf();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2099,15 +2110,16 @@ mod tests {
     fn test_refcnt_sqrt() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref().clone().sqrt();
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref().clone().sqrt();
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2121,15 +2133,16 @@ mod tests {
     fn test_refcnt_powi() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
         {
-            let _2 = _1.as_ref().clone().powi(5);
-            let _3 = _2.clone();
-            let _4 = _2.clone();
+            let x2 = x1.as_ref().clone().powi(5);
+            let x3 = x2.clone();
+            let x4 = x2.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 2);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x3, x4);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 2);
@@ -2143,17 +2156,18 @@ mod tests {
     fn test_refcnt_add() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
-        let _2 = graph.create_var("43", 4.3f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
+        let x2 = graph.create_var("43", 4.3f64).unwrap();
         {
-            let _3 = _1.as_ref() + _2.as_ref();
-            let _4 = _3.clone();
-            let _5 = _3.clone();
+            let x3 = x1.as_ref() + x2.as_ref();
+            let x4 = x3.clone();
+            let x5 = x3.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 3);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[2].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x4, x5);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 3);
@@ -2168,17 +2182,18 @@ mod tests {
     fn test_refcnt_sub() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
-        let _2 = graph.create_var("43", 4.3f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
+        let x2 = graph.create_var("43", 4.3f64).unwrap();
         {
-            let _3 = _1.as_ref() - _2.as_ref();
-            let _4 = _3.clone();
-            let _5 = _3.clone();
+            let x3 = x1.as_ref() - x2.as_ref();
+            let x4 = x3.clone();
+            let x5 = x3.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 3);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[2].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x4, x5);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 3);
@@ -2193,17 +2208,18 @@ mod tests {
     fn test_refcnt_mul() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
-        let _2 = graph.create_var("43", 4.3f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
+        let x2 = graph.create_var("43", 4.3f64).unwrap();
         {
-            let _3 = _1.as_ref() * _2.as_ref();
-            let _4 = _3.clone();
-            let _5 = _3.clone();
+            let x3 = x1.as_ref() * x2.as_ref();
+            let x4 = x3.clone();
+            let x5 = x3.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 3);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[2].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x4, x5);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 3);
@@ -2218,17 +2234,18 @@ mod tests {
     fn test_refcnt_div() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
-        let _2 = graph.create_var("43", 4.3f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
+        let x2 = graph.create_var("43", 4.3f64).unwrap();
         {
-            let _3 = _1.as_ref() / _2.as_ref();
-            let _4 = _3.clone();
-            let _5 = _3.clone();
+            let x3 = x1.as_ref() / x2.as_ref();
+            let x4 = x3.clone();
+            let x5 = x3.clone();
             assert_eq!(graph.0.borrow().tape.cells.len(), 3);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[2].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x4, x5);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 3);
@@ -2244,17 +2261,18 @@ mod tests {
         let graph = Graph::new();
 
         {
-            let _1 = graph.create_var("42", 4.2f64).unwrap();
-            let _2 = _1.as_ref() + _1.as_ref();
-            let _3 = _2.clone() + _2;
-            let _4 = _3.clone();
-            let _5 = _3.clone();
+            let x1 = graph.create_var("42", 4.2f64).unwrap();
+            let x2 = x1.as_ref() + x1.as_ref();
+            let x3 = x2.clone() + x2;
+            let x4 = x3.clone();
+            let x5 = x3.clone();
 
             assert_eq!(graph.0.borrow().tape.cells.len(), 3);
             assert_eq!(graph.0.borrow().tape.cells[0].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.cells[1].refcnt, 2);
             assert_eq!(graph.0.borrow().tape.cells[2].refcnt, 3);
             assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+            let _ = (x4, x5);
         }
 
         assert_eq!(graph.0.borrow().tape.cells.len(), 3);
@@ -2270,15 +2288,16 @@ mod tests {
     fn test_reuse_vacant_cell() {
         let graph = Graph::new();
 
-        let _1 = graph.create_var("42", 4.2f64).unwrap();
-        let _2 = graph.create_var("43", 4.3f64).unwrap();
+        let x1 = graph.create_var("42", 4.2f64).unwrap();
+        let x2 = graph.create_var("43", 4.3f64).unwrap();
         {
-            let _3 = _1.as_ref() + _2.as_ref();
+            let x3 = x1.as_ref() + x2.as_ref();
+            let _ = x3;
         }
         assert_eq!(graph.0.borrow().tape.vacancy.len(), 1);
         assert_eq!(graph.0.borrow().tape.vacancy[0], 2);
 
-        let _3 = _1.as_ref() - _2.as_ref();
+        let x3 = x1.as_ref() - x2.as_ref();
 
         // vacancy is popped and cells[2] is reused
         assert_eq!(graph.0.borrow().tape.cells.len(), 3);
@@ -2289,5 +2308,6 @@ mod tests {
             epsilon = 1e-8
         );
         assert_eq!(graph.0.borrow().tape.vacancy.len(), 0);
+        let _ = x3;
     }
 }

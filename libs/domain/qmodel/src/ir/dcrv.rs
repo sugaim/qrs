@@ -64,7 +64,7 @@ impl<S: DCrvSrcInduce> DCrvSrc for S {
         let req = self.resolve_dcrv_req(ccy, col)?;
         let crv = self.get_curve(req)?;
         Ok(DCrv(Arc::new(_Data {
-            ccy: ccy.clone(),
+            ccy: *ccy,
             col: col.clone(),
             crv,
         })))

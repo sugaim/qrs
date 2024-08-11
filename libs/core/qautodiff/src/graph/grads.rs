@@ -34,7 +34,7 @@ where
         if self.grads.len() <= var_idx {
             self.grads.resize(var_idx + 1, V::zero());
         }
-        self.grads[var_idx] += &grad;
+        self.grads[var_idx] += grad;
         Ok(())
     }
 }
@@ -150,7 +150,7 @@ impl<K, V> Grads<K, V> {
     where
         V: Real,
     {
-        if !Graph::ptr_eq(&self.graph, &var._node()._graph()) {
+        if !Graph::ptr_eq(&self.graph, var._node()._graph()) {
             return V::zero();
         }
         let varidx = var._node()._varidx().expect("Variable returns its index");
@@ -228,7 +228,7 @@ impl<K, V> GradsAccum<K, V> {
     where
         V: Real,
     {
-        if !Graph::ptr_eq(&self.graph, &var._node()._graph()) {
+        if !Graph::ptr_eq(&self.graph, var._node()._graph()) {
             return V::zero();
         }
         let varidx = var._node()._varidx().expect("Variable returns its index");

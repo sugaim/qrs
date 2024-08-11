@@ -1,9 +1,9 @@
-mod calendar;
+mod calendar_impl;
+mod data_src;
 mod holadj;
-mod src;
 mod sym;
 
-pub use calendar::{Calendar, CalendarBuilder, CalendarError};
+pub use calendar_impl::{Calendar, CalendarBuilder, CalendarError};
+pub use data_src::{CalendarSrc, CalendarSrcInduce};
 pub use holadj::HolidayAdj;
-pub use src::{CalendarSrc, CalendarSrcInduce};
 pub use sym::{CalendarSym, CalendarSymAtom};
