@@ -50,6 +50,9 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
 
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+    
     - run: cargo install llvm-cov
     - run: cargo llvm-cov --lcov --no-cfg-coverage --all-features --workspace --output-path .measurements/coverage.info
 
