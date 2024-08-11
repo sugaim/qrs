@@ -721,7 +721,6 @@ mod tests {
         assert_eq!(s, expected);
     }
 
-    #[cfg(feature = "serde")]
     #[rstest]
     #[case("TK".parse().unwrap())]
     #[case("TK|NY".parse().unwrap())]
@@ -733,7 +732,6 @@ mod tests {
         assert_eq!(ser, format!("\"{}\"", sym));
     }
 
-    #[cfg(feature = "serde")]
     #[rstest]
     #[case("TK".parse().unwrap())]
     #[case("TK|NY".parse().unwrap())]
