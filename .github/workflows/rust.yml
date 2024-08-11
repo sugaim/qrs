@@ -55,6 +55,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
     - uses: taiki-e/install-action@cargo-llvm-cov
+    - run: sudo apt install cloc
 
     - run: rm -rf .measurements
     - run: mkdir -p .measurements
@@ -69,7 +70,6 @@ jobs:
         name: codecov-coverage
         fail_ci_if_error: true
 
-    - run: sudo apt install cloc
     - run: cloc --exclude-list-file=.gitignore . --yaml --out=.measurements/cloc.json
 
     - run: git add .
