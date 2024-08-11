@@ -41,6 +41,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - run: git config --global user.email "github.actions@example.com"
+    - run: git config --global user.name "GitHub Actions"
     - run: git fetch
     - run: git checkout ci_passed
 
