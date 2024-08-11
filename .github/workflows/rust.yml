@@ -56,6 +56,7 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - uses: taiki-e/install-action@cargo-llvm-cov
 
+    - run: rm -rf .measurements
     - run: mkdir -p .measurements
 
     - run: |
@@ -69,8 +70,7 @@ jobs:
         fail_ci_if_error: true
 
     - run: sudo apt install cloc
-    - run: cloc --exclude-list-file=.gitignore . > .measurements/cloc.txt
-    - run: cat .measurements/cloc.txt
+    - run: cloc --exclude-list-file=.gitignore . --yaml --out=.measurements/cloc.json
 
     - run: git add .
     - run: git commit -m "ci passed"
