@@ -45,12 +45,12 @@ jobs:
         token: ${{ secrets.PAT }}
         fetch-depth: 0
     - run: |
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+    - run: |
         git fetch --all
         git checkout ci_passed
         git rebase develop
-    - run: |
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git config --global user.name "github-actions[bot]"
 
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
