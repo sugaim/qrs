@@ -60,11 +60,12 @@ jobs:
     - run: |
         cargo llvm-cov --lcov --no-cfg-coverage --all-features --workspace 
         --output-path .measurements/coverage.info 
-        --ignore-filename-regex sandbox/*
+        --ignore-filename-regex sandbox
+    - run: cargo llvm-cov report --codecov --output-path target/codecov.dat
     - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        files: .measurements/coverage.info
+        file: target/codecov.dat
         name: codecov-coverage
         fail_ci_if_error: true
 
