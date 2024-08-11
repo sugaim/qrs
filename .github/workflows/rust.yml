@@ -43,6 +43,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         token: ${{ secrets.PAT }}
+        fetch-depth: 0
     - run: |
         git fetch --all
         git checkout ci_passed
