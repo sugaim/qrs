@@ -41,14 +41,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - run: git config --global user.email "github.actions@example.com"
-    - run: git config --global user.name "GitHub Actions"
-    - run: git fetch
-    - run: git checkout ci_passed
+    - run: |
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git fetch
+        git checkout ci_passed
 
     - run: sudo apt install cloc
     - run: cloc --exclude-list-file=.gitignore . > .measurements/cloc.txt
     - run: git add .measurements/cloc.txt
 
     - run: git commit -m "ci passed"
-    - run: git push
+    - run: git push https://${{ secrets.PAT }}@github.com/sugaim/qrs.git HEAD:ci_passed
+      env:
+        PAT: ${{ secrets.PAT }}
