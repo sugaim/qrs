@@ -44,9 +44,9 @@ jobs:
       with:
         token: ${{ secrets.PAT }}
     - run: |
-        git fetch
+        git fetch --all
         git checkout ci_passed
-        git rebase origin/develop
+        git rebase develop
     - run: |
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
