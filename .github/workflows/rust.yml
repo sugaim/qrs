@@ -58,10 +58,11 @@ jobs:
     - run: mkdir -p .measurements
 
     - run: |
-        cargo llvm-cov --lcov --no-cfg-coverage --all-features --workspace 
-        --output-path .measurements/coverage.info 
+        cargo llvm-cov --codecov 
+        --no-cfg-coverage --all-features --workspace 
+        --output-path target/codecov.dat
         --ignore-filename-regex sandbox
-    - run: cargo llvm-cov report --codecov --output-path target/codecov.dat
+    - run: cargo llvm-cov report --lcov --output-path .measurements/coverage.info
     - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
