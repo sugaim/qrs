@@ -52,8 +52,8 @@ jobs:
 
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
-    
-    - run: cargo install llvm-cov
+
+    - uses: taiki-e/install-action@cargo-llvm-cov
     - run: cargo llvm-cov --lcov --no-cfg-coverage --all-features --workspace --output-path .measurements/coverage.info
 
     - run: sudo apt install cloc
