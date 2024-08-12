@@ -6,6 +6,9 @@ use super::Real;
 pub trait RelPos<X = Self>: PartialOrd<X> {
     type Output: Real;
 
+    /// Compute relative position of `self` between `left` and `right`.
+    ///
+    /// Returns [None] if and only if `left` and `right` are equal.
     fn relpos_between(&self, left: &X, right: &X) -> Option<Self::Output>;
 }
 

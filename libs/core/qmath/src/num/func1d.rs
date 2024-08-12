@@ -3,8 +3,9 @@
 // -----------------------------------------------------------------------------
 pub trait Func1d<Arg> {
     type Output;
+    type Error;
 
-    fn eval(&self, arg: &Arg) -> Self::Output;
+    fn eval(&self, arg: &Arg) -> Result<Self::Output, Self::Error>;
 }
 
 // -----------------------------------------------------------------------------
@@ -13,11 +14,11 @@ pub trait Func1d<Arg> {
 pub trait DerX1d<Arg>: Func1d<Arg> {
     type DerX;
 
-    fn der_x(&self, arg: &Arg) -> Self::DerX;
+    fn der_x(&self, arg: &Arg) -> Result<Self::DerX, Self::Error>;
 
     #[inline]
-    fn der_0_x(&self, arg: &Arg) -> (Self::Output, Self::DerX) {
-        (self.eval(arg), self.der_x(arg))
+    fn der_0_x(&self, arg: &Arg) -> Result<(Self::Output, Self::DerX), Self::Error> {
+        Ok((self.eval(arg)?, self.der_x(arg)?))
     }
 }
 
@@ -27,12 +28,16 @@ pub trait DerX1d<Arg>: Func1d<Arg> {
 pub trait DerXX1d<Arg>: DerX1d<Arg> {
     type DerXX;
 
-    fn der_xx(&self, arg: &Arg) -> Self::DerXX;
+    fn der_xx(&self, arg: &Arg) -> Result<Self::DerXX, Self::Error>;
 
     #[inline]
-    fn der_0_x_xx(&self, arg: &Arg) -> (Self::Output, Self::DerX, Self::DerXX) {
-        let (val, der_x) = self.der_0_x(arg);
-        (val, der_x, self.der_xx(arg))
+    #[allow(clippy::type_complexity)]
+    fn der_0_x_xx(
+        &self,
+        arg: &Arg,
+    ) -> Result<(Self::Output, Self::DerX, Self::DerXX), Self::Error> {
+        let (val, der_x) = self.der_0_x(arg)?;
+        Ok((val, der_x, self.der_xx(arg)?))
     }
 }
 
