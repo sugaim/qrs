@@ -39,7 +39,8 @@ jobs:
         git merge develop
     
     - run: sudo apt-get update && sudo apt-get install -y cloc
-    - uses: ./.github/workflows/rust-setup
+    - uses: ./.github/workflows/rust-setup    
+    - run: cargo install cargo-llvm-cov
 
     - run: rm -rf .measurements
     - run: mkdir -p .measurements
