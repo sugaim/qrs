@@ -17,16 +17,11 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-    - run: cargo generate-lockfile
-    - uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: qrs.rust
+    - uses: ./.github/workflows/rust-setup
     
     - run: cargo fmt --all --check --verbose
-    - run: cargo build --release --workspace --all-features
-    - run: cargo clippy --release --all-features -- -D warnings
     - run: cargo test --release --workspace --all-features
+    - run: cargo clippy --release --all-features -- -D warnings
     
   post-process:
     needs: check
@@ -42,14 +37,9 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git checkout ci_passed
         git merge develop
-
-    - run: sudo apt install cloc
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: taiki-e/install-action@cargo-llvm-cov
-    - run: cargo generate-lockfile
-    - uses: Swatinem/rust-cache@v2
-      with:
-        shared-key: qrs.rust
+    
+    - run: sudo apt-get update && sudo apt-get install -y cloc
+    - uses: ./.github/workflows/rust-setup
 
     - run: rm -rf .measurements
     - run: mkdir -p .measurements
