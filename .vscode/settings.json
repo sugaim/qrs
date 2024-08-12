@@ -27,14 +27,5 @@
   },
   "coverage-gutters.showGutterCoverage": true,
   "coverage-gutters.showLineCoverage": false,
-  "files.eol": "\n",
-  "rust-analyzer.cargo.features": "all",
-  "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.checkOnSave": true,
-  "rust-analyzer.linkedProjects": ["./Cargo.toml"],
-  "yaml.completion": true,
-  "yaml.format.enable": true,
-  "yaml.hover": true,
-  "yaml.schemas": {},
-  "yaml.validate": true
+  "files.eol": "\n"
 }

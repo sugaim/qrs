@@ -21,6 +21,17 @@
       "path": "../libs/domain"
     }
   ],
+  "settings": {
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.linkedProjects": ["./Cargo.toml"],
+    "yaml.completion": true,
+    "yaml.format.enable": true,
+    "yaml.hover": true,
+    "yaml.schemas": {},
+    "yaml.validate": true
+  },
   "tasks": {
     "version": "2.0.0",
     "tasks": [

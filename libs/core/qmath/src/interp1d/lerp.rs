@@ -157,3 +157,75 @@ where
         Ok(Lerp1d::new(data))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, vec};
+
+    use super::*;
+
+    fn crate_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    #[test]
+    fn test_lerp1d_eval() {
+        let indata = crate_root().join("testdata/interp1d/in/lerp1d.json");
+        let indata: serde_json::Value =
+            serde_json::from_reader(std::fs::File::open(indata).unwrap()).unwrap();
+        let indata = indata.get("interp").unwrap().clone();
+        let tested: Lerp1d<f64, f64> = serde_json::from_value(indata).unwrap();
+
+        let expected = crate_root().join("testdata/interp1d/out/lerp1d.csv");
+        let expected = std::fs::read_to_string(expected).unwrap();
+
+        for line in expected.split('\n').skip(1) {
+            let vals = line.split(',').collect::<Vec<_>>();
+            let x: f64 = vals[0].parse().unwrap();
+            let y: f64 = vals[1].parse().unwrap();
+            let dy: f64 = vals[2].parse().unwrap();
+            let d2y: f64 = vals[3].parse().unwrap();
+
+            let y_ = tested.interp(&x).unwrap();
+            approx::assert_abs_diff_eq!(y, y_, epsilon = 1e-6);
+
+            let dy_ = tested.der_x(&x).unwrap();
+            approx::assert_abs_diff_eq!(dy, dy_, epsilon = 1e-6);
+
+            let d2y_ = tested.der_xx(&x).unwrap();
+            approx::assert_abs_diff_eq!(d2y, d2y_, epsilon = 1e-6);
+
+            let (y_, dy_) = tested.der_0_x(&x).unwrap();
+            approx::assert_abs_diff_eq!(y, y_, epsilon = 1e-6);
+            approx::assert_abs_diff_eq!(dy, dy_, epsilon = 1e-6);
+
+            let (y_, dy_, d2y_) = tested.der_0_x_xx(&x).unwrap();
+
+            approx::assert_abs_diff_eq!(y, y_, epsilon = 1e-6);
+            approx::assert_abs_diff_eq!(dy, dy_, epsilon = 1e-6);
+            approx::assert_abs_diff_eq!(d2y, d2y_, epsilon = 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_bulder() {
+        let xs = vec![0.0, 1.0, 2.0];
+        let ys = vec![0.0, 1.0, 2.0];
+        let data = FlatMap::with_data(xs, ys).unwrap();
+
+        let interp = Lerp1dBuilder.build(data.clone()).unwrap();
+
+        assert_eq!(interp.interpolatee(), &data);
+    }
+
+    #[test]
+    fn test_builder_err() {
+        let xs = vec![1.0];
+        let ys = vec![1.0];
+        let data = FlatMap::with_data(xs, ys).unwrap();
+
+        let res = Lerp1dBuilder.build(data);
+
+        assert!(res.is_err());
+    }
+}
