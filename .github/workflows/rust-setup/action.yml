@@ -17,8 +17,3 @@ runs:
       uses: Swatinem/rust-cache@v2
       with:
         prefix-key: rust-${{ steps.rust-toolchain.outputs.cachekey }}
-        shared-key: qrs.rust
-    
-    - name: Install llvm-cov
-      shell: bash
-      run: cargo install cargo-llvm-cov
