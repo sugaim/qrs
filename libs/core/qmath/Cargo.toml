@@ -12,6 +12,8 @@ libm = { workspace = true }
 num = { workspace = true }
 ordered-float = { workspace = true }
 
+qcollections = { workspace = true }
+
 [dev-dependencies]
 rstest = { workspace = true }
 static_assertions = { workspace = true }
