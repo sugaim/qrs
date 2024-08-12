@@ -133,6 +133,7 @@ where
 {
     type Builder = Lerp1dBuilder;
 
+    #[inline]
     fn destruct(self) -> (Self::Builder, FlatMap<Self::X, Self::Value>) {
         (Lerp1dBuilder, self.data.into_inner())
     }
@@ -162,6 +163,8 @@ where
 mod tests {
     use std::{path::PathBuf, vec};
 
+    use crate::num::Func1d;
+
     use super::*;
 
     fn crate_root() -> PathBuf {
@@ -187,6 +190,9 @@ mod tests {
             let d2y: f64 = vals[3].parse().unwrap();
 
             let y_ = tested.interp(&x).unwrap();
+            approx::assert_abs_diff_eq!(y, y_, epsilon = 1e-6);
+
+            let y_ = tested.eval(&x).unwrap();
             approx::assert_abs_diff_eq!(y, y_, epsilon = 1e-6);
 
             let dy_ = tested.der_x(&x).unwrap();
@@ -227,5 +233,18 @@ mod tests {
         let res = Lerp1dBuilder.build(data);
 
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_destruct() {
+        let xs = vec![0.0, 1.0, 2.0];
+        let ys = vec![0.0, 1.0, 2.0];
+        let data = FlatMap::with_data(xs, ys).unwrap();
+
+        let interp = Lerp1dBuilder.build(data.clone()).unwrap();
+        let (builder, data) = interp.destruct();
+
+        assert_eq!(builder, Lerp1dBuilder);
+        assert_eq!(data, data);
     }
 }
