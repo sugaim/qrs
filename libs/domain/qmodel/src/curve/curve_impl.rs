@@ -2,7 +2,7 @@ use qchrono::timepoint::DateTime;
 use qfincore::{daycount::Act365f, Yield};
 
 use super::{
-    adj::YieldCurveAdj,
+    adjust::YieldCurveAdj,
     composite::{Adjusted, Joint, Weighted},
     YieldCurve,
 };
@@ -97,7 +97,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::curve::{adj::Bump, atom::Flat};
+    use crate::curve::{adjust::Bump, atom::Flat};
     use qmath::num::Log;
 
     use super::*;

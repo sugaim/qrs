@@ -5,7 +5,9 @@ use qfincore::{daycount::Act365f, Ccy, Yield};
 use qmath::num::Real;
 use qproduct::Collateral;
 
-use crate::curve::{adj::Adj, atom::Atom, Curve, CurveReq, CurveSrc, CurveSrcInduce, YieldCurve};
+use crate::curve::{
+    adjust::Adj, atom::Atom, Curve, CurveReq, CurveSrc, CurveSrcInduce, YieldCurve,
+};
 
 // -----------------------------------------------------------------------------
 // DCrv

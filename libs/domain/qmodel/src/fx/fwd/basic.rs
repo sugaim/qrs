@@ -96,7 +96,7 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        curve::{adj::Adj, atom::Atom, atom::Flat, CurveReq, CurveSrcInduce},
+        curve::{adjust::Adj, atom::Atom, atom::Flat, CurveReq, CurveSrcInduce},
         ir::dcrv::DCrvSrcInduce,
     };
 
