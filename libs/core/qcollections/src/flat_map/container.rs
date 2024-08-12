@@ -383,7 +383,7 @@ mod tests {
         let vs = vec!["a", "c", "b"];
         let map = FlatMap::with_data(ks, vs).unwrap();
 
-        let json = serde_json::to_value(&map).unwrap();
+        let json = serde_json::to_value(map).unwrap();
         let expected = serde_json::json!([
             {"key": 1, "value": "a"},
             {"key": 2, "value": "b"},
@@ -398,7 +398,7 @@ mod tests {
         let vs: Vec<&'static str> = vec![];
         let map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
 
-        let json = serde_json::to_value(&map).unwrap();
+        let json = serde_json::to_value(map).unwrap();
         let expected = serde_json::json!([]);
         assert_eq!(json, expected);
     }
@@ -478,7 +478,7 @@ mod tests {
             {
                 let res = map.at_mut(at);
                 assert_eq!(res, Some((&at, &mut at.to_string())));
-                res.unwrap().1.push_str("!");
+                res.unwrap().1.push('!');
             }
             assert_eq!(map.at(at), Some((&at, &(at.to_string() + "!"))));
         } else {
@@ -525,7 +525,7 @@ mod tests {
             {
                 let res = map.get_mut(&key);
                 assert_eq!(res, Some(&mut key.to_string()));
-                res.unwrap().push_str("!");
+                res.unwrap().push('!');
             }
             assert_eq!(map.get(&key), Some(&(key.to_string() + "!")));
         } else {
