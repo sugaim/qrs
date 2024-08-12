@@ -1,7 +1,7 @@
-mod flat;
+pub mod adj;
+pub mod atom;
+pub mod composite;
+
 mod traits;
-mod variant;
 
-pub use traits::{LnCoord, LnVolSlice, VarianceStrikeDer};
-
-pub use flat::Flat;
+pub use traits::{LnCoord, LnVolSlice, StrikeDer};

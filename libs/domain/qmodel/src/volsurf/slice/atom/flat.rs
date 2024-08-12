@@ -1,13 +1,13 @@
 use qmath::num::Real;
 
-use super::{LnCoord, LnVolSlice, VarianceStrikeDer};
+use super::super::{LnCoord, LnVolSlice, StrikeDer};
 
 // -----------------------------------------------------------------------------
 // Flat
 // -----------------------------------------------------------------------------
 #[derive(Debug, Clone, PartialEq, serde::Serialize, schemars::JsonSchema)]
 pub struct Flat<V> {
-    iv: V,
+    vol: V,
 }
 
 //
@@ -20,11 +20,10 @@ impl<'de, V: Real + serde::Deserialize<'de>> serde::Deserialize<'de> for Flat<V>
     {
         #[derive(serde::Deserialize)]
         struct Inner<V> {
-            iv: V,
+            vol: V,
         }
-        let Inner { iv } = Inner::deserialize(deserializer)?;
-        Self::new(iv)
-            .ok_or_else(|| serde::de::Error::custom("implied volatility must be non-negative"))
+        let Inner { vol } = Inner::deserialize(deserializer)?;
+        Self::new(vol).map_err(serde::de::Error::custom)
     }
 }
 
@@ -35,38 +34,28 @@ impl<V: Real> Flat<V> {
     /// Create a new flat volatility slice from a implied volatility in Act365f.
     ///
     /// Returns [`None`] if the implied volatility is negative.
-    pub fn new(iv: V) -> Option<Self> {
-        if iv < V::zero() {
-            None
-        } else {
-            Some(Self { iv })
-        }
+    #[inline]
+    pub fn new(vol: V) -> anyhow::Result<Self> {
+        anyhow::ensure!(V::zero() <= vol, "implied volatility must be non-negative");
+        Ok(Self { vol })
     }
 }
 
 //
 // methods
 //
-impl<V: Real> Flat<V> {
-    /// Get the implied volatility.
-    #[inline]
-    pub fn iv(&self) -> &V {
-        &self.iv
-    }
-}
-
 impl<V: Real> LnVolSlice for Flat<V> {
     type Value = V;
 
     #[inline]
-    fn iv(&self, _coord: &LnCoord<V>) -> anyhow::Result<V> {
-        Ok(self.iv.clone())
+    fn lnvol(&self, _coord: &LnCoord<V>) -> anyhow::Result<V> {
+        Ok(self.vol.clone())
     }
 
     #[inline]
-    fn variance_der(&self, _coord: &LnCoord<V>) -> anyhow::Result<VarianceStrikeDer<V>> {
-        Ok(VarianceStrikeDer {
-            var: self.iv.clone(),
+    fn lnvol_der(&self, _coord: &LnCoord<V>) -> anyhow::Result<StrikeDer<V>> {
+        Ok(StrikeDer {
+            vol: self.vol.clone(),
             dvdy: V::zero(),
             d2vdy2: V::zero(),
         })

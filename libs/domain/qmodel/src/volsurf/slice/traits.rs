@@ -1,19 +1,21 @@
+use qmath::num::Real;
+
 // -----------------------------------------------------------------------------
 // LnCoord
-// IvStrikeDer
+// StrikeDer
 // -----------------------------------------------------------------------------
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LnCoord<V>(pub V);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct VarianceStrikeDer<V> {
-    /// Value, i.e., implied variance
-    pub var: V,
+pub struct StrikeDer<V> {
+    /// 0-th derivative of volatility w.r.t. log money-ness
+    pub vol: V,
 
-    /// First derivative of implied volatility w.r.t. log money-ness
+    /// First derivative of volatility w.r.t. log money-ness
     pub dvdy: V,
 
-    /// Second derivative of implied volatility w.r.t. log money-ness
+    /// Second derivative of volatility w.r.t. log money-ness
     pub d2vdy2: V,
 }
 
@@ -21,14 +23,11 @@ pub struct VarianceStrikeDer<V> {
 // LnVolSlice
 // -----------------------------------------------------------------------------
 pub trait LnVolSlice {
-    type Value;
+    type Value: Real;
 
-    /// Calculate implied volatility at the given log money-ness
-    fn iv(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value>;
+    /// Calculate volatility at the given log money-ness
+    fn lnvol(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value>;
 
-    /// Calculate 0th, 1st, and 2nd derivative of implied volatility at the given log money-ness
-    fn variance_der(
-        &self,
-        coord: &LnCoord<Self::Value>,
-    ) -> anyhow::Result<VarianceStrikeDer<Self::Value>>;
+    /// Calculate 0th, 1st, and 2nd derivative of volatility at the given log money-ness
+    fn lnvol_der(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<StrikeDer<Self::Value>>;
 }
