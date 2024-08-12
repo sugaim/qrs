@@ -94,7 +94,7 @@ impl<K, V> FlatMap<K, V> {
                 values: vs.len(),
             });
         }
-        let mut paired = ks.into_iter().zip(vs.into_iter()).collect::<Vec<_>>();
+        let mut paired = ks.into_iter().zip(vs).collect::<Vec<_>>();
         paired.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
         let (ks, vs) = paired.into_iter().unzip();
         Self::with_sorted(ks, vs)
@@ -110,7 +110,7 @@ impl<K, V> IntoIterator for FlatMap<K, V> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.ks.into_iter().zip(self.vs.into_iter())
+        self.ks.into_iter().zip(self.vs)
     }
 }
 
@@ -165,7 +165,7 @@ impl<K, V> FlatMap<K, V> {
         K: Borrow<Q>,
         Q: Ord,
     {
-        let idx = self.ks.binary_search_by(|k| k.borrow().cmp(&key)).ok()?;
+        let idx = self.ks.binary_search_by(|k| (*k.borrow()).cmp(key)).ok()?;
         self.vs.get(idx)
     }
 
@@ -175,7 +175,7 @@ impl<K, V> FlatMap<K, V> {
         K: Borrow<Q>,
         Q: Ord,
     {
-        let idx = self.ks.binary_search_by(|k| k.borrow().cmp(&key)).ok()?;
+        let idx = self.ks.binary_search_by(|k| (*k.borrow()).cmp(key)).ok()?;
         self.vs.get_mut(idx)
     }
 
@@ -202,11 +202,10 @@ impl<K, V> FlatMap<K, V> {
             .partition_point(|k| k.borrow() <= key)
             .saturating_sub(1);
 
-        if candidate == 0 && key < self.ks[0].borrow() {
-            Some(candidate)
-        } else if candidate == self.len() - 2 && self.ks[candidate].borrow() <= key {
-            Some(candidate)
-        } else if self.ks[candidate].borrow() <= key && key < self.ks[candidate + 1].borrow() {
+        if (candidate == 0 && key < self.ks[0].borrow())
+            || (candidate == self.len() - 2 && self.ks[candidate].borrow() <= key)
+            || (self.ks[candidate].borrow() <= key && key < self.ks[candidate + 1].borrow())
+        {
             Some(candidate)
         } else {
             None
