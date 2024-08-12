@@ -7,7 +7,7 @@ use super::Error;
 // -----------------------------------------------------------------------------
 // FlatMap
 // -----------------------------------------------------------------------------
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FlatMap<K, V> {
     ks: Vec<K>,
     vs: Vec<V>,
@@ -54,6 +54,45 @@ where
         items.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap_or(Ordering::Equal));
         let (ks, vs) = items.into_iter().map(|item| (item.key, item.value)).unzip();
         Self::with_sorted(ks, vs).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<K, V> schemars::JsonSchema for FlatMap<K, V>
+where
+    K: schemars::JsonSchema,
+    V: schemars::JsonSchema,
+{
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        format!(
+            "qcollections::FlatMap<{}, {}>",
+            K::schema_name(),
+            V::schema_name()
+        )
+        .into()
+    }
+    fn schema_name() -> String {
+        format!("FlatMap_for_{}_and_{}", K::schema_name(), V::schema_name())
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        #[derive(schemars::JsonSchema)]
+        #[allow(unused)]
+        struct Item<K, V> {
+            key: K,
+            value: V,
+        }
+
+        schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::Array.into()),
+            array: Some(Box::new(schemars::schema::ArrayValidation {
+                items: Some(schemars::schema::SingleOrVec::Single(Box::new(
+                    Item::<K, V>::json_schema(gen),
+                ))),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+        .into()
     }
 }
 

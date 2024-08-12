@@ -11,6 +11,8 @@ chrono = { workspace = true }
 libm = { workspace = true }
 num = { workspace = true }
 ordered-float = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 qcollections = { workspace = true }
 
