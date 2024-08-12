@@ -1,4 +1,4 @@
-pub mod adj;
+pub mod adjust;
 pub mod atom;
 pub mod composite;
 

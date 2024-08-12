@@ -1,7 +1,7 @@
 use qchrono::timepoint::DateTime;
 use qfincore::{daycount::Act365f, Yield};
 
-use super::super::{adj::YieldCurveAdj, YieldCurve};
+use super::super::{adjust::YieldCurveAdj, YieldCurve};
 
 // -----------------------------------------------------------------------------
 // Adjusted
@@ -92,7 +92,7 @@ mod tests {
     use qchrono::duration::Tenor;
 
     use crate::curve::{
-        adj::{Bump, Lookback},
+        adjust::{Bump, Lookback},
         composite::Joint,
     };
 

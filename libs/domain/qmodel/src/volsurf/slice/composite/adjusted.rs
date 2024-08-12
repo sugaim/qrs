@@ -1,4 +1,4 @@
-use crate::volsurf::slice::{adj::LnVolSliceAdj, LnVolSlice};
+use crate::volsurf::slice::{adjust::LnVolSliceAdj, LnVolSlice};
 
 // -----------------------------------------------------------------------------
 // Adjusted
