@@ -9,6 +9,7 @@ runs:
         components: rustfmt, clippy, llvm-tools
 
     - name: Generate lockfile
+      shell: bash
       run: cargo generate-lockfile
 
     - name: Cache cargo registry
