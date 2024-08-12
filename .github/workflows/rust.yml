@@ -18,25 +18,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+    - run: cargo generate-lockfile
     - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: qrs.rust.cache
 
-    - run: cargo check --all --all-features
+    - run: cargo check --release --all --all-features
     - run: cargo fmt --all --check --verbose
-    - run: cargo clippy --all-features -- -D warnings
-        
-  test:
-    needs: check
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
-
+    - run: cargo clippy --release --all-features -- -D warnings
     - run: cargo test --release --all-features
-
-  post:
-    needs: test
+    
+  post-process:
+    needs: check
     runs-on: ubuntu-latest
 
     steps:
@@ -47,14 +40,16 @@ jobs:
     - run: |
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
-        git fetch --all
         git checkout ci_passed
         git merge develop
 
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
-    - uses: taiki-e/install-action@cargo-llvm-cov
     - run: sudo apt install cloc
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: taiki-e/install-action@cargo-llvm-cov
+    - run: cargo generate-lockfile
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: qrs.rust.cache
 
     - run: rm -rf .measurements
     - run: mkdir -p .measurements
