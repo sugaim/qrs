@@ -37,7 +37,8 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git checkout ci_passed
         git merge develop
-
+    
+    - run: sudo apt-get update && sudo apt-get install -y cloc
     - uses: ./.github/workflows/rust-setup
 
     - run: rm -rf .measurements
