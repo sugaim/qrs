@@ -96,18 +96,23 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        curve::{adjust::Adj, atom::Atom, atom::Flat, CurveReq, CurveSrcInduce},
-        ir::dcrv::DCrvSrcInduce,
+        curve::{
+            adjust::Adj,
+            atom::{Atom, Flat},
+            composite::CompositeReq,
+            CurveSrc,
+        },
+        ir::dcrv::ResolveDCrv,
     };
 
     use super::*;
 
     struct MockCalendarSrc;
 
-    impl CurveSrcInduce for MockCalendarSrc {
-        type AtomCurve = Arc<Atom<f64>>;
+    impl CurveSrc for MockCalendarSrc {
+        type Curve = Arc<Atom<f64>>;
 
-        fn get_curve_atom(&self, name: &str) -> anyhow::Result<Self::AtomCurve> {
+        fn get_curve(&self, name: &str) -> anyhow::Result<Self::Curve> {
             match name {
                 "USD" => Ok(Arc::new(Atom::Flat(Flat { rate: 0.005 }))),
                 "JPY" => Ok(Arc::new(Atom::Flat(Flat { rate: 0.001 }))),
@@ -115,16 +120,16 @@ mod tests {
             }
         }
     }
-    impl DCrvSrcInduce for MockCalendarSrc {
+    impl ResolveDCrv for MockCalendarSrc {
         type Value = f64;
 
-        fn resolve_dcrv_req(
+        fn resolve_dcrv(
             &self,
             ccy: &Ccy,
             _: &Collateral,
-        ) -> anyhow::Result<CurveReq<Adj<f64>>> {
+        ) -> anyhow::Result<CompositeReq<Adj<f64>>> {
             let name = ccy.to_string();
-            Ok(CurveReq::Atom { name })
+            Ok(CompositeReq::Atom { name })
         }
     }
     impl FxSpotMktSrc for MockCalendarSrc {
