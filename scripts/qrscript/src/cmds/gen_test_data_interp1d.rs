@@ -6,7 +6,10 @@ use std::{
 use anyhow::{bail, ensure};
 use clap::ValueEnum;
 use dialoguer::Confirm;
-use qmath::{interp1d::Lerp1d, num::DerXX1d};
+use qmath::{
+    interp1d::{Lerp1d, Pwconst1d},
+    num::DerXX1d,
+};
 
 use crate::util::path::repo_root;
 
@@ -104,6 +107,7 @@ impl Cmd for Args {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Interp {
     Lerp(Lerp1d<f64, f64>),
+    PwConst(Pwconst1d<f64, f64>),
 }
 
 impl Interp {
@@ -112,6 +116,7 @@ impl Interp {
     ) -> Box<dyn DerXX1d<f64, Output = f64, DerX = f64, DerXX = f64, Error = anyhow::Error>> {
         match self {
             Interp::Lerp(interp) => Box::new(interp),
+            Interp::PwConst(interp) => Box::new(interp),
         }
     }
 }
@@ -143,8 +148,9 @@ impl Generator for CsvGenerator {
         let mut x = data.start;
         let mut lines = vec!["x,y,dy,d2y".to_string()];
         while x <= data.end {
-            let (y, dy, d2y) = f.der_0_x_xx(&x)?;
-            lines.push(format!("{x},{y},{dy},{d2y}"));
+            let arg = (x * 1e10).round() / 1e10;
+            let (y, dy, d2y) = f.der_0_x_xx(&arg)?;
+            lines.push(format!("{arg},{y},{dy},{d2y}"));
             x += data.step;
         }
         let contents = lines.join("\n");
