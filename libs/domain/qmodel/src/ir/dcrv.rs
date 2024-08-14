@@ -6,7 +6,10 @@ use qmath::num::Real;
 use qproduct::Collateral;
 
 use crate::curve::{
-    adjust::Adj, atom::Atom, Curve, CurveReq, CurveSrc, CurveSrcInduce, YieldCurve,
+    adjust::Adj,
+    atom::Atom,
+    composite::{Composite, CompositeReq, CompositeSrc},
+    CurveSrc, YieldCurve,
 };
 
 // -----------------------------------------------------------------------------
@@ -19,7 +22,7 @@ pub struct DCrv<V>(Arc<_Data<V>>);
 struct _Data<V> {
     ccy: Ccy,
     col: Collateral,
-    crv: Curve<Arc<Atom<V>>, Adj<V>>,
+    crv: Composite<Arc<Atom<V>>, Adj<V>>,
 }
 
 //
@@ -40,7 +43,7 @@ impl<V: Real> YieldCurve for DCrv<V> {
 
 // -----------------------------------------------------------------------------
 // DCrvSrc
-// DCrvSrcInduce
+// ResolveDCrv
 // -----------------------------------------------------------------------------
 pub trait DCrvSrc {
     type Value: Real;
@@ -48,23 +51,27 @@ pub trait DCrvSrc {
     fn get_dcrv(&self, ccy: &Ccy, col: &Collateral) -> anyhow::Result<DCrv<Self::Value>>;
 }
 
-pub trait DCrvSrcInduce: CurveSrcInduce<AtomCurve = Arc<Atom<Self::Value>>> {
+pub trait ResolveDCrv {
     type Value: Real;
 
-    fn resolve_dcrv_req(
+    fn resolve_dcrv(
         &self,
         ccy: &Ccy,
         col: &Collateral,
-    ) -> anyhow::Result<CurveReq<Adj<Self::Value>>>;
+    ) -> anyhow::Result<CompositeReq<Adj<Self::Value>>>;
 }
 
-impl<S: DCrvSrcInduce> DCrvSrc for S {
+impl<S> DCrvSrc for S
+where
+    S: ResolveDCrv,
+    S: CurveSrc<Curve = Arc<Atom<S::Value>>>,
+{
     type Value = S::Value;
 
     #[inline]
     fn get_dcrv(&self, ccy: &Ccy, col: &Collateral) -> anyhow::Result<DCrv<Self::Value>> {
-        let req = self.resolve_dcrv_req(ccy, col)?;
-        let crv = self.get_curve(req)?;
+        let req = self.resolve_dcrv(ccy, col)?;
+        let crv = self.get_composite_curve(req)?;
         Ok(DCrv(Arc::new(_Data {
             ccy: *ccy,
             col: col.clone(),

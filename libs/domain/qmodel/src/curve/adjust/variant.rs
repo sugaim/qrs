@@ -2,7 +2,7 @@ use qchrono::timepoint::DateTime;
 use qfincore::{daycount::Act365f, Yield};
 use qmath::num::Real;
 
-use crate::curve::YieldCurve;
+use crate::curve::{atom::Atom, YieldCurve};
 
 use super::{Bump, Lookback, YieldCurveAdj};
 
@@ -11,7 +11,7 @@ use super::{Bump, Lookback, YieldCurveAdj};
 // -----------------------------------------------------------------------------
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub enum Adj<V> {
-    Bump(Bump<V>),
+    Bump(Bump<Atom<V>>),
     Lookback(Lookback),
 }
 

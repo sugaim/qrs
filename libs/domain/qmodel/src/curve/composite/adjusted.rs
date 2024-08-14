@@ -93,6 +93,7 @@ mod tests {
 
     use crate::curve::{
         adjust::{Bump, Lookback},
+        atom::Flat,
         composite::Joint,
     };
 
@@ -100,7 +101,7 @@ mod tests {
 
     enum Adj {
         Lookback(Lookback),
-        Bump(Bump<f64>),
+        Bump(Bump<Flat<f64>>),
     }
 
     impl YieldCurveAdj<f64> for Adj {
@@ -128,11 +129,11 @@ mod tests {
             Adj::Lookback(Lookback {
                 tenor: Tenor::Days(1),
             }),
-            Adj::Bump(Bump::with_from(
-                0.03,
-                "2021-01-04T00:00:00Z".parse().unwrap(),
-            )),
+            Adj::Bump(Bump {
+                adjuster: Flat { rate: 0.03 },
+            }),
         ];
+
         let curve = Adjusted::new(base, adjs);
         let stt = "2021-01-04T00:00:00Z".parse().unwrap();
         let end = "2021-01-05T00:00:00Z".parse().unwrap();

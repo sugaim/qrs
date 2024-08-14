@@ -52,3 +52,12 @@ impl<C: YieldCurve> YieldCurve for Arc<C> {
         self.as_ref().forward_rate(from, to)
     }
 }
+
+// -----------------------------------------------------------------------------
+// CurveSrc
+// -----------------------------------------------------------------------------
+pub trait CurveSrc {
+    type Curve: YieldCurve;
+
+    fn get_curve(&self, name: &str) -> anyhow::Result<Self::Curve>;
+}
