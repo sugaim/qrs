@@ -1,4 +1,4 @@
-use std::ops::{Div, Sub};
+use std::ops::{Div, Mul, Sub};
 
 use anyhow::{anyhow, Context};
 use num::Zero;
@@ -7,7 +7,7 @@ use qcollections::{
     size_ensured::{RequireMinSize, SizeEnsured, SizedContainer},
 };
 
-use crate::num::{DerX1d, DerXX1d, RelPos, Vector};
+use crate::num::{Arithmetic, DerX1d, DerXX1d, Integrable1d, RelPos, Vector};
 
 use super::{Interp1d, Interp1dBuilder, RebuildableInterp1d};
 
@@ -88,6 +88,64 @@ where
         let dx = xlast.clone() - xfirst.clone();
         assert!(!dx.is_zero());
         Ok(V::zero() / dx.clone() / dx)
+    }
+}
+
+impl<X, V> Integrable1d<X> for Pwconst1d<X, V>
+where
+    X: PartialOrd + Clone + Sub,
+    V: Clone + Mul<<X as Sub>::Output>,
+    <V as Mul<<X as Sub>::Output>>::Output: Arithmetic,
+{
+    type Integrated = <V as Mul<<X as Sub>::Output>>::Output;
+
+    #[inline]
+    fn integrate(&self, from: &X, to: &X) -> anyhow::Result<Self::Integrated> {
+        if to < from {
+            return self.integrate(to, from).map(std::ops::Neg::neg);
+        }
+        let lidx = self
+            .data
+            .interval_index(from)
+            .ok_or_else(|| anyhow!("Given argument maybe uncomparable."))?;
+        let ridx = self
+            .data
+            .interval_index(to)
+            .ok_or_else(|| anyhow!("Given argument maybe uncomparable."))?;
+
+        // for the following case,
+        // where f and t are from and to respectively and [i] is i-th knots
+        //
+        //      ---[0]---f---[1]-----[2]-----[3]---t---[4]---
+        //
+        // we will calculate the following 2 parts,
+        //
+        //      left_contrib  = [f ~ 1]
+        //      right_contrib = [3 ~ t]
+        //
+        // and returns ([0 ~ 1] + [1 ~ 2] + [2 ~ 3] + [3 ~ 4]) - (left_contrib + right_contrib)
+        let mut res = Zero::zero();
+        for i in lidx..=ridx {
+            let (xl, vl) = self.data.at(i).unwrap();
+            let (xr, _) = self.data.at(i + 1).unwrap();
+            res += &(vl.clone() * (xr.clone() - xl.clone()));
+        }
+        let left_trim = {
+            let (xl, vl) = self.data.at(lidx).unwrap();
+            vl.clone() * (from.clone() - xl.clone())
+        };
+        let right_trim = {
+            let (_, vl) = self.data.at(ridx).unwrap();
+            let (xr, vr) = self.data.at(ridx + 1).unwrap();
+            let v = if self.data.keys().last().unwrap() < to {
+                vr
+            } else {
+                vl
+            };
+            v.clone() * (xr.clone() - to.clone())
+        };
+        res -= &(left_trim + &right_trim);
+        Ok(res)
     }
 }
 
@@ -211,5 +269,30 @@ mod tests {
 
         assert_eq!(builder, Pwconst1dBuilder);
         assert_eq!(data, data);
+    }
+
+    #[rstest::rstest]
+    #[case(-2.0, -1.0, 2.0)]
+    #[case(-2.0, -0.5, 3.0)]
+    #[case(-2.0, 0.5, 5.0)]
+    #[case(-2.0, 1.5, 6.5)]
+    #[case(0.5, 0.75, 0.5)]
+    #[case(0.5, 1.5, 1.5)]
+    #[case(2.0, 3.0, 3.0)]
+    #[case(2.0, 4.0, 4.0)]
+    #[case(2.0, 5.0, 5.0)]
+    #[case(2.5, 5.0, 3.5)]
+    #[case(2.5, 5.5, 4.0)]
+    fn test_integrate(#[case] from: f64, #[case] to: f64, #[case] expected: f64) {
+        let xs = vec![0.0, 1.0, 2.0, 3.0];
+        let ys = vec![2.0, 1.0, 3.0, 1.0];
+        let data = FlatMap::with_data(xs, ys).unwrap();
+        let interp = Pwconst1dBuilder.build(data).unwrap();
+
+        let res = interp.integrate(&from, &to).unwrap();
+        let inv = interp.integrate(&to, &from).unwrap();
+
+        approx::assert_abs_diff_eq!(res, expected, epsilon = 1e-6);
+        approx::assert_abs_diff_eq!(res, -inv, epsilon = 1e-6);
     }
 }

@@ -57,6 +57,39 @@
           "target/lcov.info"
         ],
         "problemMatcher": ["$rustc"]
+      },
+      {
+        "label": "qrs: fmt",
+        "group": "build",
+        "type": "cargo",
+        "command": "fmt",
+        "args": ["--all", "--check", "-v"],
+        "problemMatcher": ["$rustc"]
+      },
+      {
+        "label": "qrs: clippy",
+        "group": "build",
+        "type": "cargo",
+        "command": "clippy",
+        "args": [
+          "--all-features",
+          "--release",
+          "--workspace",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "problemMatcher": ["$rustc"],
+        "dependsOn": ["qrs: fmt"]
+      },
+      {
+        "label": "qrs: prepush",
+        "group": "test",
+        "type": "cargo",
+        "command": "nextest",
+        "args": ["run", "--all-features", "--workspace", "--release"],
+        "dependsOn": ["qrs: clippy"],
+        "problemMatcher": ["$rustc"]
       }
     ]
   }
