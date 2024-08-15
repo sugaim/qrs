@@ -86,14 +86,7 @@ impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Add for Yield<Dcf, V> {
 
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(
-            self.day_count, rhs.day_count,
-            "day_count mismatch. This must be checked before."
-        );
-        Self {
-            value: self.value + rhs.value,
-            day_count: self.day_count,
-        }
+        self + &rhs
     }
 }
 impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Add<&Self> for Yield<Dcf, V> {
@@ -126,14 +119,7 @@ impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Sub for Yield<Dcf, V> {
 
     #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(
-            self.day_count, rhs.day_count,
-            "day_count mismatch. This must be checked before."
-        );
-        Self {
-            value: self.value - &rhs.value,
-            day_count: self.day_count,
-        }
+        self - &rhs
     }
 }
 impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Sub<&Self> for Yield<Dcf, V> {
@@ -203,5 +189,320 @@ impl<V: Scalar> std::ops::Mul<Duration> for Yield<Act365f, V> {
     fn mul(self, rhs: Duration) -> Self::Output {
         let dcf = rhs.approx_secs() / (24.0 * 60.0 * 60.0 * 365.0);
         self.value * &V::nearest_value_of_f64(dcf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use qchrono::timepoint::DateTime;
+    use qmath::ext::num::Zero;
+    use rstest::rstest;
+
+    use crate::daycount::DayCount;
+
+    use super::*;
+
+    #[test]
+    fn test_convert() {
+        let y = Yield {
+            day_count: Act365f,
+            value: 1i32,
+        };
+
+        let y = y.convert(|v| v as f64 * 0.5);
+
+        assert_eq!(y.value, 0.5);
+    }
+
+    #[test]
+    fn test_zero() {
+        let y = Yield::<Act365f, f64>::zero();
+
+        assert_eq!(y.day_count, Act365f);
+        assert_eq!(y.value, 0f64);
+    }
+
+    #[test]
+    fn test_is_zero() {
+        let y = Yield::<Act365f, f64>::zero();
+
+        assert!(y.is_zero());
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0)]
+    #[case(DayCount::Act365f, 0.0)]
+    #[case(DayCount::Act365f, -3.0)]
+    #[case(DayCount::Act360, 1.0)]
+    #[case(DayCount::Act360, 0.0)]
+    #[case(DayCount::Act360, -3.0)]
+    fn test_neg(#[case] dcf: DayCount, #[case] value: f64) {
+        let y = Yield {
+            day_count: dcf.clone(),
+            value,
+        };
+
+        let y = -y;
+
+        assert_eq!(y.day_count, dcf);
+        assert_eq!(y.value, -value);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, 2.0)]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, -2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, 2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, -2.0)]
+    fn test_add(
+        #[case] dcf1: DayCount,
+        #[case] value1: f64,
+        #[case] dcf2: DayCount,
+        #[case] value2: f64,
+    ) {
+        let y1 = Yield {
+            day_count: dcf1.clone(),
+            value: value1,
+        };
+        let y2 = Yield {
+            day_count: dcf2.clone(),
+            value: value2,
+        };
+
+        let y = y1 + y2;
+
+        assert_eq!(y.day_count, dcf1);
+        assert_eq!(y.value, value1 + value2);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, DayCount::Act360)]
+    #[case(DayCount::Act360, DayCount::Act365f)]
+    #[should_panic]
+    fn test_add_panics(#[case] dcf1: DayCount, #[case] dcf2: DayCount) {
+        let y1 = Yield {
+            day_count: dcf1,
+            value: 1.0,
+        };
+        let y2 = Yield {
+            day_count: dcf2,
+            value: 2.0,
+        };
+
+        let _ = y1 + y2;
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, 2.0)]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, -2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, 2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, -2.0)]
+    fn test_add_assign(
+        #[case] dcf1: DayCount,
+        #[case] value1: f64,
+        #[case] dcf2: DayCount,
+        #[case] value2: f64,
+    ) {
+        let mut y1 = Yield {
+            day_count: dcf1.clone(),
+            value: value1,
+        };
+        let y2 = Yield {
+            day_count: dcf2.clone(),
+            value: value2,
+        };
+
+        y1 += &y2;
+
+        assert_eq!(y1.day_count, dcf1);
+        assert_eq!(y1.value, value1 + value2);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, DayCount::Act360)]
+    #[case(DayCount::Act360, DayCount::Act365f)]
+    #[should_panic]
+    fn test_add_assign_panics(#[case] dcf1: DayCount, #[case] dcf2: DayCount) {
+        let mut y1 = Yield {
+            day_count: dcf1,
+            value: 1.0,
+        };
+        let y2 = Yield {
+            day_count: dcf2,
+            value: 2.0,
+        };
+
+        y1 += &y2;
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, 2.0)]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, -2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, 2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, -2.0)]
+    fn test_sub(
+        #[case] dcf1: DayCount,
+        #[case] value1: f64,
+        #[case] dcf2: DayCount,
+        #[case] value2: f64,
+    ) {
+        let y1 = Yield {
+            day_count: dcf1.clone(),
+            value: value1,
+        };
+        let y2 = Yield {
+            day_count: dcf2.clone(),
+            value: value2,
+        };
+
+        let y = y1 - y2;
+
+        assert_eq!(y.day_count, dcf1);
+        assert_eq!(y.value, value1 - value2);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, DayCount::Act360)]
+    #[case(DayCount::Act360, DayCount::Act365f)]
+    #[should_panic]
+    fn test_sub_panics(#[case] dcf1: DayCount, #[case] dcf2: DayCount) {
+        let y1 = Yield {
+            day_count: dcf1,
+            value: 1.0,
+        };
+        let y2 = Yield {
+            day_count: dcf2,
+            value: 2.0,
+        };
+
+        let _ = y1 - y2;
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, 2.0)]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, -2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, 2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, -2.0)]
+    fn test_sub_assign(
+        #[case] dcf1: DayCount,
+        #[case] value1: f64,
+        #[case] dcf2: DayCount,
+        #[case] value2: f64,
+    ) {
+        let mut y1 = Yield {
+            day_count: dcf1.clone(),
+            value: value1,
+        };
+        let y2 = Yield {
+            day_count: dcf2.clone(),
+            value: value2,
+        };
+
+        y1 -= &y2;
+
+        assert_eq!(y1.day_count, dcf1);
+        assert_eq!(y1.value, value1 - value2);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, DayCount::Act360)]
+    #[case(DayCount::Act360, DayCount::Act365f)]
+    #[should_panic]
+    fn test_sub_assign_panics(#[case] dcf1: DayCount, #[case] dcf2: DayCount) {
+        let mut y1 = Yield {
+            day_count: dcf1,
+            value: 1.0,
+        };
+        let y2 = Yield {
+            day_count: dcf2,
+            value: 2.0,
+        };
+
+        y1 -= &y2;
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, 2.0)]
+    #[case(DayCount::Act365f, 1.0, -2.0)]
+    #[case(DayCount::Act360, 1.0, 2.0)]
+    #[case(DayCount::Act360, 1.0, -2.0)]
+    fn test_mul(#[case] dcf: DayCount, #[case] value: f64, #[case] rhs: f64) {
+        let y = Yield {
+            day_count: dcf.clone(),
+            value,
+        };
+
+        let y = y * &rhs;
+
+        assert_eq!(y.day_count, dcf);
+        assert_eq!(y.value, value * rhs);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, 2.0)]
+    #[case(DayCount::Act365f, 1.0, -2.0)]
+    #[case(DayCount::Act360, 1.0, 2.0)]
+    #[case(DayCount::Act360, 1.0, -2.0)]
+    fn test_mul_assign(#[case] dcf: DayCount, #[case] value: f64, #[case] rhs: f64) {
+        let mut y = Yield {
+            day_count: dcf.clone(),
+            value,
+        };
+
+        y *= &rhs;
+
+        assert_eq!(y.day_count, dcf);
+        assert_eq!(y.value, value * rhs);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, 2.0)]
+    #[case(DayCount::Act365f, 1.0, -2.0)]
+    #[case(DayCount::Act360, 1.0, 2.0)]
+    #[case(DayCount::Act360, 1.0, -2.0)]
+    fn test_div(#[case] dcf: DayCount, #[case] value: f64, #[case] rhs: f64) {
+        let y = Yield {
+            day_count: dcf.clone(),
+            value,
+        };
+
+        let y = y / &rhs;
+
+        assert_eq!(y.day_count, dcf);
+        assert_eq!(y.value, value / rhs);
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, 2.0)]
+    #[case(DayCount::Act365f, 1.0, -2.0)]
+    #[case(DayCount::Act360, 1.0, 2.0)]
+    #[case(DayCount::Act360, 1.0, -2.0)]
+    fn test_div_assign(#[case] dcf: DayCount, #[case] value: f64, #[case] rhs: f64) {
+        let mut y = Yield {
+            day_count: dcf.clone(),
+            value,
+        };
+
+        y /= &rhs;
+
+        assert_eq!(y.day_count, dcf);
+        assert_eq!(y.value, value / rhs);
+    }
+
+    #[rstest]
+    #[case(0.02, "2021-01-01T00:00:00Z".parse().unwrap(), "2022-01-01T00:00:00Z".parse().unwrap())]
+    #[case(0.05, "2021-01-01T00:00:00Z".parse().unwrap(), "2021-01-02T00:00:00Z".parse().unwrap())]
+    #[case(0.01, "2021-01-01T00:00:00Z".parse().unwrap(), "2021-01-01T12:00:00Z".parse().unwrap())]
+    #[case(1.05, "2021-01-01T00:00:00Z".parse().unwrap(), "2021-01-01T06:00:00Z".parse().unwrap())]
+    #[case(1.0, "2021-01-01T00:00:00Z".parse().unwrap(), "2021-01-01T03:00:00Z".parse().unwrap())]
+    fn test_mul_duration(#[case] yld: f64, #[case] stt: DateTime, #[case] end: DateTime) {
+        let y = Yield {
+            day_count: Act365f,
+            value: yld,
+        };
+        let year = Act365f.year_frac(&stt, &end).unwrap();
+
+        let y = y * (end - stt);
+
+        assert_eq!(y, yld * year);
     }
 }
