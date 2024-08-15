@@ -1,4 +1,5 @@
-pub mod gen_test_data_interp1d;
+mod gen_doc_schema;
+mod gen_test_data_interp1d;
 
 // -----------------------------------------------------------------------------
 // Cmd
@@ -14,6 +15,7 @@ pub trait Cmd {
 pub enum Commands {
     ShortCut(ShortCutArgs),
     GenTestData(GenTestDataArgs),
+    GenDocs(GenDocsArgs),
 }
 
 impl Cmd for Commands {
@@ -21,6 +23,7 @@ impl Cmd for Commands {
         match self {
             Commands::ShortCut(args) => args.run(),
             Commands::GenTestData(args) => args.run(),
+            Commands::GenDocs(args) => args.run(),
         }
     }
 }
@@ -38,6 +41,7 @@ pub struct ShortCutArgs {
 #[derive(Debug, clap::Subcommand)]
 pub enum ShortCut {
     GenInterp1dTestData,
+    GenSchema,
 }
 
 impl Cmd for ShortCutArgs {
@@ -48,6 +52,15 @@ impl Cmd for ShortCutArgs {
                     subcmd: GenTestData::Interp1d(gen_test_data_interp1d::Args {
                         format: gen_test_data_interp1d::Format::Csv,
                         indir: None,
+                        outdir: None,
+                        auto_clean: Some(true),
+                    }),
+                };
+                args.run()
+            }
+            ShortCut::GenSchema => {
+                let args = GenDocsArgs {
+                    subcmd: GenDocs::Schema(gen_doc_schema::Args {
                         outdir: None,
                         auto_clean: Some(true),
                     }),
@@ -78,6 +91,30 @@ impl Cmd for GenTestDataArgs {
     fn run(&self) -> anyhow::Result<()> {
         match &self.subcmd {
             GenTestData::Interp1d(args) => args.run(),
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// GenDocsArgs
+// GenDocs
+// -----------------------------------------------------------------------------
+#[derive(Debug, clap::Args)]
+pub struct GenDocsArgs {
+    #[clap(subcommand)]
+    subcmd: GenDocs,
+}
+
+#[derive(Debug, clap::Subcommand)]
+#[clap(rename_all = "snake_case")]
+enum GenDocs {
+    Schema(gen_doc_schema::Args),
+}
+
+impl Cmd for GenDocsArgs {
+    fn run(&self) -> anyhow::Result<()> {
+        match &self.subcmd {
+            GenDocs::Schema(args) => args.run(),
         }
     }
 }

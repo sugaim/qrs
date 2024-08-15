@@ -1,0 +1,12 @@
+{
+  "title": "Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double",
+  "type": "object",
+  "required": [
+    "data"
+  ],
+  "properties": {
+    "data": {
+      "$ref": "./SizeEnsured2_for_FlatMap_for_DateTime_and_Yield_for_Act365f_and_double.yaml"
+    }
+  }
+}

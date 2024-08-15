@@ -1,0 +1,12 @@
+{
+  "title": "Lookback",
+  "type": "object",
+  "required": [
+    "tenor"
+  ],
+  "properties": {
+    "tenor": {
+      "$ref": "./Tenor.yaml"
+    }
+  }
+}

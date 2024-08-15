@@ -12,7 +12,11 @@ dialoguer = { workspace = true }
 env_logger = { workspace = true }
 git2 = { workspace = true }
 log = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+qchrono = { workspace = true }
+qfincore = { workspace = true }
 qmath = { workspace = true }
+qmodel = { workspace = true }

@@ -1,0 +1,6 @@
+{
+  "title": "Tenor",
+  "description": "Tenor string. e.g. P1D, P1W, P1M, P1Y",
+  "type": "string",
+  "pattern": "^[-+]?P\\d+[DWMY]$"
+}

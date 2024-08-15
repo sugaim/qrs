@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Atom_for_double",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "rate",
+        "type"
+      ],
+      "properties": {
+        "rate": {
+          "description": "Flat yield(value, not a percent nor a bps) in Act/365F.",
+          "type": "number",
+          "format": "double"
+        },
+        "type": {
+          "type": "string",
+          "const": "flat"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "inst_fwd",
+        "type"
+      ],
+      "properties": {
+        "inst_fwd": {
+          "$ref": "./Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "instfwd_pwconst"
+        }
+      }
+    }
+  ]
+}

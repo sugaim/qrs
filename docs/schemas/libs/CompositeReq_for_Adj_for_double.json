@@ -1,0 +1,340 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CompositeReq_for_Adj_for_double",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "Atom"
+      ],
+      "properties": {
+        "Atom": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "Adjusted"
+      ],
+      "properties": {
+        "Adjusted": {
+          "$ref": "#/definitions/Adjusted_for_CompositeReq_for_Adj_for_double_and_Adj_for_double"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "Joint"
+      ],
+      "properties": {
+        "Joint": {
+          "$ref": "#/definitions/Joint_for_CompositeReq_for_Adj_for_double_and_CompositeReq_for_Adj_for_double"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "Weighted"
+      ],
+      "properties": {
+        "Weighted": {
+          "$ref": "#/definitions/Weighted_for_CompositeReq_for_Adj_for_double"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "Act365f": {
+      "type": "string",
+      "format": "act365f"
+    },
+    "Adj_for_double": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Bump"
+          ],
+          "properties": {
+            "Bump": {
+              "$ref": "#/definitions/Bump_for_Atom_for_double"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Lookback"
+          ],
+          "properties": {
+            "Lookback": {
+              "$ref": "#/definitions/Lookback"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Adjusted_for_CompositeReq_for_Adj_for_double_and_Adj_for_double": {
+      "type": "object",
+      "required": [
+        "adjustment",
+        "curve"
+      ],
+      "properties": {
+        "adjustment": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Adj_for_double"
+          }
+        },
+        "curve": {
+          "$ref": "#/definitions/CompositeReq_for_Adj_for_double"
+        }
+      }
+    },
+    "Atom_for_double": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "rate",
+            "type"
+          ],
+          "properties": {
+            "rate": {
+              "description": "Flat yield(value, not a percent nor a bps) in Act/365F.",
+              "type": "number",
+              "format": "double"
+            },
+            "type": {
+              "type": "string",
+              "const": "flat"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "inst_fwd",
+            "type"
+          ],
+          "properties": {
+            "inst_fwd": {
+              "$ref": "#/definitions/Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double"
+            },
+            "type": {
+              "type": "string",
+              "const": "instfwd_pwconst"
+            }
+          }
+        }
+      ]
+    },
+    "Bump_for_Atom_for_double": {
+      "type": "object",
+      "required": [
+        "adjuster"
+      ],
+      "properties": {
+        "adjuster": {
+          "$ref": "#/definitions/Atom_for_double"
+        }
+      }
+    },
+    "Component_for_CompositeReq_for_Adj_for_double": {
+      "type": "object",
+      "required": [
+        "curve",
+        "weight"
+      ],
+      "properties": {
+        "curve": {
+          "$ref": "#/definitions/CompositeReq_for_Adj_for_double"
+        },
+        "weight": {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    },
+    "CompositeReq_for_Adj_for_double": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Atom"
+          ],
+          "properties": {
+            "Atom": {
+              "type": "object",
+              "required": [
+                "name"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Adjusted"
+          ],
+          "properties": {
+            "Adjusted": {
+              "$ref": "#/definitions/Adjusted_for_CompositeReq_for_Adj_for_double_and_Adj_for_double"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Joint"
+          ],
+          "properties": {
+            "Joint": {
+              "$ref": "#/definitions/Joint_for_CompositeReq_for_Adj_for_double_and_CompositeReq_for_Adj_for_double"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Weighted"
+          ],
+          "properties": {
+            "Weighted": {
+              "$ref": "#/definitions/Weighted_for_CompositeReq_for_Adj_for_double"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DateTime": {
+      "description": "DateTime with timezone. RFC3339 string or naive datetime with IANA(e.g. '2024-06-01T12:34:56[Asia/Tokyo]') are supported",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|(\\+|-)\\d{2}:\\d{2}|\\[.+\\])$"
+    },
+    "Joint_for_CompositeReq_for_Adj_for_double_and_CompositeReq_for_Adj_for_double": {
+      "description": "A combination of short term and long term yield curves.",
+      "type": "object",
+      "required": [
+        "long",
+        "short",
+        "switch_point"
+      ],
+      "properties": {
+        "long": {
+          "$ref": "#/definitions/CompositeReq_for_Adj_for_double"
+        },
+        "short": {
+          "$ref": "#/definitions/CompositeReq_for_Adj_for_double"
+        },
+        "switch_point": {
+          "$ref": "#/definitions/DateTime"
+        }
+      }
+    },
+    "Lookback": {
+      "type": "object",
+      "required": [
+        "tenor"
+      ],
+      "properties": {
+        "tenor": {
+          "$ref": "#/definitions/Tenor"
+        }
+      }
+    },
+    "Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double": {
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/SizeEnsured2_for_FlatMap_for_DateTime_and_Yield_for_Act365f_and_double"
+        }
+      }
+    },
+    "SizeEnsured2_for_FlatMap_for_DateTime_and_Yield_for_Act365f_and_double": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "$ref": "#/definitions/DateTime"
+          },
+          "value": {
+            "$ref": "#/definitions/Yield_for_Act365f_and_double"
+          }
+        }
+      },
+      "minItems": 2
+    },
+    "Tenor": {
+      "description": "Tenor string. e.g. P1D, P1W, P1M, P1Y",
+      "type": "string",
+      "pattern": "^[-+]?P\\d+[DWMY]$"
+    },
+    "Weighted_for_CompositeReq_for_Adj_for_double": {
+      "type": "object",
+      "required": [
+        "components"
+      ],
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Component_for_CompositeReq_for_Adj_for_double"
+          }
+        }
+      }
+    },
+    "Yield_for_Act365f_and_double": {
+      "type": "object",
+      "required": [
+        "day_count",
+        "value"
+      ],
+      "properties": {
+        "day_count": {
+          "$ref": "#/definitions/Act365f"
+        },
+        "value": {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    }
+  }
+}
