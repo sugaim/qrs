@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 
-use qchrono::ext::chrono::Datelike;
-use qmath::num::Real;
+use qchrono::{duration::Duration, ext::chrono::Datelike};
+use qmath::num::{Arithmetic, FloatBased, Real, Scalar};
 
-use crate::daycount::YearFrac;
+use crate::daycount::{Act365f, YearFrac};
 
 // -----------------------------------------------------------------------------
 // Yield
@@ -53,7 +53,7 @@ impl<Dcf, V> Yield<Dcf, V> {
     }
 }
 
-impl<Dcf: Debug + Eq + Default, V: Real> qmath::ext::num::Zero for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq + Default, V: Arithmetic> qmath::ext::num::Zero for Yield<Dcf, V> {
     #[inline]
     fn zero() -> Self {
         Self {
@@ -67,10 +67,10 @@ impl<Dcf: Debug + Eq + Default, V: Real> qmath::ext::num::Zero for Yield<Dcf, V>
         self.value.is_zero()
     }
 }
-impl<Dcf, V: Real> qmath::num::FloatBased for Yield<Dcf, V> {
+impl<Dcf, V: FloatBased> qmath::num::FloatBased for Yield<Dcf, V> {
     type BaseFloat = V::BaseFloat;
 }
-impl<Dcf, V: Real> std::ops::Neg for Yield<Dcf, V> {
+impl<Dcf, V: Arithmetic> std::ops::Neg for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -81,7 +81,7 @@ impl<Dcf, V: Real> std::ops::Neg for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf: Debug + Eq, V: Real> std::ops::Add for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Add for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -96,7 +96,7 @@ impl<Dcf: Debug + Eq, V: Real> std::ops::Add for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf: Debug + Eq, V: Real> std::ops::Add<&Self> for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Add<&Self> for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -111,7 +111,7 @@ impl<Dcf: Debug + Eq, V: Real> std::ops::Add<&Self> for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf: Debug + Eq, V: Real> std::ops::AddAssign<&Self> for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::AddAssign<&Self> for Yield<Dcf, V> {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         assert_eq!(
@@ -121,7 +121,7 @@ impl<Dcf: Debug + Eq, V: Real> std::ops::AddAssign<&Self> for Yield<Dcf, V> {
         self.value += &rhs.value;
     }
 }
-impl<Dcf: Debug + Eq, V: Real> std::ops::Sub for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Sub for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -136,7 +136,7 @@ impl<Dcf: Debug + Eq, V: Real> std::ops::Sub for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf: Debug + Eq, V: Real> std::ops::Sub<&Self> for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::Sub<&Self> for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -151,7 +151,7 @@ impl<Dcf: Debug + Eq, V: Real> std::ops::Sub<&Self> for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf: Debug + Eq, V: Real> std::ops::SubAssign<&Self> for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: Arithmetic> std::ops::SubAssign<&Self> for Yield<Dcf, V> {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         assert_eq!(
@@ -161,7 +161,7 @@ impl<Dcf: Debug + Eq, V: Real> std::ops::SubAssign<&Self> for Yield<Dcf, V> {
         self.value -= &rhs.value;
     }
 }
-impl<Dcf, V: Real> std::ops::Mul<&V::BaseFloat> for Yield<Dcf, V> {
+impl<Dcf, V: Scalar> std::ops::Mul<&V::BaseFloat> for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -172,13 +172,13 @@ impl<Dcf, V: Real> std::ops::Mul<&V::BaseFloat> for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf, V: Real> std::ops::MulAssign<&V::BaseFloat> for Yield<Dcf, V> {
+impl<Dcf, V: Scalar> std::ops::MulAssign<&V::BaseFloat> for Yield<Dcf, V> {
     #[inline]
     fn mul_assign(&mut self, rhs: &V::BaseFloat) {
         self.value *= rhs;
     }
 }
-impl<Dcf, V: Real> std::ops::Div<&V::BaseFloat> for Yield<Dcf, V> {
+impl<Dcf, V: Scalar> std::ops::Div<&V::BaseFloat> for Yield<Dcf, V> {
     type Output = Self;
 
     #[inline]
@@ -189,9 +189,19 @@ impl<Dcf, V: Real> std::ops::Div<&V::BaseFloat> for Yield<Dcf, V> {
         }
     }
 }
-impl<Dcf, V: Real> std::ops::DivAssign<&V::BaseFloat> for Yield<Dcf, V> {
+impl<Dcf, V: Scalar> std::ops::DivAssign<&V::BaseFloat> for Yield<Dcf, V> {
     #[inline]
     fn div_assign(&mut self, rhs: &V::BaseFloat) {
         self.value /= rhs;
+    }
+}
+
+impl<V: Scalar> std::ops::Mul<Duration> for Yield<Act365f, V> {
+    type Output = V;
+
+    #[inline]
+    fn mul(self, rhs: Duration) -> Self::Output {
+        let dcf = rhs.approx_secs() / (24.0 * 60.0 * 60.0 * 365.0);
+        self.value * &V::nearest_value_of_f64(dcf)
     }
 }
