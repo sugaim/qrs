@@ -120,4 +120,33 @@ mod tests {
         approx::assert_abs_diff_eq!(dcf, expected, epsilon = 1e-10);
         approx::assert_abs_diff_eq!(dcf, -rev, epsilon = 1e-10);
     }
+
+    #[test]
+    fn test_ser() {
+        let act365f = Act365f;
+
+        let ser = serde_json::to_string(&act365f).unwrap();
+
+        assert_eq!(ser, "\"act365f\"");
+    }
+
+    #[test]
+    fn test_de() {
+        let ser = "\"act365f\"";
+
+        let act365f: Act365f = serde_json::from_str(ser).unwrap();
+
+        assert_eq!(act365f, Act365f);
+    }
+
+    #[rstest]
+    #[case("\"Act365f\"")]
+    #[case("\"act360\"")]
+    #[case("\" act365f\"")]
+    #[case("\"act365f \"")]
+    fn test_de_err(#[case] ser: &str) {
+        let act365f: Result<Act365f, _> = serde_json::from_str(ser);
+
+        assert!(act365f.is_err());
+    }
 }

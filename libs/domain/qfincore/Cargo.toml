@@ -17,3 +17,4 @@ qmath = { workspace = true }
 [dev-dependencies]
 approx = { workspace = true }
 rstest = { workspace = true }
+serde_json = { workspace = true }

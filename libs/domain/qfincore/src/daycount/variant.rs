@@ -5,7 +5,7 @@ use qchrono::{
     timepoint::Date,
 };
 
-use super::{Act365f, Bd252, YearFrac};
+use super::{Act360, Act365f, Bd252, YearFrac};
 
 // -----------------------------------------------------------------------------
 // DayCount
@@ -13,6 +13,7 @@ use super::{Act365f, Bd252, YearFrac};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DayCount {
     Act365f,
+    Act360,
     Bd252(Bd252),
 }
 
@@ -20,6 +21,13 @@ impl From<Act365f> for DayCount {
     #[inline]
     fn from(_: Act365f) -> Self {
         DayCount::Act365f
+    }
+}
+
+impl From<Act360> for DayCount {
+    #[inline]
+    fn from(_: Act360) -> Self {
+        DayCount::Act360
     }
 }
 
@@ -45,6 +53,7 @@ impl YearFrac for DayCount {
     fn year_frac(&self, start: &Date, end: &Date) -> anyhow::Result<f64> {
         match self {
             DayCount::Act365f => Act365f.year_frac(start, end).map_err(Into::into),
+            DayCount::Act360 => Act360.year_frac(start, end).map_err(Into::into),
             DayCount::Bd252(src) => src.year_frac(start, end).map_err(Into::into),
         }
     }
@@ -55,6 +64,7 @@ impl DayCount {
     pub fn symbol(&self) -> DayCountSym {
         match self {
             DayCount::Act365f => DayCountSym::Act365f,
+            DayCount::Act360 => DayCountSym::Act360,
             DayCount::Bd252(src) => DayCountSym::Bd252 {
                 calendar: src.calendar_sym().clone(),
             },
@@ -71,6 +81,7 @@ impl DayCount {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DayCountSym {
     Act365f,
+    Act360,
     Bd252 { calendar: CalendarSym },
 }
 
@@ -79,6 +90,7 @@ impl Display for DayCountSym {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DayCountSym::Act365f => write!(f, "act365f"),
+            DayCountSym::Act360 => write!(f, "act360"),
             DayCountSym::Bd252 { calendar } => write!(f, "bd252[{}]", calendar),
         }
     }
@@ -95,6 +107,7 @@ impl<S: CalendarSrc> DayCountSrc for S {
     fn get_daycount(&self, sym: &DayCountSym) -> anyhow::Result<DayCount> {
         match sym {
             DayCountSym::Act365f => Ok(Act365f.into()),
+            DayCountSym::Act360 => Ok(Act360.into()),
             DayCountSym::Bd252 { calendar } => {
                 let cal = self.get_calendar(calendar)?;
                 Ok(Bd252::new(calendar.clone(), cal).into())
