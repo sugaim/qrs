@@ -1,0 +1,17 @@
+{
+  "title": "Component_for_CompositeReq_for_Adj_for_double",
+  "type": "object",
+  "required": [
+    "curve",
+    "weight"
+  ],
+  "properties": {
+    "curve": {
+      "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+    },
+    "weight": {
+      "type": "number",
+      "format": "double"
+    }
+  }
+}

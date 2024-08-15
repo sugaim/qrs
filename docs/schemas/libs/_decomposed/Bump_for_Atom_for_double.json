@@ -1,0 +1,12 @@
+{
+  "title": "Bump_for_Atom_for_double",
+  "type": "object",
+  "required": [
+    "adjuster"
+  ],
+  "properties": {
+    "adjuster": {
+      "$ref": "./Atom_for_double.yaml"
+    }
+  }
+}

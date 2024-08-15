@@ -1,0 +1,29 @@
+{
+  "title": "Adj_for_double",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "Bump"
+      ],
+      "properties": {
+        "Bump": {
+          "$ref": "./Bump_for_Atom_for_double.yaml"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "Lookback"
+      ],
+      "properties": {
+        "Lookback": {
+          "$ref": "./Lookback.yaml"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "title": "SizeEnsured2_for_FlatMap_for_DateTime_and_Yield_for_Act365f_and_double",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "key",
+      "value"
+    ],
+    "properties": {
+      "key": {
+        "$ref": "./DateTime.yaml"
+      },
+      "value": {
+        "$ref": "./Yield_for_Act365f_and_double.yaml"
+      }
+    }
+  },
+  "minItems": 2
+}
