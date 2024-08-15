@@ -7,8 +7,49 @@ use super::YearFrac;
 // -----------------------------------------------------------------------------
 // Act365f
 // -----------------------------------------------------------------------------
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Act365f;
+
+//
+// ser/de
+//
+impl serde::Serialize for Act365f {
+    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
+        _serializer.serialize_str("act365f")
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Act365f {
+    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
+        let s: &str = serde::Deserialize::deserialize(_deserializer)?;
+        if s == "act365f" {
+            Ok(Act365f)
+        } else {
+            Err(serde::de::Error::custom(
+                "Day count fraction string must be 'act365f'",
+            ))
+        }
+    }
+}
+
+impl schemars::JsonSchema for Act365f {
+    fn schema_name() -> String {
+        "Act365f".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "qfincore::daycount::Act365f".into()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            format: Some("act365f".to_string()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
 
 //
 // behavior

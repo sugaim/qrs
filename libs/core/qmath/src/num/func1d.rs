@@ -47,5 +47,5 @@ pub trait DerXX1d<Arg>: DerX1d<Arg> {
 pub trait Integrable1d<Arg>: Func1d<Arg> {
     type Integrated;
 
-    fn integrate(&self, from: &Arg, to: &Arg) -> Self::Integrated;
+    fn integrate(&self, from: &Arg, to: &Arg) -> Result<Self::Integrated, Self::Error>;
 }
