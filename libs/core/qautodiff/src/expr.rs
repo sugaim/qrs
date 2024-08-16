@@ -316,10 +316,7 @@ where
 
     #[inline]
     fn neg(self) -> Self::Output {
-        match &self.0 {
-            _Expr::Const(v) => (-v.clone()).into(),
-            _Expr::Node(node) => (-node).into(),
-        }
+        -self.clone()
     }
 }
 
@@ -333,16 +330,7 @@ macro_rules! _define_arithmetic_binary {
 
             #[inline]
             fn $fn(self, rhs: Expr<K, V>) -> Self::Output {
-                match (self.0, rhs.0) {
-                    (_Expr::Const(lhs), _Expr::Const(rhs)) => std::ops::$tr::$fn(lhs, &rhs).into(),
-                    (_Expr::Const(lhs), _Expr::Node(rhs)) => {
-                        std::ops::$tr::$fn(Scalar(lhs.clone()), &rhs).into()
-                    }
-                    (_Expr::Node(lhs), _Expr::Const(rhs)) => {
-                        std::ops::$tr::$fn(&lhs, Scalar(&rhs)).into()
-                    }
-                    (_Expr::Node(lhs), _Expr::Node(rhs)) => std::ops::$tr::$fn(&lhs, &rhs).into(),
-                }
+                std::ops::$tr::$fn(self, &rhs)
             }
         }
         impl<K, V> std::ops::$tr<V> for Expr<K, V>
@@ -353,10 +341,7 @@ macro_rules! _define_arithmetic_binary {
 
             #[inline]
             fn $fn(self, rhs: V) -> Self::Output {
-                match self.0 {
-                    _Expr::Const(lhs) => std::ops::$tr::$fn(lhs, &rhs).into(),
-                    _Expr::Node(lhs) => std::ops::$tr::$fn(&lhs, Scalar(&rhs)).into(),
-                }
+                std::ops::$tr::$fn(self, &rhs)
             }
         }
         impl<K, V> std::ops::$tr<&Expr<K, V>> for Expr<K, V>
@@ -368,11 +353,9 @@ macro_rules! _define_arithmetic_binary {
             #[inline]
             fn $fn(self, rhs: &Expr<K, V>) -> Self::Output {
                 match (self.0, &rhs.0) {
-                    (_Expr::Const(lhs), _Expr::Const(rhs)) => {
-                        std::ops::$tr::$fn(lhs.clone(), rhs).into()
-                    }
+                    (_Expr::Const(lhs), _Expr::Const(rhs)) => std::ops::$tr::$fn(lhs, &rhs).into(),
                     (_Expr::Const(lhs), _Expr::Node(rhs)) => {
-                        std::ops::$tr::$fn(Scalar(lhs.clone()), rhs).into()
+                        std::ops::$tr::$fn(Scalar(lhs), &rhs).into()
                     }
                     (_Expr::Node(lhs), _Expr::Const(rhs)) => {
                         std::ops::$tr::$fn(&lhs, Scalar(rhs)).into()
@@ -403,18 +386,7 @@ macro_rules! _define_arithmetic_binary {
 
             #[inline]
             fn $fn(self, rhs: &Expr<K, V>) -> Self::Output {
-                match (&self.0, &rhs.0) {
-                    (_Expr::Const(lhs), _Expr::Const(rhs)) => {
-                        std::ops::$tr::$fn(lhs.clone(), rhs).into()
-                    }
-                    (_Expr::Const(lhs), _Expr::Node(rhs)) => {
-                        std::ops::$tr::$fn(Scalar(lhs.clone()), rhs).into()
-                    }
-                    (_Expr::Node(lhs), _Expr::Const(rhs)) => {
-                        std::ops::$tr::$fn(lhs, Scalar(rhs)).into()
-                    }
-                    (_Expr::Node(lhs), _Expr::Node(rhs)) => std::ops::$tr::$fn(lhs, rhs).into(),
-                }
+                std::ops::$tr::$fn(self.clone(), rhs)
             }
         }
         impl<K, V> std::ops::$tr<&V> for &Expr<K, V>
@@ -425,10 +397,7 @@ macro_rules! _define_arithmetic_binary {
 
             #[inline]
             fn $fn(self, rhs: &V) -> Self::Output {
-                match &self.0 {
-                    _Expr::Const(lhs) => std::ops::$tr::$fn(lhs.clone(), rhs).into(),
-                    _Expr::Node(lhs) => std::ops::$tr::$fn(lhs, Scalar(rhs)).into(),
-                }
+                std::ops::$tr::$fn(self.clone(), rhs)
             }
         }
         impl<K, V> std::ops::$tr<Expr<K, V>> for &Expr<K, V>
@@ -439,18 +408,7 @@ macro_rules! _define_arithmetic_binary {
 
             #[inline]
             fn $fn(self, rhs: Expr<K, V>) -> Self::Output {
-                match (&self.0, &rhs.0) {
-                    (_Expr::Const(lhs), _Expr::Const(rhs)) => {
-                        std::ops::$tr::$fn(lhs.clone(), rhs).into()
-                    }
-                    (_Expr::Const(lhs), _Expr::Node(rhs)) => {
-                        std::ops::$tr::$fn(Scalar(lhs.clone()), rhs).into()
-                    }
-                    (_Expr::Node(lhs), _Expr::Const(rhs)) => {
-                        std::ops::$tr::$fn(lhs, Scalar(rhs)).into()
-                    }
-                    (_Expr::Node(lhs), _Expr::Node(rhs)) => std::ops::$tr::$fn(lhs, rhs).into(),
-                }
+                std::ops::$tr::$fn(self.clone(), rhs)
             }
         }
         impl<K, V> std::ops::$tr<V> for &Expr<K, V>
@@ -461,10 +419,7 @@ macro_rules! _define_arithmetic_binary {
 
             #[inline]
             fn $fn(self, rhs: V) -> Self::Output {
-                match &self.0 {
-                    _Expr::Const(lhs) => std::ops::$tr::$fn(lhs.clone(), &rhs).into(),
-                    _Expr::Node(lhs) => std::ops::$tr::$fn(lhs, Scalar(&rhs)).into(),
-                }
+                std::ops::$tr::$fn(self.clone(), rhs)
             }
         }
         impl<K, V> std::ops::$ass_tr<Expr<K, V>> for Expr<K, V>
