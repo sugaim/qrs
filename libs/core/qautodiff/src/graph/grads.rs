@@ -262,6 +262,7 @@ impl<K, V> GradsAccum<K, V> {
     /// the first argument is a mutable reference to data already accumulated in this instance,
     /// and the second argument is a reference to the gradient to be accumulated.
     /// Note that
+    #[inline]
     pub fn accum<F>(&mut self, grads: &Grads<K, V>, f: F) -> Result<(), Error<K>>
     where
         V: Real,
@@ -279,5 +280,115 @@ impl<K, V> GradsAccum<K, V> {
             f(&mut self.grads[i], grad);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_grads_wrt() {
+        let graph = Graph::new();
+        let varx = graph.create_var("x", 4.2f64).unwrap();
+        let vary = graph.create_var("y", 3.1f64).unwrap();
+        let varz = graph.create_var("z", 2.3f64).unwrap();
+        let x = varx.as_ref();
+        let y = vary.as_ref();
+        let expr = (x + y) * x + y * y;
+        let grads = expr.grads().unwrap();
+
+        let dvdx = grads.wrt(&varx);
+        let dvdy = grads.wrt(&vary);
+        let dvdz = grads.wrt(&varz);
+
+        assert_eq!(dvdx, 2. * 4.2 + 3.1);
+        assert_eq!(dvdy, 4.2 + 2. * 3.1);
+        assert_eq!(dvdz, 0.);
+    }
+
+    #[test]
+    fn test_grads_wrt_exteranal_var() {
+        let graph1 = Graph::new();
+        let graph2 = Graph::new();
+        let varx = graph1.create_var("x", 4.2f64).unwrap();
+        let vary = graph1.create_var("y", 3.1f64).unwrap();
+        let varz = graph2.create_var("z", 2.3f64).unwrap();
+        let x = varx.as_ref();
+        let y = vary.as_ref();
+        let expr = (x + y) * x + y * y;
+        let grads = expr.grads().unwrap();
+
+        // does not panic
+        let dvdz = grads.wrt(&varz);
+
+        assert_eq!(dvdz, 0.);
+    }
+
+    #[test]
+    fn test_grads_accum_wrt() {
+        let graph = Graph::new();
+        let vars = ["x", "y", "z"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, name)| graph.create_var(name, (i * i) as f64).unwrap())
+            .collect::<Vec<_>>();
+
+        let mut accum = graph.gen_grads_accum();
+        for var in &vars {
+            let x = var.as_ref();
+            let expr = x * x;
+            accum.accum(&expr.grads().unwrap(), |x, y| *x += y).unwrap();
+        }
+
+        assert_eq!(accum.wrt(&vars[0]), 0.);
+        assert_eq!(accum.wrt(&vars[1]), 2.);
+        assert_eq!(accum.wrt(&vars[2]), 8.);
+    }
+
+    #[test]
+    fn test_grads_accum_wrt_external_var() {
+        let graph1 = Graph::new();
+        let graph2 = Graph::new();
+        let vars = ["x", "y", "z"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, name)| graph1.create_var(name, (i * i) as f64).unwrap())
+            .collect::<Vec<_>>();
+
+        let mut accum = graph1.gen_grads_accum();
+        for var in &vars {
+            let x = var.as_ref();
+            let expr = x * x;
+            accum.accum(&expr.grads().unwrap(), |x, y| *x += y).unwrap();
+        }
+
+        // does not panic
+        assert_eq!(accum.wrt(&graph2.create_var("z", 0.0).unwrap()), 0.);
+    }
+
+    #[test]
+    fn test_grads_accum_collect() {
+        let graph = Graph::new();
+        let vars = ["x", "y", "z"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, name)| graph.create_var(name, (i * i) as f64).unwrap())
+            .collect::<Vec<_>>();
+
+        let mut accum = graph.gen_grads_accum();
+        for var in &vars {
+            let x = var.as_ref();
+            let expr = x * x;
+            accum.accum(&expr.grads().unwrap(), |x, y| *x += y).unwrap();
+        }
+
+        let collected = accum.collect::<HashMap<_, _>>();
+        assert_eq!(collected.len(), 3);
+        assert_eq!(collected[&"x"], 0.);
+        assert_eq!(collected[&"y"], 2.);
+        assert_eq!(collected[&"z"], 8.);
     }
 }
