@@ -4,26 +4,34 @@
     {
       "type": "object",
       "required": [
-        "Bump"
+        "adjuster",
+        "type"
       ],
       "properties": {
-        "Bump": {
-          "$ref": "./Bump_for_Atom_for_double.yaml"
+        "adjuster": {
+          "$ref": "./Atom_for_double.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "bump"
         }
-      },
-      "additionalProperties": false
+      }
     },
     {
       "type": "object",
       "required": [
-        "Lookback"
+        "tenor",
+        "type"
       ],
       "properties": {
-        "Lookback": {
-          "$ref": "./Lookback.yaml"
+        "tenor": {
+          "$ref": "./Tenor.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "lookback"
         }
-      },
-      "additionalProperties": false
+      }
     }
   ]
 }

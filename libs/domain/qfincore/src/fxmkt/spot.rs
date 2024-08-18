@@ -1,5 +1,5 @@
 use qchrono::{
-    calendar::{Calendar, HolidayAdj},
+    calendar::{Calendar, CalendarSrc, CalendarSym, HolidayAdj},
     ext::chrono::offset::LocalResult,
     timepoint::{Date, DateTime},
 };
@@ -9,9 +9,7 @@ use crate::CcyPair;
 // -----------------------------------------------------------------------------
 // FxSpotMkt
 // -----------------------------------------------------------------------------
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FxSpotMkt {
     pub spot_lag: u8,
     pub settle_cal: Calendar,
@@ -59,8 +57,26 @@ impl FxSpotMkt {
 }
 
 // -----------------------------------------------------------------------------
+// FxSpotMktReq
 // FxSpotMktSrc
 // -----------------------------------------------------------------------------
-pub trait FxSpotMktSrc {
-    fn get_fxspot_mkt(&self, pair: &CcyPair) -> anyhow::Result<FxSpotMkt>;
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+pub struct FxSpotMktReq {
+    pub spot_lag: u8,
+    pub settle_cal: CalendarSym,
+}
+
+pub trait FxSpotMktSrc: CalendarSrc {
+    fn resolve_fxmkt(&self, pair: &CcyPair) -> anyhow::Result<FxSpotMktReq>;
+
+    fn get_fxspot_mkt(&self, pair: &CcyPair) -> anyhow::Result<FxSpotMkt> {
+        let req = self.resolve_fxmkt(pair)?;
+        let settle_cal = self.get_calendar(&req.settle_cal)?;
+        Ok(FxSpotMkt {
+            spot_lag: req.spot_lag,
+            settle_cal,
+        })
+    }
 }

@@ -118,17 +118,23 @@ impl<S: CalendarSrc> DayCountSrc for S {
 
 #[cfg(test)]
 mod tests {
-    use qchrono::calendar::{Calendar, CalendarSrcInduce, CalendarSymAtom};
+    use qchrono::{
+        calendar::{Calendar, CalendarSrc, CalendarSymAtom},
+        ext::chrono::NaiveDate,
+    };
 
     use super::*;
 
     struct MockCalendarSrc;
 
-    impl CalendarSrcInduce for MockCalendarSrc {
+    impl CalendarSrc for MockCalendarSrc {
         fn get_calendar_atom(&self, req: &CalendarSymAtom) -> anyhow::Result<Calendar> {
             match req.as_str() {
-                "TKY" => Ok(Calendar::blank(false)),
-                "NYC" => Ok(Calendar::blank(false)),
+                "TKY" | "NYC" => Calendar::builder()
+                    .with_extra_business_days(Default::default())
+                    .with_extra_holidays(Default::default())
+                    .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                    .build(),
                 _ => Err(anyhow::anyhow!("unknown calendar")),
             }
         }
@@ -157,7 +163,12 @@ mod tests {
             &res,
             &DayCount::Bd252(Bd252::new(
                 "TKY|NYC".parse().unwrap(),
-                Calendar::blank(false),
+                Calendar::builder()
+                    .with_extra_business_days(Default::default())
+                    .with_extra_holidays(Default::default())
+                    .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                    .build()
+                    .unwrap()
             )),
         );
     }

@@ -6,6 +6,7 @@ use super::{Adjusted, Composite, Joint, Weighted};
 // CompositeReq
 // -----------------------------------------------------------------------------
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum CompositeReq<Adj> {
     Atom { name: String },
     Adjusted(Adjusted<Box<Self>, Adj>),

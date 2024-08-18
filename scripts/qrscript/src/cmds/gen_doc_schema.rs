@@ -127,6 +127,8 @@ fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
         SchemaItem::<qfincore::Ccy>::create(),
         SchemaItem::<qmodel::curve::composite::CompositeReq<qmodel::curve::adjust::Adj<f64>>>::create(),
         SchemaItem::<qmodel::curve::atom::Atom<f64>>::create(),
+        SchemaItem::<qfincore::daycount::DayCountSym>::create(),
+        SchemaItem::<qfincore::fxmkt::FxSpotMktReq>::create(),
     ]
 }
 

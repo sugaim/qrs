@@ -10,6 +10,7 @@ use super::{Bump, Lookback, YieldCurveAdj};
 // Adj
 // -----------------------------------------------------------------------------
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Adj<V> {
     Bump(Bump<Atom<V>>),
     Lookback(Lookback),
