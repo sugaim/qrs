@@ -1,8 +1,11 @@
 use std::convert::Infallible;
 
-use qchrono::timepoint::{Date, DateTime};
+use qchrono::{
+    ext::chrono::Datelike,
+    timepoint::{Date, DateTime},
+};
 
-use super::YearFrac;
+use super::{StateLessYearFrac, YearFrac};
 
 // -----------------------------------------------------------------------------
 // Act365f
@@ -54,6 +57,8 @@ impl schemars::JsonSchema for Act365f {
 //
 // behavior
 //
+impl<D: Datelike> StateLessYearFrac<D> for Act365f where Act365f: YearFrac<D> {}
+
 impl YearFrac for Act365f {
     type Error = Infallible;
 

@@ -55,7 +55,10 @@ where
 
         let total_contrib = short_contrib + &long_contrib;
         let dcf = Act365f.year_frac(from, to).unwrap();
-        Ok((total_contrib / &<S::Value as Scalar>::nearest_value_of_f64(dcf)).into())
+        Ok(Yield {
+            day_count: Act365f,
+            value: total_contrib / &<S::Value as Scalar>::nearest_value_of_f64(dcf),
+        })
     }
 }
 

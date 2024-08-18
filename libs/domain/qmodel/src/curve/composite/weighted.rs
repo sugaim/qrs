@@ -119,7 +119,10 @@ where
             let contrib = curve.forward_rate(from, to)?.value;
             total_contrib += &(contrib * &<C::Value as Scalar>::nearest_value_of_f64(*weight));
         }
-        Ok(total_contrib.into())
+        Ok(Yield {
+            day_count: Act365f,
+            value: total_contrib,
+        })
     }
 }
 
