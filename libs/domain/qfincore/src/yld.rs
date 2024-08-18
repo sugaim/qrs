@@ -3,29 +3,85 @@ use std::fmt::Debug;
 use qchrono::{duration::Duration, ext::chrono::Datelike};
 use qmath::num::{Arithmetic, FloatBased, Real, Scalar};
 
-use crate::daycount::{Act365f, YearFrac};
+use crate::daycount::{Act365f, StateLessYearFrac, YearFrac};
 
 // -----------------------------------------------------------------------------
 // Yield
 // -----------------------------------------------------------------------------
-#[derive(
-    Debug, Clone, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
+/// A change ratio of a value over a year.
+///
+/// The dimension of this struct is 1/T, where T is a time unit.
+/// Concrete unit of T is determined by the day count fraction and
+/// we can recover the change ratio (not a percent nor a bps) between two dates
+/// by multiplying the year fraction calculated with the given day count fraction.
+///
+/// # Example
+/// ```
+/// use qchrono::timepoint::Date;
+/// use qfincore::{daycount::{YearFrac, Act360}, Yield};
+///
+/// let y = Yield {
+///     day_count: Act360,
+///     value: 0.02,
+/// };
+///
+/// let stt: Date = "2021-01-01".parse().unwrap();
+/// let end: Date = "2021-01-31".parse().unwrap();
+///
+/// let ratio = y.to_ratio(&stt, &end).unwrap();
+/// assert_eq!(ratio, 0.02 * 30. / 360.);
+/// ```
+///
+/// # Panics
+///
+/// Alghough this struct allows arithmetic operations,
+/// we need to check that two [Yield] instances have the same day count fraction
+/// to make the calculation consistent.
+/// If this is not satisfied, the calculation will panic.
+///
+/// ```should_panic
+/// use qfincore::{daycount::{Act360, Act365f, DayCount}, Yield};
+///
+/// let y1 = Yield {
+///     day_count: DayCount::Act360,
+///     value: 0.01,
+/// };
+/// let y2 = Yield {
+///     day_count: DayCount::Act365f,
+///     value: 0.02,
+/// };
+///
+/// let _ = y1 + y2; // panics
+/// ```
+///
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct Yield<Dcf, V> {
     pub day_count: Dcf,
     pub value: V,
 }
 
 //
-// ctor
+// comp
 //
-impl<Dcf: Default, V> From<V> for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq, V: PartialEq> PartialEq for Yield<Dcf, V> {
     #[inline]
-    fn from(value: V) -> Self {
-        Yield {
-            value,
-            day_count: Dcf::default(),
-        }
+    fn eq(&self, other: &Self) -> bool {
+        assert_eq!(
+            self.day_count, other.day_count,
+            "Yields with different day count fractions are not comparable.",
+        );
+        self.value == other.value
+    }
+}
+
+impl<Dcf: Debug + Eq, V: PartialOrd> PartialOrd for Yield<Dcf, V> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        assert_eq!(
+            self.day_count, other.day_count,
+            "Yields with different day count fractions are not comparable.",
+        );
+        self.value.partial_cmp(&other.value)
     }
 }
 
@@ -53,7 +109,7 @@ impl<Dcf, V> Yield<Dcf, V> {
     }
 }
 
-impl<Dcf: Debug + Eq + Default, V: Arithmetic> qmath::ext::num::Zero for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq + StateLessYearFrac, V: Arithmetic> qmath::ext::num::Zero for Yield<Dcf, V> {
     #[inline]
     fn zero() -> Self {
         Self {
@@ -227,6 +283,66 @@ mod tests {
         let y = Yield::<Act365f, f64>::zero();
 
         assert!(y.is_zero());
+    }
+    #[rstest]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, 2.0)]
+    #[case(DayCount::Act365f, 1.0, DayCount::Act365f, -2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, 2.0)]
+    #[case(DayCount::Act360, 1.0, DayCount::Act360, -2.0)]
+    fn test_cmp(
+        #[case] dcf1: DayCount,
+        #[case] value1: f64,
+        #[case] dcf2: DayCount,
+        #[case] value2: f64,
+    ) {
+        let y1 = Yield {
+            day_count: dcf1.clone(),
+            value: value1,
+        };
+        let y2 = Yield {
+            day_count: dcf2.clone(),
+            value: value2,
+        };
+
+        let eq = y1 == y2;
+        let cmp = y1.partial_cmp(&y2);
+
+        assert_eq!(eq, value1 == value2);
+        assert_eq!(cmp, value1.partial_cmp(&value2));
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, DayCount::Act360)]
+    #[case(DayCount::Act360, DayCount::Act365f)]
+    #[should_panic]
+    fn test_eq_panics(#[case] dcf1: DayCount, #[case] dcf2: DayCount) {
+        let y1 = Yield {
+            day_count: dcf1,
+            value: 1.0,
+        };
+        let y2 = Yield {
+            day_count: dcf2,
+            value: 2.0,
+        };
+
+        let _ = y1 == y2;
+    }
+
+    #[rstest]
+    #[case(DayCount::Act365f, DayCount::Act360)]
+    #[case(DayCount::Act360, DayCount::Act365f)]
+    #[should_panic]
+    fn test_cmp_panics(#[case] dcf1: DayCount, #[case] dcf2: DayCount) {
+        let y1 = Yield {
+            day_count: dcf1,
+            value: 1.0,
+        };
+        let y2 = Yield {
+            day_count: dcf2,
+            value: 2.0,
+        };
+
+        let _ = y1.partial_cmp(&y2);
     }
 
     #[rstest]

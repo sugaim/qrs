@@ -25,6 +25,9 @@ impl<V: Real> YieldCurve for Flat<V> {
         _: &DateTime,
         _: &DateTime,
     ) -> anyhow::Result<Yield<Act365f, Self::Value>> {
-        Ok(self.rate.clone().into())
+        Ok(Yield {
+            day_count: Act365f,
+            value: self.rate.clone(),
+        })
     }
 }

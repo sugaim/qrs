@@ -4,7 +4,7 @@ mod bd252;
 mod traits;
 mod variant;
 
-pub use traits::YearFrac;
+pub use traits::{StateLessYearFrac, YearFrac};
 pub use variant::{DayCount, DayCountSrc, DayCountSym};
 
 pub use act360::Act360;
