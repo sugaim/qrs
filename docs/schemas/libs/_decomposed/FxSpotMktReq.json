@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "FxSpotMkt",
+  "title": "FxSpotMktReq",
   "type": "object",
   "required": [
     "settle_cal",
@@ -8,7 +8,7 @@
   ],
   "properties": {
     "settle_cal": {
-      "$ref": "./Calendar.yaml"
+      "$ref": "./CalendarSym.yaml"
     },
     "spot_lag": {
       "type": "integer",
