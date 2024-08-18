@@ -1,6 +1,8 @@
 use qmath::num::Real;
 
-use super::super::{LnCoord, LnVolSlice, StrikeDer};
+use crate::lnvol::LnCoord;
+
+use super::super::{StrikeDer, VolCurve};
 
 // -----------------------------------------------------------------------------
 // Flat
@@ -44,16 +46,16 @@ impl<V: Real> Flat<V> {
 //
 // methods
 //
-impl<V: Real> LnVolSlice for Flat<V> {
+impl<V: Real> VolCurve for Flat<V> {
     type Value = V;
 
     #[inline]
-    fn lnvol(&self, _coord: &LnCoord<V>) -> anyhow::Result<V> {
+    fn bs_totalvol(&self, _coord: &LnCoord<V>) -> anyhow::Result<V> {
         Ok(self.vol.clone())
     }
 
     #[inline]
-    fn lnvol_der(&self, _coord: &LnCoord<V>) -> anyhow::Result<StrikeDer<V>> {
+    fn bsvol_der(&self, _coord: &LnCoord<V>) -> anyhow::Result<StrikeDer<V>> {
         Ok(StrikeDer {
             vol: self.vol.clone(),
             dvdy: V::zero(),

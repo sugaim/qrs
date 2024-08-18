@@ -4,4 +4,4 @@ pub mod composite;
 
 mod traits;
 
-pub use traits::{LnCoord, LnVolSlice, StrikeDer};
+pub use traits::{StrikeDer, VolCurve};

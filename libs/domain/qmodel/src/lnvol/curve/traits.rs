@@ -1,11 +1,11 @@
 use qmath::num::Real;
 
+use crate::lnvol::LnCoord;
+
 // -----------------------------------------------------------------------------
 // LnCoord
 // StrikeDer
 // -----------------------------------------------------------------------------
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LnCoord<V>(pub V);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StrikeDer<V> {
@@ -20,14 +20,18 @@ pub struct StrikeDer<V> {
 }
 
 // -----------------------------------------------------------------------------
-// LnVolSlice
+// VolCurve
 // -----------------------------------------------------------------------------
-pub trait LnVolSlice {
+pub trait VolCurve {
     type Value: Real;
 
-    /// Calculate volatility at the given log money-ness
-    fn lnvol(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value>;
+    /// Calculate total volatility at the given log money-ness
+    ///
+    /// Here, the total volatility is dimentionless value, sigma * sqrt(T),
+    /// where sigma is the volatility and T is the time to maturity.
+    /// Implementation must ensure that this value is non-negative.
+    fn bs_totalvol(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value>;
 
     /// Calculate 0th, 1st, and 2nd derivative of volatility at the given log money-ness
-    fn lnvol_der(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<StrikeDer<Self::Value>>;
+    fn bsvol_der(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<StrikeDer<Self::Value>>;
 }

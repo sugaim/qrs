@@ -1,39 +1,42 @@
 use qmath::num::Real;
 
-use crate::volsurf::slice::{LnCoord, LnVolSlice, StrikeDer};
+use crate::lnvol::{
+    curve::{StrikeDer, VolCurve},
+    LnCoord,
+};
 
-use super::LnVolSliceAdj;
+use super::VolCurveAdjust;
 
 // -----------------------------------------------------------------------------
-// LnCoordShift
+// Shift
 // -----------------------------------------------------------------------------
 /// Coordinate shifter along strike dimension.
 ///
 /// Note that this shifts vol slices rather than coordinates.
 /// Hence, shift is implemented with negative sign, 'f(x - shift)'.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct LnCoordShift<V> {
+pub struct Shift<V> {
     pub shift: V,
 }
 
-impl<V: Real> LnVolSliceAdj<V> for LnCoordShift<V> {
+impl<V: Real> VolCurveAdjust<V> for Shift<V> {
     #[inline]
-    fn adjusted_lnvol<AS: LnVolSlice<Value = V>>(
+    fn adjusted_bsvol<AS: VolCurve<Value = V>>(
         &self,
         slice: &AS,
-        coord: &crate::volsurf::slice::LnCoord<V>,
+        coord: &LnCoord<V>,
     ) -> anyhow::Result<V> {
         let coord = LnCoord(coord.0.clone() - &self.shift);
-        slice.lnvol(&coord)
+        slice.bs_totalvol(&coord)
     }
 
     #[inline]
-    fn adjusted_lnvol_der<AS: LnVolSlice<Value = V>>(
+    fn adjusted_bsvol_der<AS: VolCurve<Value = V>>(
         &self,
         slice: &AS,
         coord: &LnCoord<V>,
     ) -> anyhow::Result<StrikeDer<V>> {
         let coord = LnCoord(coord.0.clone() - &self.shift);
-        slice.lnvol_der(&coord)
+        slice.bsvol_der(&coord)
     }
 }
