@@ -149,8 +149,8 @@ pub enum CalendarError {
 ///
 /// let cal = Calendar::builder()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 1)])
-///     .with_extra_business_days([])
+///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
+///     .with_extra_business_days(vec![])
 ///     .build()
 ///     .unwrap();
 ///
@@ -200,15 +200,15 @@ pub enum CalendarError {
 ///
 /// let cal1 = Calendar::builder()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 1)])
-///     .with_extra_business_days([])
+///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
+///     .with_extra_business_days(vec![])
 ///     .build()
 ///     .unwrap();
 ///
 /// let cal2 = Calendar::builder()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 5)])
-///     .with_extra_business_days([])
+///     .with_extra_holidays(vec![ymd(2021, 1, 5)])
+///     .with_extra_business_days(vec![])
 ///     .build()
 ///     .unwrap();
 ///
@@ -467,7 +467,12 @@ impl Calendar {
     /// use chrono::NaiveDate;
     /// use qchrono::calendar::Calendar;
     ///
-    /// let cal = Calendar::blank(false);
+    /// let cal = Calendar::builder()
+    ///     .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+    ///     .with_extra_holidays(vec![])
+    ///     .with_extra_business_days(vec![])
+    ///     .build()
+    ///     .unwrap();
     /// let from = NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(); // Sun
     /// let to = NaiveDate::from_ymd_opt(2021, 1, 8).unwrap(); // Fri
     ///
@@ -611,8 +616,8 @@ impl Calendar {
     ///
     /// let cal = Calendar::builder()
     ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-    ///     .with_extra_holidays([ymd(2021, 1, 6)])
-    ///     .with_extra_business_days([])
+    ///     .with_extra_holidays(vec![ymd(2021, 1, 6)])
+    ///     .with_extra_business_days(vec![])
     ///     .build()
     ///     .unwrap();
     ///
@@ -654,8 +659,8 @@ impl Calendar {
     ///
     /// let cal = Calendar::builder()
     ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-    ///     .with_extra_holidays([ymd(2021, 1, 1)])
-    ///     .with_extra_business_days([])
+    ///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
+    ///     .with_extra_business_days(vec![])
     ///     .build()
     ///     .unwrap();
     ///
@@ -761,7 +766,7 @@ impl DoubleEndedIterator for DateIterator {
 /// let cal = Calendar::builder()
 ///     .treat_weekend_as_bizday()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 1)])
+///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
 ///     .build();
 ///
 /// ````
