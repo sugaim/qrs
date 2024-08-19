@@ -1,0 +1,11 @@
+{
+  "title": "CalendarSym",
+  "description": "A symbol for a calendar. Combined calendars are available. As an atom, only alphanumeric characters or '_' are allowed.",
+  "examples": [
+    "TK",
+    "TK|NY",
+    "TK&NY",
+    "(TK|NY)&(LN|TK)"
+  ],
+  "type": "string"
+}

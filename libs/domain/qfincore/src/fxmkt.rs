@@ -1,3 +1,3 @@
 mod spot;
 
-pub use spot::{FxSpotMkt, FxSpotMktSrc};
+pub use spot::{FxSpotMkt, FxSpotMktReq, FxSpotMktSrc};

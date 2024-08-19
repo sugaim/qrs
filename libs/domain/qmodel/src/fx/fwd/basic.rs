@@ -91,8 +91,11 @@ impl<S: BasicFxFwdSrcInduce> FxFwdSrc for S {
 mod tests {
     use std::{str::FromStr, sync::Arc};
 
-    use qchrono::calendar::Calendar;
-    use qfincore::Ccy;
+    use qchrono::{
+        calendar::{Calendar, CalendarSrc, CalendarSymAtom},
+        ext::chrono::NaiveDate,
+    };
+    use qfincore::{fxmkt::FxSpotMktReq, Ccy};
     use rstest::rstest;
 
     use crate::{
@@ -108,6 +111,16 @@ mod tests {
     use super::*;
 
     struct MockCalendarSrc;
+
+    impl CalendarSrc for MockCalendarSrc {
+        fn get_calendar_atom(&self, _: &CalendarSymAtom) -> anyhow::Result<Calendar> {
+            Calendar::builder()
+                .with_extra_business_days(Default::default())
+                .with_extra_holidays(Default::default())
+                .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                .build()
+        }
+    }
 
     impl CurveSrc for MockCalendarSrc {
         type Curve = Arc<Atom<f64>>;
@@ -133,10 +146,10 @@ mod tests {
         }
     }
     impl FxSpotMktSrc for MockCalendarSrc {
-        fn get_fxspot_mkt(&self, _: &CcyPair) -> anyhow::Result<FxSpotMkt> {
-            Ok(FxSpotMkt {
+        fn resolve_fxmkt(&self, _: &CcyPair) -> anyhow::Result<qfincore::fxmkt::FxSpotMktReq> {
+            Ok(FxSpotMktReq {
                 spot_lag: 2,
-                settle_cal: Calendar::blank(false),
+                settle_cal: "TKY|NYC".parse()?,
             })
         }
     }
@@ -177,7 +190,12 @@ mod tests {
             },
             mkt: FxSpotMkt {
                 spot_lag: 2,
-                settle_cal: Calendar::blank(false),
+                settle_cal: Calendar::builder()
+                    .with_extra_business_days(Default::default())
+                    .with_extra_holidays(Default::default())
+                    .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                    .build()
+                    .unwrap(),
             },
         };
 

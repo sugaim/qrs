@@ -6,17 +6,10 @@ use super::{Calendar, CalendarSym, CalendarSymAtom};
 
 // -----------------------------------------------------------------------------
 // CalendarSrc
-// CalendarSrcInduce
 // -----------------------------------------------------------------------------
 pub trait CalendarSrc {
-    fn get_calendar(&self, req: &CalendarSym) -> anyhow::Result<Calendar>;
-}
-
-pub trait CalendarSrcInduce {
     fn get_calendar_atom(&self, req: &CalendarSymAtom) -> anyhow::Result<Calendar>;
-}
 
-impl<S: CalendarSrcInduce> CalendarSrc for S {
     fn get_calendar(&self, req: &CalendarSym) -> anyhow::Result<Calendar> {
         let leaves = req
             .leaves()
@@ -62,7 +55,7 @@ mod tests {
     mockall::mock! {
         Src {}
 
-        impl CalendarSrcInduce for Src {
+        impl CalendarSrc for Src {
             fn get_calendar_atom(&self, req: &CalendarSymAtom) -> anyhow::Result<Calendar>;
         }
     }

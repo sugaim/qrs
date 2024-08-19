@@ -5,58 +5,85 @@
     {
       "type": "object",
       "required": [
-        "Atom"
+        "name",
+        "type"
       ],
       "properties": {
-        "Atom": {
-          "type": "object",
-          "required": [
-            "name"
-          ],
-          "properties": {
-            "name": {
-              "type": "string"
-            }
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "atom"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "adjustment",
+        "curve",
+        "type"
+      ],
+      "properties": {
+        "adjustment": {
+          "type": "array",
+          "items": {
+            "$ref": "./Adj_for_double.yaml"
           }
+        },
+        "curve": {
+          "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "adjusted"
         }
-      },
-      "additionalProperties": false
+      }
+    },
+    {
+      "description": "A combination of short term and long term yield curves.",
+      "type": "object",
+      "required": [
+        "long",
+        "short",
+        "switch_point",
+        "type"
+      ],
+      "properties": {
+        "long": {
+          "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+        },
+        "short": {
+          "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+        },
+        "switch_point": {
+          "$ref": "./DateTime.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "joint"
+        }
+      }
     },
     {
       "type": "object",
       "required": [
-        "Adjusted"
+        "components",
+        "type"
       ],
       "properties": {
-        "Adjusted": {
-          "$ref": "./Adjusted_for_CompositeReq_for_Adj_for_double_and_Adj_for_double.yaml"
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "./Component_for_CompositeReq_for_Adj_for_double.yaml"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "weighted"
         }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "Joint"
-      ],
-      "properties": {
-        "Joint": {
-          "$ref": "./Joint_for_CompositeReq_for_Adj_for_double_and_CompositeReq_for_Adj_for_double.yaml"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "Weighted"
-      ],
-      "properties": {
-        "Weighted": {
-          "$ref": "./Weighted_for_CompositeReq_for_Adj_for_double.yaml"
-        }
-      },
-      "additionalProperties": false
+      }
     }
   ]
 }

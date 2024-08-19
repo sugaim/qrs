@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DayCountSym",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "act365f"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "act360"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "calendar",
+        "type"
+      ],
+      "properties": {
+        "calendar": {
+          "$ref": "./CalendarSym.yaml"
+        },
+        "type": {
+          "type": "string",
+          "const": "bd252"
+        }
+      }
+    }
+  ]
+}

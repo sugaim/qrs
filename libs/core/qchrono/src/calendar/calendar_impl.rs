@@ -149,8 +149,8 @@ pub enum CalendarError {
 ///
 /// let cal = Calendar::builder()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 1)])
-///     .with_extra_business_days([])
+///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
+///     .with_extra_business_days(vec![])
 ///     .build()
 ///     .unwrap();
 ///
@@ -200,15 +200,15 @@ pub enum CalendarError {
 ///
 /// let cal1 = Calendar::builder()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 1)])
-///     .with_extra_business_days([])
+///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
+///     .with_extra_business_days(vec![])
 ///     .build()
 ///     .unwrap();
 ///
 /// let cal2 = Calendar::builder()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 5)])
-///     .with_extra_business_days([])
+///     .with_extra_holidays(vec![ymd(2021, 1, 5)])
+///     .with_extra_business_days(vec![])
 ///     .build()
 ///     .unwrap();
 ///
@@ -280,44 +280,6 @@ impl Calendar {
         )
         .map(Arc::new)
         .map(Self)
-    }
-
-    /// Create a calendar without any extra holidays and business days.
-    /// That is, this function returns
-    /// - false: weekends are holidays and weekdays are business days
-    /// - true: all days are business days
-    ///
-    /// # Example
-    /// ```
-    /// use chrono::NaiveDate;
-    /// use qchrono::calendar::Calendar;
-    ///
-    /// let ymd = |y: i32, m: u32, d: u32| {
-    ///     NaiveDate::from_ymd_opt(y, m, d).unwrap()
-    /// };
-    ///
-    /// let cal = Calendar::blank(false);
-    /// assert!(cal.is_bizday(ymd(2021, 1, 1)).unwrap()); // Fri
-    /// assert!(!cal.is_bizday(ymd(2021, 1, 2)).unwrap()); // Sat
-    /// assert!(!cal.is_bizday(ymd(2021, 1, 3)).unwrap()); // Sun
-    /// assert!(cal.is_bizday(ymd(2021, 1, 4)).unwrap()); // Mon
-    ///
-    /// let cal = Calendar::blank(true);
-    /// assert!(cal.is_bizday(ymd(2021, 1, 1)).unwrap()); // Fri
-    /// assert!(cal.is_bizday(ymd(2021, 1, 2)).unwrap()); // Sat
-    /// assert!(cal.is_bizday(ymd(2021, 1, 3)).unwrap()); // Sun
-    /// assert!(cal.is_bizday(ymd(2021, 1, 4)).unwrap()); // Mon
-    /// ```
-    #[inline]
-    pub fn blank(treat_weekend_as_business_day: bool) -> Self {
-        Self::_new(
-            Vec::new(),
-            Vec::new(),
-            NaiveDate::MIN,
-            NaiveDate::MAX,
-            treat_weekend_as_business_day,
-        )
-        .expect("Default calendar must be valid")
     }
 
     /// Get [CalendarBuilder] instance.
@@ -505,7 +467,12 @@ impl Calendar {
     /// use chrono::NaiveDate;
     /// use qchrono::calendar::Calendar;
     ///
-    /// let cal = Calendar::blank(false);
+    /// let cal = Calendar::builder()
+    ///     .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+    ///     .with_extra_holidays(vec![])
+    ///     .with_extra_business_days(vec![])
+    ///     .build()
+    ///     .unwrap();
     /// let from = NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(); // Sun
     /// let to = NaiveDate::from_ymd_opt(2021, 1, 8).unwrap(); // Fri
     ///
@@ -649,8 +616,8 @@ impl Calendar {
     ///
     /// let cal = Calendar::builder()
     ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-    ///     .with_extra_holidays([ymd(2021, 1, 6)])
-    ///     .with_extra_business_days([])
+    ///     .with_extra_holidays(vec![ymd(2021, 1, 6)])
+    ///     .with_extra_business_days(vec![])
     ///     .build()
     ///     .unwrap();
     ///
@@ -692,8 +659,8 @@ impl Calendar {
     ///
     /// let cal = Calendar::builder()
     ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-    ///     .with_extra_holidays([ymd(2021, 1, 1)])
-    ///     .with_extra_business_days([])
+    ///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
+    ///     .with_extra_business_days(vec![])
     ///     .build()
     ///     .unwrap();
     ///
@@ -799,7 +766,7 @@ impl DoubleEndedIterator for DateIterator {
 /// let cal = Calendar::builder()
 ///     .treat_weekend_as_bizday()
 ///     .with_valid_period(ymd(2021, 1, 1), ymd(2021, 1, 10))
-///     .with_extra_holidays([ymd(2021, 1, 1)])
+///     .with_extra_holidays(vec![ymd(2021, 1, 1)])
 ///     .build();
 ///
 /// ````
@@ -840,10 +807,10 @@ impl<B, V> CalendarBuilder<(), B, V> {
     /// As `extra_holds`, this function expects that days which are non-business day weekdays.
     pub fn with_extra_holidays(
         self,
-        extra_holds: impl IntoIterator<Item = NaiveDate>,
+        extra_holds: Vec<NaiveDate>,
     ) -> CalendarBuilder<Vec<NaiveDate>, B, V> {
         CalendarBuilder {
-            extra_holds: extra_holds.into_iter().collect(),
+            extra_holds,
             extra_bizds: self.extra_bizds,
             valid_from: self.valid_from,
             valid_to: self.valid_to,
@@ -858,11 +825,11 @@ impl<H, V> CalendarBuilder<H, (), V> {
     /// As `extra_bizds`, this function expects that days which are business day weekends.
     pub fn with_extra_business_days(
         self,
-        extra_bizds: impl IntoIterator<Item = NaiveDate>,
+        extra_bizds: Vec<NaiveDate>,
     ) -> CalendarBuilder<H, Vec<NaiveDate>, V> {
         CalendarBuilder {
             extra_holds: self.extra_holds,
-            extra_bizds: extra_bizds.into_iter().collect(),
+            extra_bizds,
             valid_from: self.valid_from,
             valid_to: self.valid_to,
             treat_weekend_as_business_day: self.treat_weekend_as_business_day,

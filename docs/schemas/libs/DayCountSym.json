@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DayCountSym",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "act365f"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "act360"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "calendar",
+        "type"
+      ],
+      "properties": {
+        "calendar": {
+          "$ref": "#/definitions/CalendarSym"
+        },
+        "type": {
+          "type": "string",
+          "const": "bd252"
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "CalendarSym": {
+      "description": "A symbol for a calendar. Combined calendars are available. As an atom, only alphanumeric characters or '_' are allowed.",
+      "examples": [
+        "TK",
+        "TK|NY",
+        "TK&NY",
+        "(TK|NY)&(LN|TK)"
+      ],
+      "type": "string"
+    }
+  }
+}
