@@ -1,3 +1,4 @@
+mod adjust;
 mod traits;
 
 pub mod curve;

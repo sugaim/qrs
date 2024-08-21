@@ -1,3 +1,4 @@
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::num::Real;
 
 use crate::lnvol::{
@@ -24,7 +25,7 @@ impl<V: Real> VolCurveAdjust<V> for Adj<V> {
         &self,
         slice: &AS,
         coord: &LnCoord<V>,
-    ) -> anyhow::Result<V> {
+    ) -> anyhow::Result<Volatility<Act365f, V>> {
         match self {
             Adj::Bump(adj) => adj.adjusted_bsvol(slice, coord),
             Adj::Shift(adj) => adj.adjusted_bsvol(slice, coord),

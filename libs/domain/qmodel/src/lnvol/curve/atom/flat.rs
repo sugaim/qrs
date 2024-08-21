@@ -1,3 +1,4 @@
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::num::Real;
 
 use crate::lnvol::LnCoord;
@@ -7,7 +8,7 @@ use super::super::{StrikeDer, VolCurve};
 // -----------------------------------------------------------------------------
 // Flat
 // -----------------------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, schemars::JsonSchema)]
 pub struct Flat<V> {
     vol: V,
 }
@@ -50,16 +51,25 @@ impl<V: Real> VolCurve for Flat<V> {
     type Value = V;
 
     #[inline]
-    fn bs_totalvol(&self, _coord: &LnCoord<V>) -> anyhow::Result<V> {
-        Ok(self.vol.clone())
+    fn bsvol(&self, _: &LnCoord<Self::Value>) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
+        Ok(Volatility {
+            day_count: Act365f,
+            value: self.vol.clone(),
+        })
     }
 
     #[inline]
-    fn bsvol_der(&self, _coord: &LnCoord<V>) -> anyhow::Result<StrikeDer<V>> {
-        Ok(StrikeDer {
-            vol: self.vol.clone(),
-            dvdy: V::zero(),
-            d2vdy2: V::zero(),
+    fn bsvol_der(&self, coord: &LnCoord<V>) -> anyhow::Result<StrikeDer<V>> {
+        self.bsvol(coord).map(|vol| StrikeDer {
+            vol,
+            dvdy: Volatility {
+                day_count: Act365f,
+                value: V::zero(),
+            },
+            d2vdy2: Volatility {
+                day_count: Act365f,
+                value: V::zero(),
+            },
         })
     }
 }

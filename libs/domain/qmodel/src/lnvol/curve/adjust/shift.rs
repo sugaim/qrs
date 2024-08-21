@@ -1,3 +1,4 @@
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::num::Real;
 
 use crate::lnvol::{
@@ -25,9 +26,9 @@ impl<V: Real> VolCurveAdjust<V> for Shift<V> {
         &self,
         slice: &AS,
         coord: &LnCoord<V>,
-    ) -> anyhow::Result<V> {
+    ) -> anyhow::Result<Volatility<Act365f, V>> {
         let coord = LnCoord(coord.0.clone() - &self.shift);
-        slice.bs_totalvol(&coord)
+        slice.bsvol(&coord)
     }
 
     #[inline]
