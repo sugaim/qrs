@@ -1,3 +1,4 @@
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::{ext::num::Zero, num::Scalar};
 
 use crate::lnvol::{
@@ -72,29 +73,41 @@ impl<S: VolCurve> VolCurve for Weighted<S> {
     type Value = S::Value;
 
     #[inline]
-    fn bs_totalvol(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value> {
+    fn bsvol(
+        &self,
+        coord: &LnCoord<Self::Value>,
+    ) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
         let mut sum = <S::Value as Zero>::zero();
         for (slice, weight) in &self.components {
             let weight = <S::Value as Scalar>::nearest_value_of_f64(*weight);
-            let value = slice.bs_totalvol(coord)?;
+            let value = slice.bsvol(coord)?.value;
             sum += &(value * &weight);
         }
-        Ok(sum)
+        Ok(qfincore::Volatility {
+            day_count: qfincore::daycount::Act365f,
+            value: sum,
+        })
     }
 
     #[inline]
     fn bsvol_der(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<StrikeDer<Self::Value>> {
-        let mut sum = StrikeDer {
-            vol: <S::Value as Zero>::zero(),
-            dvdy: <S::Value as Zero>::zero(),
-            d2vdy2: <S::Value as Zero>::zero(),
+        let mut sum = {
+            let zero = Volatility {
+                day_count: Act365f,
+                value: <Self::Value as Zero>::zero(),
+            };
+            StrikeDer {
+                vol: zero.clone(),
+                dvdy: zero.clone(),
+                d2vdy2: zero,
+            }
         };
         for (slice, weight) in &self.components {
             let weight = <S::Value as Scalar>::nearest_value_of_f64(*weight);
             let der = slice.bsvol_der(coord)?;
-            sum.vol += &(der.vol * &weight);
-            sum.dvdy += &(der.dvdy * &weight);
-            sum.d2vdy2 += &(der.d2vdy2 * &weight);
+            sum.vol.value += &(der.vol.value * &weight);
+            sum.dvdy.value += &(der.dvdy.value * &weight);
+            sum.d2vdy2.value += &(der.d2vdy2.value * &weight);
         }
         Ok(sum)
     }

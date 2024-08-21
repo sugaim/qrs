@@ -1,3 +1,4 @@
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::num::Real;
 
 use crate::lnvol::{
@@ -22,10 +23,13 @@ impl<V: Real> VolCurve for Atom<V> {
     type Value = V;
 
     #[inline]
-    fn bs_totalvol(&self, coord: &LnCoord<V>) -> anyhow::Result<V> {
+    fn bsvol(
+        &self,
+        coord: &LnCoord<Self::Value>,
+    ) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
         match self {
-            Atom::Flat(flat) => flat.bs_totalvol(coord),
-            Atom::Svi(svi) => svi.bs_totalvol(coord),
+            Atom::Flat(flat) => flat.bsvol(coord),
+            Atom::Svi(svi) => svi.bsvol(coord),
         }
     }
 

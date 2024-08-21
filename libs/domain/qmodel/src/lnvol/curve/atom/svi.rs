@@ -1,4 +1,5 @@
 use anyhow::ensure;
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::num::Real;
 
 use crate::lnvol::{
@@ -133,11 +134,17 @@ impl<V: Real> VolCurve for Svi<V> {
     type Value = V;
 
     #[inline]
-    fn bs_totalvol(&self, coord: &LnCoord<V>) -> anyhow::Result<V> {
+    fn bsvol(
+        &self,
+        coord: &LnCoord<Self::Value>,
+    ) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
         let y = coord.clone().0 - &self.m;
         let non_lin = (y.clone().powi(2) + &self.sigma.clone().powi(2)).sqrt();
         let var = self.a.clone() + &(self.b.clone() * (y * &self.rho + &non_lin));
-        Ok(var.sqrt())
+        Ok(Volatility {
+            day_count: qfincore::daycount::Act365f,
+            value: var.sqrt(),
+        })
     }
 
     #[inline]
@@ -157,6 +164,19 @@ impl<V: Real> VolCurve for Svi<V> {
         let d2v2dy2 = self.b.clone() * &self.sigma * &self.sigma / &non_lin.powi(3);
         let d2vdy2 = (d2v2dy2 - &(V::nearest_value_of_f64(0.5) * &dvdy.clone().powi(2))) / &vol;
 
-        Ok(StrikeDer { vol, dvdy, d2vdy2 })
+        Ok(StrikeDer {
+            vol: Volatility {
+                day_count: Act365f,
+                value: vol,
+            },
+            dvdy: Volatility {
+                day_count: Act365f,
+                value: dvdy,
+            },
+            d2vdy2: Volatility {
+                day_count: Act365f,
+                value: d2vdy2,
+            },
+        })
     }
 }

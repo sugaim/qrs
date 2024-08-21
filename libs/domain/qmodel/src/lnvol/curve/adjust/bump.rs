@@ -1,3 +1,4 @@
+use qfincore::{daycount::Act365f, Volatility};
 use qmath::num::Real;
 
 use crate::lnvol::{
@@ -23,9 +24,9 @@ impl<V: Real, S: VolCurve<Value = V>> VolCurveAdjust<V> for Bump<S> {
         &self,
         slice: &AS,
         coord: &LnCoord<V>,
-    ) -> anyhow::Result<V> {
-        let base = self.adjster.bs_totalvol(coord)?;
-        let adj = slice.bs_totalvol(coord)?;
+    ) -> anyhow::Result<Volatility<Act365f, V>> {
+        let base = self.adjster.bsvol(coord)?;
+        let adj = slice.bsvol(coord)?;
         Ok(base + &adj)
     }
 
@@ -39,7 +40,7 @@ impl<V: Real, S: VolCurve<Value = V>> VolCurveAdjust<V> for Bump<S> {
         let adj = slice.bsvol_der(coord)?;
 
         Ok(StrikeDer {
-            vol: (base.vol.sqrt() + &adj.vol.sqrt()).powi(2),
+            vol: base.vol + &adj.vol,
             dvdy: base.dvdy + &adj.dvdy,
             d2vdy2: base.d2vdy2 + &adj.d2vdy2,
         })

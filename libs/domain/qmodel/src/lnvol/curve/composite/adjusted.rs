@@ -1,3 +1,5 @@
+use qfincore::{daycount::Act365f, Volatility};
+
 use crate::lnvol::{
     curve::{adjust::VolCurveAdjust, StrikeDer, VolCurve},
     LnCoord,
@@ -16,12 +18,15 @@ impl<S: VolCurve, A: VolCurveAdjust<S::Value>> VolCurve for Adjusted<S, A> {
     type Value = S::Value;
 
     #[inline]
-    fn bs_totalvol(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value> {
+    fn bsvol(
+        &self,
+        coord: &LnCoord<Self::Value>,
+    ) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
         let slice = _Adj {
             base: &self.base,
             adjust: &self.adjust,
         };
-        slice.bs_totalvol(coord)
+        slice.bsvol(coord)
     }
 
     #[inline]
@@ -43,7 +48,10 @@ impl<'a, S: VolCurve, A: VolCurveAdjust<S::Value>> VolCurve for _Adj<'a, S, A> {
     type Value = S::Value;
 
     #[inline]
-    fn bs_totalvol(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<Self::Value> {
+    fn bsvol(
+        &self,
+        coord: &LnCoord<Self::Value>,
+    ) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
         match self.adjust.split_last() {
             Some((last, rest)) => {
                 let slice = _Adj {
@@ -52,7 +60,7 @@ impl<'a, S: VolCurve, A: VolCurveAdjust<S::Value>> VolCurve for _Adj<'a, S, A> {
                 };
                 last.adjusted_bsvol(&slice, coord)
             }
-            None => self.base.bs_totalvol(coord),
+            None => self.base.bsvol(coord),
         }
     }
 

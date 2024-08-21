@@ -55,7 +55,7 @@ use crate::daycount::{StateLessYearFrac, YearFrac};
 /// let _ = y1 + y2; // panics
 /// ```
 ///
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct Volatility<Dcf, V> {
     pub day_count: Dcf,
     pub value: V,
