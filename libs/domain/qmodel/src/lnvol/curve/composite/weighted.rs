@@ -1,5 +1,6 @@
 use qfincore::{daycount::Act365f, Volatility};
 use qmath::{ext::num::Zero, num::Scalar};
+use schemars::schema::SchemaObject;
 
 use crate::lnvol::{
     curve::{StrikeDer, VolCurve},
@@ -11,9 +12,12 @@ use crate::lnvol::{
 // -----------------------------------------------------------------------------
 #[derive(Clone, Debug, PartialEq)]
 pub struct Weighted<S> {
-    pub components: Vec<(S, f64)>,
+    components: Vec<(S, f64)>,
 }
 
+//
+// serde
+//
 impl<S: serde::Serialize> serde::Serialize for Weighted<S> {
     fn serialize<Se>(&self, serializer: Se) -> Result<Se::Ok, Se::Error>
     where
@@ -60,15 +64,71 @@ where
             components: Vec<Component<S>>,
         }
         let Components { components } = Components::deserialize(deserializer)?;
-        Ok(Weighted {
-            components: components
+        Self::new(
+            components
                 .into_iter()
                 .map(|c| (c.slice, c.weight))
                 .collect(),
-        })
+        )
+        .map_err(serde::de::Error::custom)
     }
 }
 
+impl<S> schemars::JsonSchema for Weighted<S>
+where
+    S: schemars::JsonSchema,
+{
+    fn schema_name() -> String {
+        format!("Weighted_for_{}", S::schema_name())
+    }
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        format!(
+            "qmodel::lnvol::curve::composite::Weighted<{}>",
+            S::schema_id()
+        )
+        .into()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        #[derive(schemars::JsonSchema)]
+        #[allow(dead_code)]
+        struct Item<S> {
+            slice: S,
+            weight: f64,
+        }
+        let res = SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::Array.into()),
+            array: Some(Box::new(schemars::schema::ArrayValidation {
+                items: Some(schemars::schema::SingleOrVec::Single(Box::new(
+                    Item::<S>::json_schema(gen),
+                ))),
+                min_items: Some(1),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+        res.into()
+    }
+}
+
+//
+// ctor
+//
+impl<S> Weighted<S> {
+    #[inline]
+    pub fn new(components: Vec<(S, f64)>) -> anyhow::Result<Self> {
+        anyhow::ensure!(!components.is_empty(), "components must not be empty");
+        anyhow::ensure!(
+            components.iter().all(|(_, weight)| 0.0 <= *weight),
+            "weights must be non-negative"
+        );
+        Ok(Self { components })
+    }
+}
+
+//
+// methods
+//
 impl<S: VolCurve> VolCurve for Weighted<S> {
     type Value = S::Value;
 
@@ -83,8 +143,8 @@ impl<S: VolCurve> VolCurve for Weighted<S> {
             let value = slice.bsvol(coord)?.value;
             sum += &(value * &weight);
         }
-        Ok(qfincore::Volatility {
-            day_count: qfincore::daycount::Act365f,
+        Ok(Volatility {
+            day_count: Act365f,
             value: sum,
         })
     }

@@ -39,3 +39,20 @@ pub trait VolCurve {
     /// Calculate 0th, 1st, and 2nd derivative of volatility at the given log money-ness
     fn bsvol_der(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<StrikeDer<Self::Value>>;
 }
+
+impl<S: VolCurve> VolCurve for Box<S> {
+    type Value = S::Value;
+
+    #[inline]
+    fn bsvol(
+        &self,
+        coord: &LnCoord<Self::Value>,
+    ) -> anyhow::Result<Volatility<Act365f, Self::Value>> {
+        (**self).bsvol(coord)
+    }
+
+    #[inline]
+    fn bsvol_der(&self, coord: &LnCoord<Self::Value>) -> anyhow::Result<StrikeDer<Self::Value>> {
+        (**self).bsvol_der(coord)
+    }
+}
