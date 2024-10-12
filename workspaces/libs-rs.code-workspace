@@ -30,7 +30,10 @@
     "yaml.format.enable": true,
     "yaml.hover": true,
     "yaml.schemas": {},
-    "yaml.validate": true
+    "yaml.validate": true,
+    "terminal.integrated.env.osx": {
+      "PATH": "${workspaceRoot}/target/debug:${env:PATH}"
+    }
   },
   "tasks": {
     "version": "2.0.0",

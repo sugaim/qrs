@@ -16,7 +16,7 @@ struct _GradCollect<'a, V> {
     grads: &'a mut Vec<V>,
 }
 
-impl<'a, K, V> _BackProp<K, V> for _GradCollect<'a, V>
+impl<K, V> _BackProp<K, V> for _GradCollect<'_, V>
 where
     V: Real,
 {
