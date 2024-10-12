@@ -40,7 +40,7 @@ struct _AdjCurve<'a, C, V> {
     adjustment: &'a [V],
 }
 
-impl<'a, C, V> YieldCurve for _AdjCurve<'a, C, V>
+impl<C, V> YieldCurve for _AdjCurve<'_, C, V>
 where
     C: YieldCurve,
     V: YieldCurveAdj<C::Value>,
