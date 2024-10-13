@@ -1,6 +1,6 @@
 use qchrono::timepoint::DateTime;
 use qfincore::{CcyPair, FxRate};
-use qmath::num::Real;
+use qmath::num::{Positive, Real};
 
 use super::super::spot::FxSpot;
 
@@ -21,7 +21,7 @@ pub trait FxFwd {
     /// So returns spot rate if the target date is the spot date.
     fn forward_of(
         &self,
-        spot_rate: &Self::Value,
+        spot_rate: &Positive<Self::Value>,
         spot_date: &DateTime,
         tgt: &DateTime,
     ) -> anyhow::Result<FxRate<Self::Value>>;
@@ -43,7 +43,7 @@ pub trait FxFwd {
     /// spot date matches with the one of the argument spot).
     fn fwdspot_of(
         &self,
-        spot_rate: &Self::Value,
+        spot_rate: &Positive<Self::Value>,
         spot_date: &DateTime,
         tgt: &DateTime,
     ) -> anyhow::Result<FxRate<Self::Value>>;

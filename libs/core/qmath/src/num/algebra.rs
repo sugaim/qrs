@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::{
+    fmt::Display,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 use num::{One, Zero};
 
@@ -184,6 +187,6 @@ impl<T> Scalar for T where
 /// Trait for real numbers.
 /// We consider a type `T` as a real number if it is a scalar on a 1-dim line.
 /// Hence, this trait requires total ordering in addition to scalar requirements.
-pub trait Real: Scalar + PartialOrd + Erf<Output = Self> {}
+pub trait Real: Scalar + PartialOrd + Erf<Output = Self> + Display {}
 
-impl<T> Real for T where T: Scalar + PartialOrd + Erf<Output = Self> {}
+impl<T> Real for T where T: Scalar + PartialOrd + Erf<Output = Self> + Display {}
