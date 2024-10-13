@@ -17,14 +17,14 @@ pub struct Act365f;
 // ser/de
 //
 impl serde::Serialize for Act365f {
-    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
-        _serializer.serialize_str("act365f")
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str("act365f")
     }
 }
 
 impl<'de> serde::Deserialize<'de> for Act365f {
-    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
-        let s: &str = serde::Deserialize::deserialize(_deserializer)?;
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s: &str = serde::Deserialize::deserialize(deserializer)?;
         if s == "act365f" {
             Ok(Act365f)
         } else {

@@ -3,7 +3,7 @@ use qfincore::{
     fxmkt::{FxSpotMkt, FxSpotMktSrc},
     CcyPair, FxRate,
 };
-use qmath::num::Real;
+use qmath::num::{Positive, Real};
 use qproduct::Collateral;
 
 use crate::{
@@ -41,22 +41,25 @@ impl<V: Real> FxFwd for BasicFxFwd<V> {
     #[inline]
     fn forward_of(
         &self,
-        spot_rate: &Self::Value,
+        spot_rate: &Positive<Self::Value>,
         spot_date: &DateTime,
         tgt: &DateTime,
     ) -> anyhow::Result<FxRate<Self::Value>> {
         let qdisc = self.quote.discount(spot_date, tgt)?;
         let bdisc = self.base.discount(spot_date, tgt)?;
+        let spot_rate = spot_rate.as_ref();
         Ok(FxRate {
             pair: self.spot.rate.pair,
-            value: bdisc / &qdisc * spot_rate,
+            value: Positive::new(bdisc.clone() / &qdisc * spot_rate).ok_or_else(|| {
+                anyhow::anyhow!("Negative forward rate: {bdisc} / {qdisc} * {spot_rate}",)
+            })?,
         })
     }
 
     #[inline]
     fn fwdspot_of(
         &self,
-        spot_rate: &Self::Value,
+        spot_rate: &Positive<Self::Value>,
         spot_date: &DateTime,
         tgt: &DateTime,
     ) -> anyhow::Result<FxRate<V>> {
@@ -164,7 +167,7 @@ mod tests {
                         base: Ccy::USD,
                         quote: Ccy::JPY,
                     },
-                    value: 100.0,
+                    value: Positive::new(100.0).unwrap(),
                 },
             })
         }
@@ -185,7 +188,7 @@ mod tests {
                         base: Ccy::USD,
                         quote: Ccy::JPY,
                     },
-                    value: 100.0,
+                    value: Positive::new(100.0).unwrap(),
                 },
             },
             mkt: FxSpotMkt {
@@ -229,7 +232,7 @@ mod tests {
             .unwrap();
 
         let spot = fxfwd.fxspot();
-        assert_eq!(spot.rate.value, 100.0);
+        assert_eq!(spot.rate.value.into_inner(), 100.0);
         assert_eq!(
             spot.rate.pair,
             CcyPair {
@@ -276,7 +279,9 @@ mod tests {
             })
             .unwrap();
 
-        let res = fxfwd.forward_of(&spot, &spot_dt, &tgt).unwrap();
+        let res = fxfwd
+            .forward_of(&Positive::new(spot).unwrap(), &spot_dt, &tgt)
+            .unwrap();
 
         assert_eq!(
             res.pair,
@@ -285,7 +290,7 @@ mod tests {
                 quote: Ccy::JPY
             }
         );
-        approx::assert_abs_diff_eq!(res.value, expected, epsilon = 1e-10);
+        approx::assert_abs_diff_eq!(res.value.into_inner(), expected, epsilon = 1e-10);
     }
 
     #[rstest]
@@ -312,7 +317,7 @@ mod tests {
 
         let res = fxfwd.forward(&tgt).unwrap();
 
-        approx::assert_abs_diff_eq!(res.value, expected, epsilon = 1e-10);
+        approx::assert_abs_diff_eq!(res.value.into_inner(), expected, epsilon = 1e-10);
     }
 
     #[rstest]
@@ -348,7 +353,9 @@ mod tests {
             })
             .unwrap();
 
-        let res = fxfwd.fwdspot_of(&spot, &spot_dt, &tgt).unwrap();
+        let res = fxfwd
+            .fwdspot_of(&Positive::new(spot).unwrap(), &spot_dt, &tgt)
+            .unwrap();
 
         assert_eq!(
             res.pair,
@@ -357,7 +364,7 @@ mod tests {
                 quote: Ccy::JPY
             }
         );
-        approx::assert_abs_diff_eq!(res.value, expected, epsilon = 1e-10);
+        approx::assert_abs_diff_eq!(res.value.into_inner(), expected, epsilon = 1e-10);
     }
 
     #[rstest]
@@ -384,6 +391,6 @@ mod tests {
 
         let res = fxfwd.fwdspot(&tgt).unwrap();
 
-        approx::assert_abs_diff_eq!(res.value, expected, epsilon = 1e-10);
+        approx::assert_abs_diff_eq!(res.value.into_inner(), expected, epsilon = 1e-10);
     }
 }

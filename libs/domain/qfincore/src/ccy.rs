@@ -1,3 +1,5 @@
+use qmath::num::Positive;
+
 // -----------------------------------------------------------------------------
 // Ccy
 // -----------------------------------------------------------------------------
@@ -42,8 +44,11 @@ pub struct CcyPair {
 // -----------------------------------------------------------------------------
 // FxRate
 // -----------------------------------------------------------------------------
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(bound(deserialize = "Positive<V>: serde::Deserialize<'de>"))]
 pub struct FxRate<V> {
     pub pair: CcyPair,
-    pub value: V,
+    pub value: Positive<V>,
 }
