@@ -42,31 +42,9 @@
     "version": "2.0.0",
     "tasks": [
       {
-        "label": "qrs: test",
-        "group": "test",
-        "type": "cargo",
-        "command": "test",
-        "args": ["--all-features", "--workspace"],
-        "problemMatcher": ["$rustc"]
-      },
-      {
-        "label": "qrs: coverage",
-        "group": "test",
-        "type": "cargo",
-        "command": "llvm-cov",
-        "args": [
-          "--lcov",
-          "--no-cfg-coverage",
-          "--all-features",
-          "--workspace",
-          "--output-path",
-          "target/lcov.info"
-        ],
-        "problemMatcher": ["$rustc"]
-      },
-      {
         "label": "qrs: fmt",
         "group": "build",
+        "hide": true,
         "type": "cargo",
         "command": "fmt",
         "args": ["--all", "--check", "-v"],
@@ -75,6 +53,7 @@
       {
         "label": "qrs: clippy",
         "group": "build",
+        "hide": true,
         "type": "cargo",
         "command": "clippy",
         "args": [
@@ -89,13 +68,85 @@
         "dependsOn": ["qrs: fmt"]
       },
       {
-        "label": "qrs: prepush",
+        "label": "qrs: build-debug",
+        "group": "build",
+        "hide": true,
+        "type": "cargo",
+        "command": "build",
+        "args": ["--all-features", "--workspace"],
+        "problemMatcher": ["$rustc"],
+        "dependsOn": ["qrs: clippy"]
+      },
+      {
+        "label": "qrs: gen-schema",
         "group": "test",
+        "hide": true,
+        "type": "shell",
+        "command": "qrscript",
+        "args": ["gen-docs", "schema", "--auto-clean", "true"],
+        "dependsOn": ["qrs: build-debug"]
+      },
+      {
+        "label": "qrs: gen-interp-testdata",
+        "group": "test",
+        "hide": true,
+        "type": "shell",
+        "command": "qrscript",
+        "args": [
+          "gen-test-data",
+          "interp1d",
+          "--format",
+          "csv",
+          "--auto-clean",
+          "true"
+        ],
+        "dependsOn": ["qrs: build-debug"]
+      },
+      {
+        "label": "qrs: coverage",
+        "group": "test",
+        "hide": true,
+        "type": "cargo",
+        "command": "llvm-cov",
+        "args": [
+          "--lcov",
+          "--no-cfg-coverage",
+          "--all-features",
+          "--workspace",
+          "--output-path",
+          "target/lcov.info"
+        ],
+        "problemMatcher": ["$rustc"],
+        "dependsOn": ["qrs: build-debug"]
+      },
+      {
+        "label": "qrs: test-debug",
+        "group": "test",
+        "hide": true,
+        "type": "cargo",
+        "command": "test",
+        "args": ["--all-features", "--workspace"],
+        "problemMatcher": ["$rustc"],
+        "dependsOn": ["qrs: gen-interp-testdata", "qrs: gen-schema"]
+      },
+      {
+        "label": "qrs: nextest-release",
+        "group": "test",
+        "hide": true,
         "type": "cargo",
         "command": "nextest",
         "args": ["run", "--all-features", "--workspace", "--release"],
-        "dependsOn": ["qrs: clippy"],
+        "dependsOn": ["qrs: build-debug"],
         "problemMatcher": ["$rustc"]
+      },
+      {
+        "label": "qrs: test",
+        "group": "test",
+        "dependsOn": [
+          "qrs: test-debug",
+          "qrs: nextest-release",
+          "qrs: coverage"
+        ]
       }
     ]
   }
