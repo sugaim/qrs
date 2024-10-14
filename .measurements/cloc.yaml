@@ -3,27 +3,27 @@
 header : 
   cloc_url           : github.com/AlDanial/cloc
   cloc_version       : 1.90
-  elapsed_seconds    : 0.229701042175293
-  n_files            : 133
-  n_lines            : 18034
-  files_per_second   : 579.013480916221
-  lines_per_second   : 78510.7452243844
+  elapsed_seconds    : 0.220689058303833
+  n_files            : 131
+  n_lines            : 18020
+  files_per_second   : 593.595355414704
+  lines_per_second   : 81653.3458364348
   report_file        : .measurements/cloc.yaml
 'Rust' :
   nFiles: 93
-  blank: 1767
-  comment: 1428
-  code: 12260
+  blank: 1770
+  comment: 1429
+  code: 12281
 'CSV' :
   nFiles: 2
   blank: 0
   comment: 0
   code: 1204
 'JSON' :
-  nFiles: 25
+  nFiles: 23
   blank: 0
   comment: 0
-  code: 1061
+  code: 1022
 'TOML' :
   nFiles: 10
   blank: 25
@@ -40,7 +40,7 @@ header :
   comment: 0
   code: 3
 SUM: 
-  blank: 1808
-  comment: 1428
-  code: 14798
-  nFiles: 133
+  blank: 1811
+  comment: 1429
+  code: 14780
+  nFiles: 131
