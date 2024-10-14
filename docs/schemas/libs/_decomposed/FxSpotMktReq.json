@@ -3,17 +3,21 @@
   "title": "FxSpotMktReq",
   "type": "object",
   "required": [
-    "settle_cal",
-    "spot_lag"
+    "settle_calender",
+    "spot_lag",
+    "trading_calender"
   ],
   "properties": {
-    "settle_cal": {
+    "settle_calender": {
       "$ref": "./CalendarSym.json"
     },
     "spot_lag": {
       "type": "integer",
       "format": "uint8",
       "minimum": 0.0
+    },
+    "trading_calender": {
+      "$ref": "./CalendarSym.json"
     }
   }
 }

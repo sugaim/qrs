@@ -132,26 +132,35 @@
         {
           "type": "object",
           "required": [
-            "Flat"
+            "rate",
+            "type"
           ],
           "properties": {
-            "Flat": {
-              "$ref": "#/definitions/Flat_for_double"
+            "rate": {
+              "description": "Flat yield(value, not a percent nor a bps) in Act/365F.",
+              "$ref": "#/definitions/Yield_for_Act365f_and_double"
+            },
+            "type": {
+              "type": "string",
+              "const": "flat"
             }
-          },
-          "additionalProperties": false
+          }
         },
         {
           "type": "object",
           "required": [
-            "InstfwdPwconst"
+            "inst_fwd",
+            "type"
           ],
           "properties": {
-            "InstfwdPwconst": {
-              "$ref": "#/definitions/Instfwd_for_Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double"
+            "inst_fwd": {
+              "$ref": "#/definitions/Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double"
+            },
+            "type": {
+              "type": "string",
+              "const": "instfwd_pwconst"
             }
-          },
-          "additionalProperties": false
+          }
         }
       ]
     },
@@ -263,37 +272,13 @@
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|(\\+|-)\\d{2}:\\d{2}|\\[.+\\])$"
     },
-    "Flat_for_double": {
-      "type": "object",
-      "required": [
-        "rate"
-      ],
-      "properties": {
-        "rate": {
-          "description": "Flat yield(value, not a percent nor a bps) in Act/365F.",
-          "type": "number",
-          "format": "double"
-        }
-      }
-    },
-    "Instfwd_for_Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double": {
-      "type": "object",
-      "required": [
-        "inst_fwd"
-      ],
-      "properties": {
-        "inst_fwd": {
-          "$ref": "#/definitions/Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double"
-        }
-      }
-    },
     "Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double": {
       "type": "object",
       "required": [
-        "data"
+        "interpolatee"
       ],
       "properties": {
-        "data": {
+        "interpolatee": {
           "$ref": "#/definitions/SizeEnsured2_for_FlatMap_for_DateTime_and_Yield_for_Act365f_and_double"
         }
       }

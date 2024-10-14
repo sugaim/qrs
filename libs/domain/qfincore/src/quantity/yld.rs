@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use qchrono::{duration::Duration, ext::chrono::Datelike};
 use qmath::num::{Arithmetic, FloatBased, Real, Scalar};
 
-use crate::daycount::{Act365f, StateLessYearFrac, YearFrac};
+use crate::daycount::{Act360, Act365f, YearFrac};
 
 // -----------------------------------------------------------------------------
 // Yield
@@ -59,6 +59,16 @@ pub struct Yield<Dcf, V> {
     pub value: V,
 }
 
+impl<V: Arithmetic> From<V> for Yield<Act365f, V> {
+    #[inline]
+    fn from(value: V) -> Self {
+        Self {
+            day_count: Act365f,
+            value,
+        }
+    }
+}
+
 //
 // comp
 //
@@ -108,7 +118,7 @@ impl<Dcf, V> Yield<Dcf, V> {
     }
 }
 
-impl<Dcf: Debug + Eq + StateLessYearFrac, V: Arithmetic> qmath::ext::num::Zero for Yield<Dcf, V> {
+impl<Dcf: Debug + Eq + Default, V: Arithmetic> qmath::ext::num::Zero for Yield<Dcf, V> {
     #[inline]
     fn zero() -> Self {
         Self {
@@ -243,6 +253,16 @@ impl<V: Scalar> std::ops::Mul<Duration> for Yield<Act365f, V> {
     #[inline]
     fn mul(self, rhs: Duration) -> Self::Output {
         let dcf = rhs.approx_secs() / (24.0 * 60.0 * 60.0 * 365.0);
+        self.value * &V::nearest_value_of_f64(dcf)
+    }
+}
+
+impl<V: Scalar> std::ops::Mul<Duration> for Yield<Act360, V> {
+    type Output = V;
+
+    #[inline]
+    fn mul(self, rhs: Duration) -> Self::Output {
+        let dcf = rhs.approx_secs() / (24.0 * 60.0 * 60.0 * 360.0);
         self.value * &V::nearest_value_of_f64(dcf)
     }
 }

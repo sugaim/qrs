@@ -71,14 +71,14 @@ mod tests {
         fn get_curve(&self, req: &str) -> anyhow::Result<Self::Curve> {
             let num: f64 = req.parse()?;
             Ok(Flat {
-                rate: self.unit * num,
+                rate: (self.unit * num).into(),
             })
         }
     }
 
     #[test]
     fn test_discount() {
-        let crv = Flat { rate: 0.05 };
+        let crv = Flat { rate: 0.05.into() };
         let from = "2021-01-01T00:00:00Z".parse().unwrap();
         let to = "2021-01-31T00:00:00Z".parse().unwrap();
 
@@ -96,7 +96,7 @@ mod tests {
 
         let curve = src.get_composite_curve(req).unwrap();
 
-        assert_eq!(curve, Composite::Atom(Flat { rate: 0.04 }));
+        assert_eq!(curve, Composite::Atom(Flat { rate: 0.04.into() }));
     }
 
     #[test]
@@ -107,7 +107,7 @@ mod tests {
                 name: "2".to_string(),
             }),
             adjustment: vec![Bump {
-                adjuster: Flat { rate: 0.03 },
+                adjuster: Flat { rate: 0.03.into() },
             }],
         });
 
@@ -116,9 +116,9 @@ mod tests {
         assert_eq!(
             curve,
             Composite::Adjusted(Adjusted {
-                curve: Box::new(Composite::Atom(Flat { rate: 0.04 })),
+                curve: Box::new(Composite::Atom(Flat { rate: 0.04.into() })),
                 adjustment: vec![Bump {
-                    adjuster: Flat { rate: 0.03 }
+                    adjuster: Flat { rate: 0.03.into() }
                 }],
             })
         );
@@ -143,8 +143,8 @@ mod tests {
             curve,
             Composite::Joint(Joint {
                 switch_point: "2021-01-04T00:00:00Z".parse().unwrap(),
-                short: Box::new(Composite::Atom(Flat { rate: 0.04 })),
-                long: Box::new(Composite::Atom(Flat { rate: 0.06 })),
+                short: Box::new(Composite::Atom(Flat { rate: 0.04.into() })),
+                long: Box::new(Composite::Atom(Flat { rate: 0.06.into() })),
             })
         );
     }
@@ -175,8 +175,8 @@ mod tests {
             curve,
             Composite::Weighted(Weighted {
                 components: vec![
-                    (Box::new(Composite::Atom(Flat { rate: 0.04 })), 0.03,),
-                    (Box::new(Composite::Atom(Flat { rate: 0.06 })), 0.04,),
+                    (Box::new(Composite::Atom(Flat { rate: 0.04.into() })), 0.03,),
+                    (Box::new(Composite::Atom(Flat { rate: 0.06.into() })), 0.04,),
                 ]
             })
         );
@@ -199,10 +199,10 @@ mod tests {
                             }),
                             adjustment: vec![
                                 Bump {
-                                    adjuster: Flat { rate: 0.03 },
+                                    adjuster: Flat { rate: 0.03.into() },
                                 },
                                 Bump {
-                                    adjuster: Flat { rate: 0.04 },
+                                    adjuster: Flat { rate: 0.04.into() },
                                 },
                             ],
                         })),
@@ -227,22 +227,22 @@ mod tests {
                     (
                         Box::new(Composite::Joint(Joint {
                             switch_point: "2021-01-04T00:00:00Z".parse().unwrap(),
-                            short: Box::new(Composite::Atom(Flat { rate: 0.04 })),
+                            short: Box::new(Composite::Atom(Flat { rate: 0.04.into() })),
                             long: Box::new(Composite::Adjusted(Adjusted {
-                                curve: Box::new(Composite::Atom(Flat { rate: 0.06 })),
+                                curve: Box::new(Composite::Atom(Flat { rate: 0.06.into() })),
                                 adjustment: vec![
                                     Bump {
-                                        adjuster: Flat { rate: 0.03 },
+                                        adjuster: Flat { rate: 0.03.into() },
                                     },
                                     Bump {
-                                        adjuster: Flat { rate: 0.04 },
+                                        adjuster: Flat { rate: 0.04.into() },
                                     },
                                 ],
                             })),
                         })),
                         0.03,
                     ),
-                    (Box::new(Composite::Atom(Flat { rate: 0.08 })), 0.04,),
+                    (Box::new(Composite::Atom(Flat { rate: 0.08.into() })), 0.04,),
                 ]
             })
         );

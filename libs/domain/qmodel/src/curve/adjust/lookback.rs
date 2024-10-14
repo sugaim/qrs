@@ -61,8 +61,8 @@ mod tests {
     fn test_adj(#[case] tenor: Tenor, #[case] expected: f64) {
         let curve = Joint {
             switch_point: "2021-01-02T00:00:00Z".parse().unwrap(),
-            short: Flat { rate: 0.01 },
-            long: Flat { rate: 0.02 },
+            short: Flat { rate: 0.01.into() },
+            long: Flat { rate: 0.02.into() },
         };
         let stt = "2021-01-03T00:00:00Z".parse().unwrap();
         let end = "2021-01-05T00:00:00Z".parse().unwrap();
@@ -97,7 +97,7 @@ mod tests {
         "P1D".parse().unwrap()
     )]
     fn test_adj_err(#[case] stt: DateTime, #[case] end: DateTime, #[case] tenor: Tenor) {
-        let crv = Flat { rate: 0.01 };
+        let crv = Flat { rate: 0.01.into() };
         let adj = Lookback { tenor };
 
         let res = adj.adjusted_forward_rate(&crv, &stt, &end);

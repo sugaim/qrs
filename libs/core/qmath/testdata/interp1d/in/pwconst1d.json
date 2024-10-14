@@ -4,7 +4,7 @@
   "step": 0.01,
   "interp": {
     "type": "pw_const",
-    "data": [
+    "interpolatee": [
       {
         "key": 0.0,
         "value": 0.0

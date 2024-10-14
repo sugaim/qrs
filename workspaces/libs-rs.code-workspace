@@ -82,7 +82,7 @@
         "group": "test",
         "hide": true,
         "type": "shell",
-        "command": "qrscript",
+        "command": "target/debug/qrscript",
         "args": ["gen-docs", "schema", "--auto-clean", "true"],
         "dependsOn": ["qrs: build-debug"]
       },
@@ -91,7 +91,7 @@
         "group": "test",
         "hide": true,
         "type": "shell",
-        "command": "qrscript",
+        "command": "target/debug/qrscript",
         "args": [
           "gen-test-data",
           "interp1d",
@@ -117,7 +117,7 @@
           "target/lcov.info"
         ],
         "problemMatcher": ["$rustc"],
-        "dependsOn": ["qrs: build-debug"]
+        "dependsOn": ["qrs: gen-interp-testdata", "qrs: gen-schema"]
       },
       {
         "label": "qrs: test-debug",
@@ -136,7 +136,7 @@
         "type": "cargo",
         "command": "nextest",
         "args": ["run", "--all-features", "--workspace", "--release"],
-        "dependsOn": ["qrs: build-debug"],
+        "dependsOn": ["qrs: gen-interp-testdata", "qrs: gen-schema"],
         "problemMatcher": ["$rustc"]
       },
       {
