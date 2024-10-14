@@ -57,6 +57,7 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
+    use qchrono::timepoint::Weekday;
     use rstest::rstest;
 
     fn ymd(year: i32, month: u32, day: u32) -> Date {
@@ -69,6 +70,7 @@ mod tests {
             .with_valid_period(ymd(2000, 1, 1), ymd(2999, 12, 31))
             .with_extra_business_days(vec![])
             .with_extra_holidays(vec![ymd(2021, 1, 13)])
+            .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
             .build()
             .unwrap();
         Bd252 {

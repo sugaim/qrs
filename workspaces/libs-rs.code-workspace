@@ -33,6 +33,9 @@
     "yaml.validate": true,
     "terminal.integrated.env.osx": {
       "PATH": "${workspaceRoot}/target/debug:${env:PATH}"
+    },
+    "terminal.integrated.env.windows": {
+      "PATH": "${workspaceRoot}/target/debug;${env:PATH}"
     }
   },
   "tasks": {

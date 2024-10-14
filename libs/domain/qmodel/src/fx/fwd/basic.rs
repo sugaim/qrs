@@ -97,6 +97,7 @@ mod tests {
     use qchrono::{
         calendar::{Calendar, CalendarSrc, CalendarSymAtom},
         ext::chrono::NaiveDate,
+        timepoint::Weekday,
     };
     use qfincore::{fxmkt::FxSpotMktReq, Ccy};
     use rstest::rstest;
@@ -121,6 +122,7 @@ mod tests {
                 .with_extra_business_days(Default::default())
                 .with_extra_holidays(Default::default())
                 .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
                 .build()
         }
     }
@@ -197,6 +199,7 @@ mod tests {
                     .with_extra_business_days(Default::default())
                     .with_extra_holidays(Default::default())
                     .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                    .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
                     .build()
                     .unwrap(),
             },
