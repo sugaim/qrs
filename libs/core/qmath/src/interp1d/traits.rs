@@ -1,4 +1,4 @@
-use qcollections::flat_map::FlatMap;
+use qcollections::flat_dict::FlatDict;
 
 use crate::num::Func1d;
 
@@ -11,7 +11,7 @@ pub trait Interp1d {
 
     fn interp(&self, x: &Self::X) -> anyhow::Result<Self::Value>;
 
-    fn interpolatee(&self) -> &FlatMap<Self::X, Self::Value>;
+    fn interpolatee(&self) -> &FlatDict<Self::X, Self::Value>;
 }
 
 impl<I: Interp1d> Func1d<I::X> for I {
@@ -31,11 +31,11 @@ impl<I: Interp1d> Func1d<I::X> for I {
 pub trait Interp1dBuilder<X, V> {
     type Output: Interp1d<X = X, Value = V>;
 
-    fn build(self, data: FlatMap<X, V>) -> anyhow::Result<Self::Output>;
+    fn build(self, data: FlatDict<X, V>) -> anyhow::Result<Self::Output>;
 }
 
 pub trait RebuildableInterp1d: Interp1d {
     type Builder: Interp1dBuilder<Self::X, Self::Value, Output = Self>;
 
-    fn destruct(self) -> (Self::Builder, FlatMap<Self::X, Self::Value>);
+    fn destruct(self) -> (Self::Builder, FlatDict<Self::X, Self::Value>);
 }

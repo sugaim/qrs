@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AtomCurve_for_double",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "Flat"
+      ],
+      "properties": {
+        "Flat": {
+          "$ref": "./Flat_for_double.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "InstfwdPwconst"
+      ],
+      "properties": {
+        "InstfwdPwconst": {
+          "$ref": "./Instfwd_for_Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double.json"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

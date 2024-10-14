@@ -1,7 +1,7 @@
 use qchrono::timepoint::DateTime;
 use qfincore::{
     daycount::{Act365f, YearFrac},
-    Yield,
+    quantity::Yield,
 };
 use qmath::num::Scalar;
 

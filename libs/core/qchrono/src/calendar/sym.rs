@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::BTreeSet, fmt::Display, str::FromStr};
 
-use anyhow::{bail, Context};
+use anyhow::{ensure, Context};
 use qcollections::size_ensured::{NonEmpty, RequireMinSize};
 
 // -----------------------------------------------------------------------------
@@ -10,7 +10,7 @@ use qcollections::size_ensured::{NonEmpty, RequireMinSize};
 ///
 /// This is just a string with some constraints.
 /// - It should not be empty.
-/// - It should consist of alphanumeric characters and underscore.
+/// - It should consist of alphanumeric characters or underscore.
 ///
 /// This is combined to create a [`CalendarSym`].
 ///
@@ -81,22 +81,19 @@ impl<'de> serde::Deserialize<'de> for CalendarSymAtom {
 // ctors
 //
 impl CalendarSymAtom {
-    /// Create a new [`CalendarSymAtom`] from a string.]
+    /// Create a new [`CalendarSymAtom`] from a string.
     ///
     /// # Errors
     /// - If the given string is empty.
     /// - If the given string contains any non-alphanumeric characters other than underscore.
     pub fn new(name: impl Into<String>) -> Result<Self, anyhow::Error> {
         let name: String = name.into();
-        let is_ok = |c: char| c.is_ascii_alphanumeric() || c == '_';
-        if name.is_empty() {
-            bail!("Single calendar symbol should not be empty");
-        }
-        if name.chars().all(is_ok) {
-            Ok(Self(name))
-        } else {
-            bail!("Invalid calendar symbol. Only alphanumeric characters and underscore are allowed: {name}")
-        }
+        ensure!(!name.is_empty(), "Single calendar symbol must be non-empty");
+        ensure!(
+            name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            "Only alphanumeric characters and underscore are allowed: '{name}'"
+        );
+        Ok(Self(name))
     }
 }
 
@@ -385,9 +382,7 @@ impl CalendarSym {
                 set.insert(s.clone());
             }
             Self::AnyClosed(c) | Self::AllClosed(c) => {
-                for sym in c.iter() {
-                    sym.collect_leaves(set);
-                }
+                c.iter().for_each(|sym| sym.collect_leaves(set));
             }
         }
     }

@@ -1,5 +1,5 @@
 mod container;
 mod error;
 
-pub use container::FlatMap;
+pub use container::FlatDict;
 pub use error::Error;

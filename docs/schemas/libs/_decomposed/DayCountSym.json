@@ -34,7 +34,7 @@
       ],
       "properties": {
         "calendar": {
-          "$ref": "./CalendarSym.yaml"
+          "$ref": "./CalendarSym.json"
         },
         "type": {
           "type": "string",

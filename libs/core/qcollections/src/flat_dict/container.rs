@@ -5,10 +5,10 @@ use itertools::Itertools;
 use super::Error;
 
 // -----------------------------------------------------------------------------
-// FlatMap
+// FlatDict
 // -----------------------------------------------------------------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct FlatMap<K, V> {
+pub struct FlatDict<K, V> {
     ks: Vec<K>,
     vs: Vec<V>,
 }
@@ -16,7 +16,7 @@ pub struct FlatMap<K, V> {
 //
 // serde
 //
-impl<K, V> serde::Serialize for FlatMap<K, V>
+impl<K, V> serde::Serialize for FlatDict<K, V>
 where
     K: serde::Serialize,
     V: serde::Serialize,
@@ -36,7 +36,7 @@ where
     }
 }
 
-impl<'de, K, V> serde::Deserialize<'de> for FlatMap<K, V>
+impl<'de, K, V> serde::Deserialize<'de> for FlatDict<K, V>
 where
     K: serde::Deserialize<'de> + PartialOrd,
     V: serde::Deserialize<'de>,
@@ -57,7 +57,7 @@ where
     }
 }
 
-impl<K, V> schemars::JsonSchema for FlatMap<K, V>
+impl<K, V> schemars::JsonSchema for FlatDict<K, V>
 where
     K: schemars::JsonSchema,
     V: schemars::JsonSchema,
@@ -99,7 +99,7 @@ where
 //
 // ctor
 //
-impl<K, V> FlatMap<K, V> {
+impl<K, V> FlatDict<K, V> {
     #[inline]
     pub fn with_sorted(ks: Vec<K>, vs: Vec<V>) -> Result<Self, Error>
     where
@@ -119,7 +119,7 @@ impl<K, V> FlatMap<K, V> {
                 _ => (),
             }
         }
-        Ok(FlatMap { ks, vs })
+        Ok(FlatDict { ks, vs })
     }
 
     #[inline]
@@ -143,7 +143,7 @@ impl<K, V> FlatMap<K, V> {
 //
 // methods
 //
-impl<K, V> IntoIterator for FlatMap<K, V> {
+impl<K, V> IntoIterator for FlatDict<K, V> {
     type Item = (K, V);
     type IntoIter = std::iter::Zip<std::vec::IntoIter<K>, std::vec::IntoIter<V>>;
 
@@ -153,7 +153,7 @@ impl<K, V> IntoIterator for FlatMap<K, V> {
     }
 }
 
-impl<'a, K, V> IntoIterator for &'a FlatMap<K, V> {
+impl<'a, K, V> IntoIterator for &'a FlatDict<K, V> {
     type Item = (&'a K, &'a V);
     type IntoIter = std::iter::Zip<std::slice::Iter<'a, K>, std::slice::Iter<'a, V>>;
 
@@ -163,7 +163,7 @@ impl<'a, K, V> IntoIterator for &'a FlatMap<K, V> {
     }
 }
 
-impl<K, V> FlatMap<K, V> {
+impl<K, V> FlatDict<K, V> {
     #[inline]
     pub fn keys(&self) -> &[K] {
         &self.ks
@@ -270,7 +270,7 @@ mod tests {
         let ks = vec![1, 2, 3];
         let vs = vec!["a", "b", "c"];
 
-        let map = FlatMap::with_sorted(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_sorted(ks.clone(), vs.clone()).unwrap();
 
         assert_eq!(map.keys(), ks.as_slice());
         assert_eq!(map.values(), vs.as_slice());
@@ -283,7 +283,7 @@ mod tests {
         let ks: Vec<i64> = vec![];
         let vs: Vec<&'static str> = vec![];
 
-        let map = FlatMap::with_sorted(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_sorted(ks.clone(), vs.clone()).unwrap();
 
         assert_eq!(map.keys(), ks.as_slice());
         assert_eq!(map.values(), vs.as_slice());
@@ -296,7 +296,7 @@ mod tests {
         let ks = vec![1, 2];
         let vs = vec!["a", "b", "c"];
 
-        let err = FlatMap::with_sorted(ks, vs).unwrap_err();
+        let err = FlatDict::with_sorted(ks, vs).unwrap_err();
 
         assert!(matches!(err, Error::SizeMismatch { keys: 2, values: 3 }));
     }
@@ -306,7 +306,7 @@ mod tests {
         let ks = vec![1f64, f64::NAN, 3f64];
         let vs = vec!["a", "b", "c"];
 
-        let err = FlatMap::with_sorted(ks, vs).unwrap_err();
+        let err = FlatDict::with_sorted(ks, vs).unwrap_err();
 
         assert!(matches!(err, Error::Unsortable));
     }
@@ -316,7 +316,7 @@ mod tests {
         let ks = vec![1, 3, 2];
         let vs = vec!["a", "b", "c"];
 
-        let err = FlatMap::with_sorted(ks, vs).unwrap_err();
+        let err = FlatDict::with_sorted(ks, vs).unwrap_err();
 
         assert!(matches!(err, Error::Unordered));
     }
@@ -326,7 +326,7 @@ mod tests {
         let ks = vec![1, 2, 2, 3];
         let vs = vec!["a", "b", "c", "d"];
 
-        let err = FlatMap::with_sorted(ks, vs).unwrap_err();
+        let err = FlatDict::with_sorted(ks, vs).unwrap_err();
 
         assert!(matches!(err, Error::Duplicated));
     }
@@ -336,7 +336,7 @@ mod tests {
         let ks = vec![1, 3, 2];
         let vs = vec!["a", "c", "b"];
 
-        let map = FlatMap::with_data(ks, vs).unwrap();
+        let map = FlatDict::with_data(ks, vs).unwrap();
 
         assert_eq!(map.keys(), &[1, 2, 3]);
         assert_eq!(map.values(), &["a", "b", "c"]);
@@ -349,7 +349,7 @@ mod tests {
         let ks: Vec<i64> = vec![];
         let vs: Vec<&'static str> = vec![];
 
-        let map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         assert_eq!(map.keys(), ks.as_slice());
         assert_eq!(map.values(), vs.as_slice());
@@ -362,7 +362,7 @@ mod tests {
         let ks = vec![1, 2];
         let vs = vec!["a", "b", "c"];
 
-        let err = FlatMap::with_data(ks, vs).unwrap_err();
+        let err = FlatDict::with_data(ks, vs).unwrap_err();
 
         assert!(matches!(err, Error::SizeMismatch { keys: 2, values: 3 }));
     }
@@ -372,7 +372,7 @@ mod tests {
         let ks = vec![1f64, f64::NAN, 3f64];
         let vs = vec!["a", "b", "c"];
 
-        let err = FlatMap::with_data(ks, vs).unwrap_err();
+        let err = FlatDict::with_data(ks, vs).unwrap_err();
 
         assert!(matches!(err, Error::Unsortable));
     }
@@ -381,7 +381,7 @@ mod tests {
     fn test_serialize() {
         let ks = vec![1, 3, 2];
         let vs = vec!["a", "c", "b"];
-        let map = FlatMap::with_data(ks, vs).unwrap();
+        let map = FlatDict::with_data(ks, vs).unwrap();
 
         let json = serde_json::to_value(map).unwrap();
         let expected = serde_json::json!([
@@ -396,7 +396,7 @@ mod tests {
     fn test_serialize_empty() {
         let ks: Vec<i64> = vec![];
         let vs: Vec<&'static str> = vec![];
-        let map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         let json = serde_json::to_value(map).unwrap();
         let expected = serde_json::json!([]);
@@ -411,7 +411,7 @@ mod tests {
             {"key": 3, "value": "c"},
         ]);
 
-        let map: FlatMap<i64, String> = serde_json::from_value(json).unwrap();
+        let map: FlatDict<i64, String> = serde_json::from_value(json).unwrap();
 
         assert_eq!(map.keys(), &[1, 2, 3]);
         assert_eq!(map.values(), &["a", "b", "c"]);
@@ -421,7 +421,7 @@ mod tests {
     fn test_deserizlize_empty() {
         let json = serde_json::json!([]);
 
-        let map: FlatMap<i64, String> = serde_json::from_value(json).unwrap();
+        let map: FlatDict<i64, String> = serde_json::from_value(json).unwrap();
 
         assert!(map.is_empty());
     }
@@ -434,7 +434,7 @@ mod tests {
             {"key": 2, "value": "b"},
         ]);
 
-        let res = serde_json::from_value::<FlatMap<i64, String>>(json);
+        let res = serde_json::from_value::<FlatDict<i64, String>>(json);
 
         assert!(res.is_err());
     }
@@ -450,7 +450,7 @@ mod tests {
     fn test_at(#[case] size: usize, #[case] at: usize) {
         let ks = (0..size).collect::<Vec<_>>();
         let vs = (0..size).map(|i| i.to_string()).collect::<Vec<_>>();
-        let map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         let res = map.at(at);
 
@@ -472,7 +472,7 @@ mod tests {
     fn test_at_mut(#[case] size: usize, #[case] at: usize) {
         let ks = (0..size).collect::<Vec<_>>();
         let vs = (0..size).map(|i| i.to_string()).collect::<Vec<_>>();
-        let mut map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let mut map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         if at < size {
             {
@@ -497,7 +497,7 @@ mod tests {
     fn test_get(#[case] size: usize, #[case] key: usize) {
         let ks = (0..size).collect::<Vec<_>>();
         let vs = (0..size).map(|i| i.to_string()).collect::<Vec<_>>();
-        let map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         let res = map.get(&key);
 
@@ -519,7 +519,7 @@ mod tests {
     fn test_get_mut(#[case] size: usize, #[case] key: usize) {
         let ks = (0..size).collect::<Vec<_>>();
         let vs = (0..size).map(|i| i.to_string()).collect::<Vec<_>>();
-        let mut map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let mut map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         if key < size {
             {
@@ -549,7 +549,7 @@ mod tests {
     fn test_interval_index(#[case] x: f64, #[case] expected: Option<usize>) {
         let ks = vec![1.0, 2.0, 4.0, 5.0];
         let vs = vec!["a", "b", "d", "e"];
-        let map = FlatMap::with_data(ks.clone(), vs.clone()).unwrap();
+        let map = FlatDict::with_data(ks.clone(), vs.clone()).unwrap();
 
         let res = map.interval_index(&x);
 
@@ -570,8 +570,8 @@ mod tests {
     #[case(f64::INFINITY)]
     #[case(f64::NAN)]
     fn test_interval_index_err(#[case] x: f64) {
-        let empty = FlatMap::<f64, &str>::with_data(vec![], vec![]).unwrap();
-        let single = FlatMap::with_data(vec![1.0], vec!["a"]).unwrap();
+        let empty = FlatDict::<f64, &str>::with_data(vec![], vec![]).unwrap();
+        let single = FlatDict::with_data(vec![1.0], vec!["a"]).unwrap();
 
         assert_eq!(empty.interval_index(&x), None);
         assert_eq!(single.interval_index(&x), None);

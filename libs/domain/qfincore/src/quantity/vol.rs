@@ -19,7 +19,7 @@ use crate::daycount::{StateLessYearFrac, YearFrac};
 /// # Example
 /// ```
 /// use qchrono::timepoint::Date;
-/// use qfincore::{daycount::{YearFrac, Act360}, Yield};
+/// use qfincore::{daycount::{YearFrac, Act360}, quantity::Yield};
 ///
 /// let y = Yield {
 ///     day_count: Act360,
@@ -41,7 +41,7 @@ use crate::daycount::{StateLessYearFrac, YearFrac};
 /// If this is not satisfied, the calculation will panic.
 ///
 /// ```should_panic
-/// use qfincore::{daycount::{Act360, Act365f, DayCount}, Yield};
+/// use qfincore::{daycount::{Act360, Act365f, DayCount}, quantity::Yield};
 ///
 /// let y1 = Yield {
 ///     day_count: DayCount::Act360,

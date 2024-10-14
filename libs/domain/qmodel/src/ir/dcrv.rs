@@ -1,7 +1,10 @@
 use std::{fmt::Debug, sync::Arc};
 
 use qchrono::timepoint::DateTime;
-use qfincore::{daycount::Act365f, Ccy, Yield};
+use qfincore::{
+    daycount::Act365f,
+    quantity::{Ccy, Yield},
+};
 use qmath::num::Real;
 use qproduct::Collateral;
 

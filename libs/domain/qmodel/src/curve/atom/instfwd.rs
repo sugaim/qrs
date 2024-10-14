@@ -1,7 +1,7 @@
 use qchrono::timepoint::DateTime;
 use qfincore::{
     daycount::{Act365f, YearFrac},
-    Yield,
+    quantity::Yield,
 };
 use qmath::num::{Integrable1d, Real};
 
@@ -47,7 +47,7 @@ mod tests {
     use qchrono::timepoint::DateTime;
     use qfincore::{
         daycount::{Act365f, YearFrac},
-        Yield,
+        quantity::Yield,
     };
     use qmath::num::{Func1d, Integrable1d};
     use rstest::rstest;

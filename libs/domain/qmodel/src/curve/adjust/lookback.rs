@@ -1,5 +1,5 @@
 use qchrono::{duration::Tenor, ext::chrono::offset::LocalResult, timepoint::DateTime};
-use qfincore::{daycount::Act365f, Yield};
+use qfincore::{daycount::Act365f, quantity::Yield};
 use qmath::num::Real;
 
 use crate::curve::YieldCurve;

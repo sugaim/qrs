@@ -1,6 +1,6 @@
 {
   "title": "Yield_for_Act365f_and_double",
-  "description": "A change ratio of a value over a year.\n\nThe dimension of this struct is 1/T, where T is a time unit. Concrete unit of T is determined by the day count fraction and we can recover the change ratio (not a percent nor a bps) between two dates by multiplying the year fraction calculated with the given day count fraction.\n\n# Example ``` use qchrono::timepoint::Date; use qfincore::{daycount::{YearFrac, Act360}, Yield};\n\nlet y = Yield { day_count: Act360, value: 0.02, };\n\nlet stt: Date = \"2021-01-01\".parse().unwrap(); let end: Date = \"2021-01-31\".parse().unwrap();\n\nlet ratio = y.to_ratio(&stt, &end).unwrap(); assert_eq!(ratio, 0.02 * 30. / 360.); ```\n\n# Panics\n\nAlghough this struct allows arithmetic operations, we need to check that two [Yield] instances have the same day count fraction to make the calculation consistent. If this is not satisfied, the calculation will panic.\n\n```should_panic use qfincore::{daycount::{Act360, Act365f, DayCount}, Yield};\n\nlet y1 = Yield { day_count: DayCount::Act360, value: 0.01, }; let y2 = Yield { day_count: DayCount::Act365f, value: 0.02, };\n\nlet _ = y1 + y2; // panics ```",
+  "description": "A change ratio of a value over a year.\n\nThe dimension of this struct is 1/T, where T is a time unit. Concrete unit of T is determined by the day count fraction and we can recover the change ratio (not a percent nor a bps) between two dates by multiplying the year fraction calculated with the given day count fraction.\n\n# Example ``` use qchrono::timepoint::Date; use qfincore::{daycount::{YearFrac, Act360}, quantity::Yield};\n\nlet y = Yield { day_count: Act360, value: 0.02, };\n\nlet stt: Date = \"2021-01-01\".parse().unwrap(); let end: Date = \"2021-01-31\".parse().unwrap();\n\nlet ratio = y.to_ratio(&stt, &end).unwrap(); assert_eq!(ratio, 0.02 * 30. / 360.); ```\n\n# Panics\n\nAlghough this struct allows arithmetic operations, we need to check that two [Yield] instances have the same day count fraction to make the calculation consistent. If this is not satisfied, the calculation will panic.\n\n```should_panic use qfincore::{daycount::{Act360, Act365f, DayCount}, quantity::Yield};\n\nlet y1 = Yield { day_count: DayCount::Act360, value: 0.01, }; let y2 = Yield { day_count: DayCount::Act365f, value: 0.02, };\n\nlet _ = y1 + y2; // panics ```",
   "type": "object",
   "required": [
     "day_count",
@@ -8,7 +8,7 @@
   ],
   "properties": {
     "day_count": {
-      "$ref": "./Act365f.yaml"
+      "$ref": "./Act365f.json"
     },
     "value": {
       "type": "number",

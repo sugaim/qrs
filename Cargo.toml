@@ -33,7 +33,6 @@ libm = { version = "0.2" }
 log = { version = "0.4" }
 maplit = { version = "1.0" }
 mockall = { version = "0.13" }
-moka = { version = "0.12", features = ["sync"] }
 num = { version = "0.4" }
 ordered-float = { version = "4.2" }
 peg = { version = "0.8" }

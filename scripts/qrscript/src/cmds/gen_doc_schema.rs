@@ -124,7 +124,7 @@ impl<T: JsonSchema> ISchemaItem for SchemaItem<T> {
 fn get_schema_items() -> Vec<Box<dyn ISchemaItem>> {
     vec![
         SchemaItem::<qchrono::calendar::Calendar>::create(),
-        SchemaItem::<qfincore::Ccy>::create(),
+        SchemaItem::<qfincore::quantity::Ccy>::create(),
         SchemaItem::<qmodel::curve::composite::CompositeReq<qmodel::curve::adjust::Adj<f64>>>::create(),
         SchemaItem::<qmodel::curve::atom::Atom<f64>>::create(),
         SchemaItem::<qfincore::daycount::DayCountSym>::create(),
@@ -147,7 +147,7 @@ fn gen_schema(remove_defs: bool) -> anyhow::Result<SchemaCollector> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeSet, HashMap};
 
     use super::*;
 
@@ -189,7 +189,7 @@ mod tests {
             let schemas = gen_schema(true);
             assert!(schemas.is_ok(), "Failed to generate schema");
             let schemas = schemas.unwrap();
-            let mut res = HashMap::default();
+            let mut res = HashMap::new();
             for (name, sch) in &schemas.definitions {
                 let j = serde_json::to_value(sch);
                 assert!(j.is_ok(), "Failed to serialize schema: {:?}", j);
@@ -202,6 +202,14 @@ mod tests {
             }
             res
         };
-        assert!(expected == generated);
+        assert_eq!(
+            expected.keys().collect::<BTreeSet<_>>(),
+            generated.keys().collect::<BTreeSet<_>>()
+        );
+        for name in expected.keys() {
+            let expected = expected.get(name).unwrap();
+            let generated = generated.get(name).unwrap();
+            assert_eq!(expected, generated, "Mismatched schema: {:?}", name);
+        }
     }
 }

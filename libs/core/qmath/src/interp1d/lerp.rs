@@ -3,7 +3,7 @@ use std::ops::{Div, Sub};
 use anyhow::{anyhow, Context};
 use num::{One, Zero};
 use qcollections::{
-    flat_map::FlatMap,
+    flat_dict::FlatDict,
     size_ensured::{RequireMinSize, SizeEnsured},
 };
 
@@ -19,12 +19,12 @@ use super::{Interp1d, Interp1dBuilder, RebuildableInterp1d};
     deserialize = "X: PartialOrd + serde::Deserialize<'de>, V: serde::Deserialize<'de>"
 ))]
 pub struct Lerp1d<X, V> {
-    data: SizeEnsured<FlatMap<X, V>, 2>,
+    data: SizeEnsured<FlatDict<X, V>, 2>,
 }
 
 impl<X, V> Lerp1d<X, V> {
     #[inline]
-    pub fn new(data: SizeEnsured<FlatMap<X, V>, 2>) -> Self {
+    pub fn new(data: SizeEnsured<FlatDict<X, V>, 2>) -> Self {
         Lerp1d { data }
     }
 }
@@ -38,7 +38,7 @@ where
     type Value = V;
 
     #[inline]
-    fn interpolatee(&self) -> &FlatMap<Self::X, Self::Value> {
+    fn interpolatee(&self) -> &FlatDict<Self::X, Self::Value> {
         &self.data
     }
 
@@ -144,7 +144,7 @@ where
     type Builder = Lerp1dBuilder;
 
     #[inline]
-    fn destruct(self) -> (Self::Builder, FlatMap<Self::X, Self::Value>) {
+    fn destruct(self) -> (Self::Builder, FlatDict<Self::X, Self::Value>) {
         (Lerp1dBuilder, self.data.into_inner())
     }
 }
@@ -163,7 +163,7 @@ where
     type Output = Lerp1d<X, V>;
 
     #[inline]
-    fn build(self, data: FlatMap<X, V>) -> anyhow::Result<Self::Output> {
+    fn build(self, data: FlatDict<X, V>) -> anyhow::Result<Self::Output> {
         let data = data.require_min_size().context("Building lerp")?;
         Ok(Lerp1d::new(data))
     }
@@ -227,7 +227,7 @@ mod tests {
     fn test_bulder() {
         let xs = vec![0.0, 1.0, 2.0];
         let ys = vec![0.0, 1.0, 2.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
 
         let interp = Lerp1dBuilder.build(data.clone()).unwrap();
 
@@ -238,7 +238,7 @@ mod tests {
     fn test_builder_err() {
         let xs = vec![1.0];
         let ys = vec![1.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
 
         let res = Lerp1dBuilder.build(data);
 
@@ -249,7 +249,7 @@ mod tests {
     fn test_destruct() {
         let xs = vec![0.0, 1.0, 2.0];
         let ys = vec![0.0, 1.0, 2.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
 
         let interp = Lerp1dBuilder.build(data.clone()).unwrap();
         let (builder, data) = interp.destruct();

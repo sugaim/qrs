@@ -8,8 +8,10 @@ use super::{Calendar, CalendarSym, CalendarSymAtom};
 // CalendarSrc
 // -----------------------------------------------------------------------------
 pub trait CalendarSrc {
+    /// Get an atomic calendar data.
     fn get_calendar_atom(&self, req: &CalendarSymAtom) -> anyhow::Result<Calendar>;
 
+    /// Get a calendar data. Not only atomic but also composed of multiple atomic calendars are supported.
     fn get_calendar(&self, req: &CalendarSym) -> anyhow::Result<Calendar> {
         let leaves = req
             .leaves()
