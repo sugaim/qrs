@@ -74,6 +74,7 @@ mod tests {
                 )
                 .with_extra_holidays(vec![NaiveDate::from_ymd_opt(2021, 1, 1).unwrap()])
                 .with_extra_business_days(vec![])
+                .with_holiday_weekdays(vec![chrono::Weekday::Sun, chrono::Weekday::Sat])
                 .build()
                 .unwrap(),
             CalendarSymAtom::new("NYK").unwrap() => Calendar::builder()
@@ -83,6 +84,7 @@ mod tests {
                 )
                 .with_extra_holidays(vec![NaiveDate::from_ymd_opt(2021, 1, 13).unwrap()])
                 .with_extra_business_days(vec![])
+                .with_holiday_weekdays(vec![chrono::Weekday::Sun, chrono::Weekday::Sat])
                 .build()
                 .unwrap(),
             CalendarSymAtom::new("LDN").unwrap() => Calendar::builder()
@@ -92,6 +94,7 @@ mod tests {
                 )
                 .with_extra_holidays(vec![NaiveDate::from_ymd_opt(2021, 1, 6).unwrap()])
                 .with_extra_business_days(vec![])
+                .with_holiday_weekdays(vec![chrono::Weekday::Sun, chrono::Weekday::Sat])
                 .build()
                 .unwrap(),
         };

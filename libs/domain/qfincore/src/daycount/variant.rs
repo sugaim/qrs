@@ -121,6 +121,7 @@ mod tests {
     use qchrono::{
         calendar::{Calendar, CalendarSrc, CalendarSymAtom},
         ext::chrono::NaiveDate,
+        timepoint::Weekday,
     };
 
     use super::*;
@@ -134,6 +135,7 @@ mod tests {
                     .with_extra_business_days(Default::default())
                     .with_extra_holidays(Default::default())
                     .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                    .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
                     .build(),
                 _ => Err(anyhow::anyhow!("unknown calendar")),
             }
@@ -167,6 +169,7 @@ mod tests {
                     .with_extra_business_days(Default::default())
                     .with_extra_holidays(Default::default())
                     .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+                    .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
                     .build()
                     .unwrap()
             )),
