@@ -1,0 +1,12 @@
+{
+  "title": "Instfwd_for_Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double",
+  "type": "object",
+  "required": [
+    "inst_fwd"
+  ],
+  "properties": {
+    "inst_fwd": {
+      "$ref": "./Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double.json"
+    }
+  }
+}

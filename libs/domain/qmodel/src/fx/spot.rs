@@ -1,5 +1,5 @@
 use qchrono::timepoint::DateTime;
-use qfincore::{CcyPair, FxRate};
+use qfincore::quantity::{CcyPair, FxRate};
 use qmath::num::Real;
 
 // -----------------------------------------------------------------------------

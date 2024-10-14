@@ -11,8 +11,6 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 derivative = { workspace = true }
 maplit = { workspace = true }
-moka = { workspace = true }
-num = { workspace = true }
 peg = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
@@ -20,7 +18,6 @@ schemars = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-uuid = { workspace = true }
 
 qcollections = { workspace = true }
 qmath = { workspace = true }

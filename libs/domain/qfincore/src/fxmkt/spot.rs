@@ -4,7 +4,7 @@ use qchrono::{
     timepoint::{Date, DateTime},
 };
 
-use crate::CcyPair;
+use crate::quantity::CcyPair;
 
 // -----------------------------------------------------------------------------
 // FxSpotMkt

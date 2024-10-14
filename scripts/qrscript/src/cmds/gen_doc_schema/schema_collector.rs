@@ -42,7 +42,7 @@ impl Visitor for SchemaCollector {
                     .split('/')
                     .last()
                     .expect("Reference must have a name");
-                new_ref = Some(format!("./{}.yaml", name));
+                new_ref = Some(format!("./{}.json", name));
             }
             schema.reference = new_ref;
         }

@@ -1,7 +1,7 @@
 use qchrono::timepoint::DateTime;
 use qfincore::{
     fxmkt::{FxSpotMkt, FxSpotMktSrc},
-    CcyPair, FxRate,
+    quantity::{CcyPair, FxRate},
 };
 use qmath::num::{Positive, Real};
 use qproduct::Collateral;
@@ -99,7 +99,7 @@ mod tests {
         ext::chrono::NaiveDate,
         timepoint::Weekday,
     };
-    use qfincore::{fxmkt::FxSpotMktReq, Ccy};
+    use qfincore::{fxmkt::FxSpotMktReq, quantity::Ccy};
     use rstest::rstest;
 
     use crate::{

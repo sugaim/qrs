@@ -1,2 +1,2 @@
-pub mod flat_map;
+pub mod flat_dict;
 pub mod size_ensured;

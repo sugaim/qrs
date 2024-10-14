@@ -1,3 +1,5 @@
+use qmath::ext::num::Zero;
+
 // -----------------------------------------------------------------------------
 // Duration
 // -----------------------------------------------------------------------------
@@ -157,7 +159,7 @@ impl std::ops::Div<i32> for Duration {
     }
 }
 
-impl num::Zero for Duration {
+impl Zero for Duration {
     #[inline]
     fn zero() -> Self {
         chrono::Duration::zero().into()
@@ -187,7 +189,6 @@ impl qmath::num::RelPos for Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num::Zero;
     use rstest::rstest;
 
     #[test]

@@ -1,4 +1,4 @@
-use qfincore::Ccy;
+use qfincore::quantity::Ccy;
 
 // -----------------------------------------------------------------------------
 // Collateral
@@ -46,7 +46,7 @@ impl schemars::JsonSchema for Collateral {
 }
 
 mod col_serde {
-    use qfincore::Ccy;
+    use qfincore::quantity::Ccy;
 
     #[derive(
         Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,

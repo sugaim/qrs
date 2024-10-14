@@ -29,11 +29,11 @@
         "adjustment": {
           "type": "array",
           "items": {
-            "$ref": "./Adj_for_double.yaml"
+            "$ref": "./Adj_for_double.json"
           }
         },
         "curve": {
-          "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+          "$ref": "./CompositeReq_for_Adj_for_double.json"
         },
         "type": {
           "type": "string",
@@ -52,13 +52,13 @@
       ],
       "properties": {
         "long": {
-          "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+          "$ref": "./CompositeReq_for_Adj_for_double.json"
         },
         "short": {
-          "$ref": "./CompositeReq_for_Adj_for_double.yaml"
+          "$ref": "./CompositeReq_for_Adj_for_double.json"
         },
         "switch_point": {
-          "$ref": "./DateTime.yaml"
+          "$ref": "./DateTime.json"
         },
         "type": {
           "type": "string",
@@ -76,7 +76,7 @@
         "components": {
           "type": "array",
           "items": {
-            "$ref": "./Component_for_CompositeReq_for_Adj_for_double.yaml"
+            "$ref": "./Component_for_CompositeReq_for_Adj_for_double.json"
           }
         },
         "type": {

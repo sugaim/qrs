@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use qchrono::timepoint::DateTime;
-use qfincore::{daycount::Act365f, Yield};
+use qfincore::{daycount::Act365f, quantity::Yield};
 use qmath::num::{Exp, Real};
 
 // -----------------------------------------------------------------------------

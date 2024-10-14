@@ -1,5 +1,5 @@
 use qchrono::timepoint::DateTime;
-use qfincore::{daycount::Act365f, Yield};
+use qfincore::{daycount::Act365f, quantity::Yield};
 
 use super::super::{adjust::YieldCurveAdj, YieldCurve};
 

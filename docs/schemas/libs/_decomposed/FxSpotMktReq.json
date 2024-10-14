@@ -8,7 +8,7 @@
   ],
   "properties": {
     "settle_cal": {
-      "$ref": "./CalendarSym.yaml"
+      "$ref": "./CalendarSym.json"
     },
     "spot_lag": {
       "type": "integer",

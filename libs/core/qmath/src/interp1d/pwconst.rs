@@ -3,7 +3,7 @@ use std::ops::{Div, Mul, Sub};
 use anyhow::{anyhow, Context};
 use num::Zero;
 use qcollections::{
-    flat_map::FlatMap,
+    flat_dict::FlatDict,
     size_ensured::{RequireMinSize, SizeEnsured, SizedContainer},
 };
 
@@ -19,12 +19,12 @@ use super::{Interp1d, Interp1dBuilder, RebuildableInterp1d};
     deserialize = "X: PartialOrd + serde::Deserialize<'de>, V: serde::Deserialize<'de>"
 ))]
 pub struct Pwconst1d<X, V> {
-    data: SizeEnsured<FlatMap<X, V>, 2>,
+    data: SizeEnsured<FlatDict<X, V>, 2>,
 }
 
 impl<X, V> Pwconst1d<X, V> {
     #[inline]
-    pub fn new(data: SizeEnsured<FlatMap<X, V>, 2>) -> Self {
+    pub fn new(data: SizeEnsured<FlatDict<X, V>, 2>) -> Self {
         Pwconst1d { data }
     }
 }
@@ -38,7 +38,7 @@ where
     type Value = V;
 
     #[inline]
-    fn interpolatee(&self) -> &FlatMap<Self::X, Self::Value> {
+    fn interpolatee(&self) -> &FlatDict<Self::X, Self::Value> {
         &self.data
     }
 
@@ -157,7 +157,7 @@ where
     type Builder = Pwconst1dBuilder;
 
     #[inline]
-    fn destruct(self) -> (Self::Builder, FlatMap<Self::X, Self::Value>) {
+    fn destruct(self) -> (Self::Builder, FlatDict<Self::X, Self::Value>) {
         (Pwconst1dBuilder, self.data.into_inner())
     }
 }
@@ -176,7 +176,7 @@ where
     type Output = Pwconst1d<X, V>;
 
     #[inline]
-    fn build(self, data: FlatMap<X, V>) -> anyhow::Result<Self::Output> {
+    fn build(self, data: FlatDict<X, V>) -> anyhow::Result<Self::Output> {
         let data = data.require_min_size().context("Building pwconst interp")?;
         Ok(Pwconst1d::new(data))
     }
@@ -240,7 +240,7 @@ mod tests {
     fn test_bulder() {
         let xs = vec![0.0, 1.0, 2.0];
         let ys = vec![0.0, 1.0, 2.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
 
         let interp = Pwconst1dBuilder.build(data.clone()).unwrap();
 
@@ -251,7 +251,7 @@ mod tests {
     fn test_builder_err() {
         let xs = vec![1.0];
         let ys = vec![1.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
 
         let res = Pwconst1dBuilder.build(data);
 
@@ -262,7 +262,7 @@ mod tests {
     fn test_destruct() {
         let xs = vec![0.0, 1.0, 2.0];
         let ys = vec![0.0, 1.0, 2.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
 
         let interp = Pwconst1dBuilder.build(data.clone()).unwrap();
         let (builder, data) = interp.destruct();
@@ -286,7 +286,7 @@ mod tests {
     fn test_integrate(#[case] from: f64, #[case] to: f64, #[case] expected: f64) {
         let xs = vec![0.0, 1.0, 2.0, 3.0];
         let ys = vec![2.0, 1.0, 3.0, 1.0];
-        let data = FlatMap::with_data(xs, ys).unwrap();
+        let data = FlatDict::with_data(xs, ys).unwrap();
         let interp = Pwconst1dBuilder.build(data).unwrap();
 
         let res = interp.integrate(&from, &to).unwrap();

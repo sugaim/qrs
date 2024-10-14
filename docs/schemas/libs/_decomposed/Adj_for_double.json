@@ -9,7 +9,7 @@
       ],
       "properties": {
         "adjuster": {
-          "$ref": "./Atom_for_double.yaml"
+          "$ref": "./AtomCurve_for_double.json"
         },
         "type": {
           "type": "string",
@@ -25,7 +25,7 @@
       ],
       "properties": {
         "tenor": {
-          "$ref": "./Tenor.yaml"
+          "$ref": "./Tenor.json"
         },
         "type": {
           "type": "string",
