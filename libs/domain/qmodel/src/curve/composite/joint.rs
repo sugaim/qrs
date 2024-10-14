@@ -78,8 +78,8 @@ mod tests {
     #[case("2021-01-02T00:00:00Z".parse().unwrap(), "2021-01-03T00:00:00Z".parse().unwrap(), 0.02)]
     fn test_forward_rate(#[case] stt: DateTime, #[case] end: DateTime, #[case] expected: f64) {
         let curve = Joint {
-            short: Flat { rate: 0.01 },
-            long: Flat { rate: 0.02 },
+            short: Flat { rate: 0.01.into() },
+            long: Flat { rate: 0.02.into() },
             switch_point: "2021-01-02T00:00:00Z".parse().unwrap(),
         };
 

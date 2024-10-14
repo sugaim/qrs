@@ -5,26 +5,35 @@
     {
       "type": "object",
       "required": [
-        "Flat"
+        "rate",
+        "type"
       ],
       "properties": {
-        "Flat": {
-          "$ref": "./Flat_for_double.json"
+        "rate": {
+          "description": "Flat yield(value, not a percent nor a bps) in Act/365F.",
+          "$ref": "./Yield_for_Act365f_and_double.json"
+        },
+        "type": {
+          "type": "string",
+          "const": "flat"
         }
-      },
-      "additionalProperties": false
+      }
     },
     {
       "type": "object",
       "required": [
-        "InstfwdPwconst"
+        "inst_fwd",
+        "type"
       ],
       "properties": {
-        "InstfwdPwconst": {
-          "$ref": "./Instfwd_for_Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double.json"
+        "inst_fwd": {
+          "$ref": "./Pwconst1d_for_DateTime_and_Yield_for_Act365f_and_double.json"
+        },
+        "type": {
+          "type": "string",
+          "const": "instfwd_pwconst"
         }
-      },
-      "additionalProperties": false
+      }
     }
   ]
 }

@@ -51,6 +51,7 @@ mod col_serde {
     #[derive(
         Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
     )]
+    #[serde(rename_all = "snake_case", tag = "type")]
     pub(super) enum Collateral {
         Ccy { ccy: Ccy },
     }

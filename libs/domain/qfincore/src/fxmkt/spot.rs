@@ -13,6 +13,7 @@ use crate::quantity::CcyPair;
 pub struct FxSpotMkt {
     pub spot_lag: u8,
     pub settle_cal: Calendar,
+    pub trading_cal: Calendar,
 }
 
 impl FxSpotMkt {
@@ -65,7 +66,10 @@ impl FxSpotMkt {
 )]
 pub struct FxSpotMktReq {
     pub spot_lag: u8,
+    #[serde(rename = "settle_calender")]
     pub settle_cal: CalendarSym,
+    #[serde(rename = "trading_calender")]
+    pub trading_cal: CalendarSym,
 }
 
 pub trait FxSpotMktSrc: CalendarSrc {
@@ -73,10 +77,10 @@ pub trait FxSpotMktSrc: CalendarSrc {
 
     fn get_fxspot_mkt(&self, pair: &CcyPair) -> anyhow::Result<FxSpotMkt> {
         let req = self.resolve_fxmkt(pair)?;
-        let settle_cal = self.get_calendar(&req.settle_cal)?;
         Ok(FxSpotMkt {
             spot_lag: req.spot_lag,
-            settle_cal,
+            settle_cal: self.get_calendar(&req.settle_cal)?,
+            trading_cal: self.get_calendar(&req.trading_cal)?,
         })
     }
 }

@@ -132,8 +132,8 @@ mod tests {
 
         fn get_curve(&self, name: &str) -> anyhow::Result<Self::Curve> {
             match name {
-                "USD" => Ok(Arc::new(Atom::Flat(Flat { rate: 0.005 }))),
-                "JPY" => Ok(Arc::new(Atom::Flat(Flat { rate: 0.001 }))),
+                "USD" => Ok(Arc::new(Atom::Flat(Flat { rate: 0.005.into() }))),
+                "JPY" => Ok(Arc::new(Atom::Flat(Flat { rate: 0.001.into() }))),
                 _ => Err(anyhow::anyhow!("Unknown curve: {}", name)),
             }
         }
@@ -155,6 +155,7 @@ mod tests {
             Ok(FxSpotMktReq {
                 spot_lag: 2,
                 settle_cal: "TKY|NYC".parse()?,
+                trading_cal: "TKY|NYC".parse()?,
             })
         }
     }
@@ -180,6 +181,13 @@ mod tests {
     #[test]
     fn test_get_basic_fxfwd() {
         let src = MockCalendarSrc;
+        let expected_cal = Calendar::builder()
+            .with_extra_business_days(Default::default())
+            .with_extra_holidays(Default::default())
+            .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
+            .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
+            .build()
+            .unwrap();
         let expected = BasicFxFwd {
             base: src.get_dcrv(&Ccy::USD, &Collateral::Ccy(Ccy::JPY)).unwrap(),
             quote: src.get_dcrv(&Ccy::JPY, &Collateral::Ccy(Ccy::JPY)).unwrap(),
@@ -195,13 +203,8 @@ mod tests {
             },
             mkt: FxSpotMkt {
                 spot_lag: 2,
-                settle_cal: Calendar::builder()
-                    .with_extra_business_days(Default::default())
-                    .with_extra_holidays(Default::default())
-                    .with_valid_period(NaiveDate::MIN, NaiveDate::MAX)
-                    .with_holiday_weekdays(vec![Weekday::Sun, Weekday::Sat])
-                    .build()
-                    .unwrap(),
+                settle_cal: expected_cal.clone(),
+                trading_cal: expected_cal.clone(),
             },
         };
 

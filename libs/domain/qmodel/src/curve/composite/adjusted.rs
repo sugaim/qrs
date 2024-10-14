@@ -122,15 +122,15 @@ mod tests {
     fn test_forward_rate_adj_order() {
         let base = Joint {
             switch_point: "2021-01-04T00:00:00Z".parse().unwrap(),
-            short: crate::curve::atom::Flat { rate: 0.01 },
-            long: crate::curve::atom::Flat { rate: 0.02 },
+            short: crate::curve::atom::Flat { rate: 0.01.into() },
+            long: crate::curve::atom::Flat { rate: 0.02.into() },
         };
         let adjs = vec![
             Adj::Lookback(Lookback {
                 tenor: Tenor::Days(1),
             }),
             Adj::Bump(Bump {
-                adjuster: Flat { rate: 0.03 },
+                adjuster: Flat { rate: 0.03.into() },
             }),
         ];
 

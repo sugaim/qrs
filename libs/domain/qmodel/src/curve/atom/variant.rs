@@ -27,6 +27,7 @@ impl<V: schemars::JsonSchema> schemars::JsonSchema for Atom<V> {
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         #[derive(schemars::JsonSchema)]
+        #[serde(tag = "type", rename_all = "snake_case")]
         #[allow(dead_code)]
         enum ForSchema<V> {
             Flat(Flat<V>),

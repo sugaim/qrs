@@ -19,6 +19,7 @@ use super::{Interp1d, Interp1dBuilder, RebuildableInterp1d};
     deserialize = "X: PartialOrd + serde::Deserialize<'de>, V: serde::Deserialize<'de>"
 ))]
 pub struct Lerp1d<X, V> {
+    #[serde(rename = "interpolatee")]
     data: SizeEnsured<FlatDict<X, V>, 2>,
 }
 

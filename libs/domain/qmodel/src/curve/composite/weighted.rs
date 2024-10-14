@@ -146,12 +146,8 @@ mod tests {
                 .into_iter()
                 .enumerate()
                 .map(|(i, weight)| {
-                    (
-                        Flat {
-                            rate: 0.01 * (i + 1) as f64,
-                        },
-                        weight,
-                    )
+                    let value = 0.01 * (i + 1) as f64;
+                    (Flat { rate: value.into() }, weight)
                 })
                 .collect(),
         };

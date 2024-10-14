@@ -10,7 +10,7 @@ use super::super::YieldCurve;
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct Flat<V> {
     /// Flat yield(value, not a percent nor a bps) in Act/365F.
-    pub rate: V,
+    pub rate: Yield<Act365f, V>,
 }
 
 //
@@ -25,9 +25,6 @@ impl<V: Real> YieldCurve for Flat<V> {
         _: &DateTime,
         _: &DateTime,
     ) -> anyhow::Result<Yield<Act365f, Self::Value>> {
-        Ok(Yield {
-            day_count: Act365f,
-            value: self.rate.clone(),
-        })
+        Ok(self.rate.clone())
     }
 }
